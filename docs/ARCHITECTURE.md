@@ -6,12 +6,12 @@
 
 The system is a local-first desktop product with an asset-generation pipeline. Data flows from a user-supplied source image through validation, digital-character generation, asset packaging, preview, and finally a desktop overlay runtime that displays and animates the pet.
 
-The first vertical slice uses Electron and TypeScript for a macOS-first desktop runtime. It loads a local `pet bundle v0.1`, validates the bundle before launch, then renders the pet in a transparent, frameless, always-on-top window. The second vertical slice adds local source-image intake. The third vertical slice routes generation through a scripted adapter that returns frame PNGs shaped like future model output, without connecting a real model provider. The real image-to-character adapter spike chooses a cloud adapter behind explicit opt-in for the first real model path, with local model mode kept behind the same adapter contract for a later slice. The current cloud scaffold uses a mock provider, opt-in gating, provider config checks, source normalization, provider error mapping, and temp cleanup. An OpenAI image provider is connected only through the guided manager's `openai_live` mode and remains disabled unless `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and per-generation UI upload confirmation are all present. The preview/QA/deletion slice adds a review layer that validates generated bundles, writes inspectable preview artifacts, accepts bundles into a local library, and deletes review or library directories within an explicit allowed root. The guided desktop UI slice adds an Electron manager window that orchestrates local image selection, local, mock-cloud, or opt-in OpenAI live generation, explicit upload confirmation, QA preview, accept/delete, and launch while the overlay runtime still consumes only validated bundles.
+The first vertical slice uses Electron and TypeScript for a macOS-first desktop runtime. It loads a local `pet bundle v0.1`, validates the bundle before launch, then renders the pet in a transparent, frameless, always-on-top window. The second vertical slice adds local source-image intake. The default local generation path now uses a deterministic, non-model stylized PNG adapter: it normalizes the selected image locally, posterizes source pixels, adds edge lines and a transparent character mask, then writes `preview.png` and `atlases/main.png`. The scripted adapter remains useful for contract tests and future model-output shims. The real image-to-character adapter spike chooses a cloud adapter behind explicit opt-in for the first real model path, with local model mode kept behind the same adapter contract for a later slice. The current cloud scaffold uses a mock provider, opt-in gating, provider config checks, source normalization, provider error mapping, and temp cleanup. An OpenAI image provider is connected only through the guided manager's `openai_live` mode and remains disabled unless `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and per-generation UI upload confirmation are all present. The preview/QA/deletion slice adds a review layer that validates generated bundles, writes inspectable preview artifacts, accepts bundles into a local library, and deletes review or library directories within an explicit allowed root. The guided desktop UI slice adds an Electron manager window that orchestrates local image selection, local deterministic generation, mock-cloud, or opt-in OpenAI live generation, explicit upload confirmation, QA preview, accept/delete, and launch while the overlay runtime still consumes only validated bundles.
 
 Initial components:
 
 - Image intake: validates file type, dimensions, consent metadata, and prepares normalized image inputs.
-- Character generation: converts the source image into a stylized digital-human or mascot design.
+- Character generation: converts the source image into a stylized digital-human or mascot design. The local MVP path is deterministic image processing, not model generation.
 - Pet asset builder: produces animation frames, sprite sheets, transparent assets, manifests, and thumbnails.
 - Preview and QA: renders generated assets for inspection before installation.
 - Desktop runtime: loads a pet bundle, renders it above the desktop, and handles idle/interaction behaviors.
@@ -33,7 +33,7 @@ Current implementation layout:
 - `src/pet_bundle/` for schemas, manifest validation, sprites, and packaging.
 - `src/intake/` for local source-image validation.
 - `src/generation/` for bundle generation, adapter contracts, and model-adapter boundaries.
-- `src/generation/adapters/` for fake/scripted adapters now and real local/cloud adapters later.
+- `src/generation/adapters/` for the deterministic local stylizer, scripted contract adapters, and real local/cloud adapters later.
 - `src/generation/normalization/` for source-derived temporary working images used by provider adapters.
 - `src/review/` for preview, QA, accept/install, and deletion workflows that consume already generated bundles.
 - `src/app/` for the guided desktop manager UI and app-level flow orchestration.
@@ -57,9 +57,11 @@ Root files should be limited to stable entrypoints, project config, and compatib
 - Use Electron for the first runtime because transparent/frameless/always-on-top windows and mouse-event forwarding are first-slice requirements.
 - Use a fixed-grid PNG sprite atlas for `pet bundle v0.1`: 256x256 frames, 4x2 atlas, `idle` and `tap_react` animations.
 - Use `pngjs` for PNG decode and `jpeg-js` for JPEG decode in local source-image intake; Node and the existing PNG-only dependency cannot fully decode JPEG inputs.
+- Use the deterministic stylized PNG adapter as the default non-model local MVP: resize to a 256x256 temporary PNG, derive colors from source pixels, posterize/edge-detect, mask to a transparent character sticker, and animate that sticker into the fixed v0.1 frame sequence.
+- Treat deterministic stylized output as a generated asset that may still preserve likeness. It is local-only and does not store the original source image, but it is not an anonymization step.
 - Adapter output is a transparent 256x256 PNG frame sequence plus preview metadata; bundle packaging converts those frames into the v0.1 atlas consumed by runtime.
 - Real cloud generation must require explicit user confirmation before upload and must not change the runtime/bundle boundary.
-- Source image normalization is a generation concern: decode, orient, strip metadata, resize, create temporary working images, then delete temporary source-derived files outside the final bundle.
+- Source image normalization is a generation concern: decode, orient, strip metadata, resize, create temporary working images, then delete temporary source-derived files outside the final bundle. Both deterministic local stylization and cloud adapters consume normalized source-derived PNGs rather than raw source paths.
 - Cloud scaffold bundles set `privacy.cloudGenerated:true`; scripted/local bundles keep it false.
 - Review artifacts are outside the pet bundle contract. Accepted bundles remain valid `pet bundle v0.1` directories without extra installation metadata files.
 - The guided app owns user workflow state and local workspace paths, but launch still hands only an accepted bundle path to the desktop runtime.

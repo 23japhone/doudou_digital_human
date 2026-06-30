@@ -63,10 +63,10 @@ export async function normalizeSourceImage(options: NormalizeSourceImageOptions)
 
 function assertNormalizableDimensions(sourceImage: SourceImageInfo): void {
   if (sourceImage.width < 16 || sourceImage.height < 16) {
-    throw new SourceImageNormalizationError("SOURCE_IMAGE_TOO_SMALL", "Source image is too small for cloud generation.");
+    throw new SourceImageNormalizationError("SOURCE_IMAGE_TOO_SMALL", "Source image is too small for generation.");
   }
   if (sourceImage.width * sourceImage.height > 4096 * 4096) {
-    throw new SourceImageNormalizationError("SOURCE_IMAGE_TOO_LARGE", "Source image is too large for cloud generation.");
+    throw new SourceImageNormalizationError("SOURCE_IMAGE_TOO_LARGE", "Source image is too large for generation.");
   }
 }
 
@@ -88,7 +88,7 @@ async function decodeSourceImage(sourceImagePath: string, mime: SourceImageInfo[
   } catch {
     throw new SourceImageNormalizationError(
       "SOURCE_IMAGE_NORMALIZATION_FAILED",
-      "Source image could not be normalized for cloud generation."
+      "Source image could not be normalized for generation."
     );
   }
 }

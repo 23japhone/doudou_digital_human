@@ -4,7 +4,7 @@ import { PNG } from "pngjs";
 import type { PetManifest } from "../pet_bundle/manifest.js";
 import { validatePetBundle } from "../pet_bundle/validate.js";
 import { SourceImageIntakeError, validateSourceImage, type SourceImageInfo } from "../intake/source-image.js";
-import { createScriptedPetAdapter } from "./adapters/scripted-pet-adapter.js";
+import { createDeterministicStylizedPngAdapter } from "./adapters/deterministic-stylized-png-adapter.js";
 import type { GeneratedPetAdapterOutput, GeneratedPetFrame, PetGenerationAdapter } from "./adapters/types.js";
 import {
   normalizeSourceImage,
@@ -51,7 +51,7 @@ export async function generatePetBundleFromSource(options: GeneratePetBundleOpti
     throw new PetGenerationError("MISSING_OUTPUT_DIR", "An output bundle directory is required.");
   }
 
-  const adapter = options.adapter ?? createScriptedPetAdapter();
+  const adapter = options.adapter ?? createDeterministicStylizedPngAdapter();
   adapter.preflight?.();
 
   const sourceImage = await validateSourceImage(options.sourceImagePath);

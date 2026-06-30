@@ -21,12 +21,14 @@ describe("generatePetBundleFromSource", () => {
     const workspace = await createTempDir();
     const sourcePath = path.join(workspace, "input.png");
     const outputDir = path.join(workspace, "generated_pet");
-    const sourceBytes = createPngSource();
+    const normalizationRoot = path.join(workspace, "normalization");
+    const sourceBytes = createSplitPngSource();
     await writeFile(sourcePath, sourceBytes);
 
     const result = await generatePetBundleFromSource({
       sourceImagePath: sourcePath,
       outputBundleDir: outputDir,
+      normalizationTempRoot: normalizationRoot,
       now: fixedNow
     });
 
@@ -57,7 +59,7 @@ describe("generatePetBundleFromSource", () => {
     expect(sourceMeta).toMatchObject({
       fixture: false,
       generatedBy: "src/generation/generate-pet.ts",
-      generationAdapter: "scripted-pet-adapter",
+      generationAdapter: "deterministic-stylized-png-adapter",
       generationAdapterVersion: "0.1.0",
       sourceType: "local-image-intake",
       inputMime: "image/png",
@@ -68,6 +70,11 @@ describe("generatePetBundleFromSource", () => {
     expect(JSON.stringify(sourceMeta)).not.toContain(sourcePath);
     expect(JSON.stringify(sourceMeta)).not.toContain("prompt");
     expect(JSON.stringify(sourceMeta)).not.toContain("rawResponse");
+    await expect(readdir(normalizationRoot)).resolves.toEqual([]);
+
+    const preview = PNG.sync.read(await readFile(path.join(outputDir, "preview.png")));
+    expect(countRedPixels(preview)).toBeGreaterThan(500);
+    expect(countGreenPixels(preview)).toBeGreaterThan(500);
   });
 
   test("generates a validated v0.1 bundle from a local JPEG", async () => {
@@ -118,6 +125,8 @@ describe("generatePetBundleFromSource", () => {
     await expect(validatePetBundle(outputDir)).resolves.toMatchObject({
       manifest: expect.objectContaining({ id: "generated_local_pet" })
     });
+    const sourceMeta = JSON.parse(await readFile(path.join(outputDir, "source.meta.json"), "utf8")) as Record<string, unknown>;
+    expect(sourceMeta.generationAdapter).toBe("deterministic-stylized-png-adapter");
   });
 
   test("rejects adapter output that does not provide all required frame PNGs", async () => {
@@ -396,6 +405,46 @@ function createPngSource(width = 24, height = 24): Buffer {
     }
   }
   return PNG.sync.write(png);
+}
+
+function createSplitPngSource(width = 32, height = 32): Buffer {
+  const png = new PNG({ width, height });
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      const index = (png.width * y + x) << 2;
+      if (x < png.width / 2) {
+        png.data[index] = 230;
+        png.data[index + 1] = 60;
+        png.data[index + 2] = 50;
+      } else {
+        png.data[index] = 50;
+        png.data[index + 1] = 210;
+        png.data[index + 2] = 90;
+      }
+      png.data[index + 3] = 255;
+    }
+  }
+  return PNG.sync.write(png);
+}
+
+function countRedPixels(png: PNG): number {
+  let count = 0;
+  for (let index = 0; index < png.data.length; index += 4) {
+    if (png.data[index + 3] > 0 && png.data[index] > 160 && png.data[index + 1] < 120) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function countGreenPixels(png: PNG): number {
+  let count = 0;
+  for (let index = 0; index < png.data.length; index += 4) {
+    if (png.data[index + 3] > 0 && png.data[index + 1] > 150 && png.data[index] < 130) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 function createJpegSource(width: number, height: number): Buffer {

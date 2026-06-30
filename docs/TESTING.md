@@ -22,7 +22,7 @@
 ## Test Strategy
 
 - Unit test image validation, manifest parsing, bundle validation, and behavior state transitions.
-- Use fake/scripted model adapters for deterministic generation tests and verify adapter outputs before bundle packaging.
+- Use the deterministic stylized PNG adapter for local source-image-to-bundle tests, including source-palette evidence in generated previews. Use fake/scripted model adapters for contract tests and verify adapter outputs before bundle packaging.
 - Real cloud adapter scaffold tests use mocked provider calls only. OpenAI live-provider smoke requires explicit environment opt-in and is skipped by default. Run `npm run probe:openai-image` against a new custom endpoint before using `smoke:app:live -- --source <image-path>`.
 - Keep a tiny rights-safe golden fixture bundle for regression tests.
 - Add smoke tests for preview rendering and desktop runtime launch once a runtime stack exists.
@@ -52,7 +52,7 @@ Fixtures must be small, rights-safe, and documented.
 - Privacy-sensitive changes verify logs, fixtures, and errors do not expose source images or secrets.
 - Fixture assets must be synthetic or explicitly licensed. The current fixture is generated from simple project-owned geometric shapes.
 - Bundle validation changes must keep negative coverage for unreferenced files, source-like payloads, bad preview images, missing assets, and unsupported schema versions.
-- Generation adapter changes must cover valid frame output, missing frames, out-of-range frame indexes, bad preview assets, and sanitized provenance metadata.
+- Generation adapter changes must cover valid frame output, source-derived local stylization where applicable, missing frames, out-of-range frame indexes, bad preview assets, and sanitized provenance metadata.
 - Real adapter changes must cover cloud confirmation gating, provider config failures, source normalization cleanup, provider error mapping, live-provider env gating, `privacy.cloudGenerated`, and no leakage of raw prompts, raw responses, tokens, or source paths.
 - Review/deletion changes must cover invalid bundle rejection before artifact creation, accepted bundle validation, refusal to overwrite installs, refusal to delete outside the allowed root, and no absolute path or secret leakage in review/install records.
 - Guided UI changes must include a flow-level unit test plus an Electron smoke that proves renderer buttons can drive local or mock-cloud generate, QA, accept/delete, and launch without leaking source paths or provider secrets in smoke output.
