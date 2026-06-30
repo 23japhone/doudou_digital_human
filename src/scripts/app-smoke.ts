@@ -26,7 +26,11 @@ async function main(): Promise<void> {
     if (result.code !== 0) {
       throw new Error(`guided app smoke exited ${result.code}\n${result.output}`);
     }
-    if (result.output.includes(sourceImagePath) || result.output.includes(tempRoot)) {
+    if (
+      result.output.includes(sourceImagePath) ||
+      result.output.includes(tempRoot) ||
+      result.output.includes("secret-test-key")
+    ) {
       throw new Error(`guided app smoke leaked local paths\n${result.output}`);
     }
     const smokeResult = parseSmokeResult(result.output);
@@ -36,6 +40,9 @@ async function main(): Promise<void> {
       !smokeResult.reviewed ||
       !smokeResult.previewLoaded ||
       !smokeResult.contactSheetLoaded ||
+      smokeResult.generationMode !== "mock_cloud" ||
+      smokeResult.petId !== "generated_cloud_pet" ||
+      !smokeResult.cloudGenerated ||
       !smokeResult.accepted ||
       !smokeResult.launched ||
       !smokeResult.runtimeSmoke?.bundleLoaded ||
@@ -65,7 +72,7 @@ function runAppSmoke(sourceImagePath: string, workspaceDir: string): Promise<Spa
       workspaceDir
     ], {
       cwd: repoRoot,
-      env: { ...process.env, NODE_OPTIONS: "" },
+      env: { ...process.env, NODE_OPTIONS: "", DOUDOU_MOCK_CLOUD_API_KEY: "secret-test-key" },
       stdio: ["ignore", "pipe", "pipe"]
     });
     let output = "";

@@ -4,6 +4,11 @@ import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { generatePetBundleFromSource } from "../generation/generate-pet.js";
 import {
+  createCloudImageAdapter,
+  createMockCloudImageProvider
+} from "../generation/adapters/cloud-image-adapter.js";
+import type { PetGenerationAdapter } from "../generation/adapters/types.js";
+import {
   acceptPetBundle,
   createPetReview,
   deletePetAssets
@@ -17,6 +22,8 @@ export type GuidedPetFlowStatus =
   | "needs_review"
   | "accepted"
   | "launched";
+
+export type GuidedGenerationMode = "local" | "mock_cloud";
 
 export type GuidedPetFlowErrorCode =
   | "SOURCE_IMAGE_REQUIRED"
@@ -39,6 +46,13 @@ export interface GuidedPetFlowOptions {
   now?: Date;
   runtimeElectronPath?: string;
   runtimeMainPath?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+export interface GuidedGenerationSettings {
+  mode: GuidedGenerationMode;
+  providerId?: "mock-provider";
+  confirmCloudUpload?: boolean;
 }
 
 export interface PublicGuidedPetState {
@@ -59,6 +73,12 @@ export interface PublicGuidedPetState {
     launched: boolean;
     smokeResult?: RuntimeSmokeResult;
   } | null;
+  generation: {
+    mode: GuidedGenerationMode;
+    providerId: string | null;
+    cloudUploadConfirmed: boolean;
+    cloudProviderConfigured: boolean;
+  };
   actions: {
     canGenerate: boolean;
     canReview: boolean;
@@ -138,6 +158,12 @@ export class GuidedPetFlow {
   private readonly now?: Date;
   private readonly runtimeElectronPath: string;
   private readonly runtimeMainPath?: string;
+  private readonly env: NodeJS.ProcessEnv;
+  private generationSettings: Required<GuidedGenerationSettings> = {
+    mode: "local",
+    providerId: "mock-provider",
+    confirmCloudUpload: false
+  };
   private sourceImagePath: string | null = null;
   private sourceImageName: string | null = null;
   private status: GuidedPetFlowStatus = "idle";
@@ -156,6 +182,7 @@ export class GuidedPetFlow {
     this.now = options.now;
     this.runtimeElectronPath = options.runtimeElectronPath ?? process.execPath;
     this.runtimeMainPath = options.runtimeMainPath;
+    this.env = options.env ?? process.env;
   }
 
   async initialize(): Promise<void> {
@@ -172,10 +199,23 @@ export class GuidedPetFlow {
     return { sourceImageName: this.sourceImageName };
   }
 
+  async setGenerationSettings(settings: Partial<GuidedGenerationSettings> = {}): Promise<PublicGuidedPetState> {
+    const mode: GuidedGenerationMode = settings.mode === "mock_cloud" ? "mock_cloud" : "local";
+    this.generationSettings = {
+      mode,
+      providerId: "mock-provider",
+      confirmCloudUpload: mode === "mock_cloud" ? settings.confirmCloudUpload ?? false : false
+    };
+    this.lastError = null;
+    return this.getPublicState();
+  }
+
   async generatePet(): Promise<GenerateFlowResult> {
     if (!this.sourceImagePath) {
       throw this.setError(new GuidedPetFlowError("SOURCE_IMAGE_REQUIRED", "Select a source image before generating."));
     }
+    const adapter = this.createGenerationAdapter();
+    adapter?.preflight?.();
     if (this.draft) {
       await this.deleteDraftAssets();
     }
@@ -186,6 +226,8 @@ export class GuidedPetFlow {
     const result = await generatePetBundleFromSource({
       sourceImagePath: this.sourceImagePath,
       outputBundleDir: bundleDir,
+      normalizationTempRoot: join(runDir, "normalization"),
+      adapter,
       now: this.now
     });
     this.draft = {
@@ -337,8 +379,15 @@ export class GuidedPetFlow {
           }
         : null,
       launch: this.launch,
+      generation: {
+        mode: this.generationSettings.mode,
+        providerId: this.generationSettings.mode === "mock_cloud" ? this.generationSettings.providerId : null,
+        cloudUploadConfirmed:
+          this.generationSettings.mode === "mock_cloud" && this.generationSettings.confirmCloudUpload,
+        cloudProviderConfigured: this.isCloudProviderConfigured()
+      },
       actions: {
-        canGenerate: Boolean(this.sourceImagePath),
+        canGenerate: Boolean(this.sourceImagePath) && this.canGenerateWithCurrentSettings(),
         canReview: Boolean(this.draft),
         canAccept: Boolean(this.draft),
         canLaunch: Boolean(this.accepted),
@@ -353,6 +402,34 @@ export class GuidedPetFlow {
     this.runCounter += 1;
     const stamp = (this.now ?? new Date()).toISOString().replaceAll(/[^0-9]/g, "").slice(0, 14);
     return `run-${stamp}-${this.runCounter}`;
+  }
+
+  private createGenerationAdapter(): PetGenerationAdapter | undefined {
+    if (this.generationSettings.mode === "local") {
+      return undefined;
+    }
+    return createCloudImageAdapter({
+      confirmCloudUpload: this.generationSettings.confirmCloudUpload,
+      config: {
+        providerId: this.generationSettings.providerId,
+        apiKey: this.env.DOUDOU_MOCK_CLOUD_API_KEY
+      },
+      provider: createMockCloudImageProvider()
+    });
+  }
+
+  private canGenerateWithCurrentSettings(): boolean {
+    if (this.generationSettings.mode === "local") {
+      return true;
+    }
+    return this.generationSettings.confirmCloudUpload && this.isCloudProviderConfigured();
+  }
+
+  private isCloudProviderConfigured(): boolean {
+    if (this.generationSettings.mode === "local") {
+      return false;
+    }
+    return this.generationSettings.providerId === "mock-provider" && Boolean(this.env.DOUDOU_MOCK_CLOUD_API_KEY);
   }
 
   private async runRuntimeSmoke(bundleDir: string): Promise<RuntimeSmokeResult> {

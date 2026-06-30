@@ -4,9 +4,9 @@
 
 ## Current Phase
 
-Phase 0: project framing, first desktop runtime vertical slice, local source-image intake, scripted generation-adapter vertical slice, real image-to-character adapter design spike, cloud-adapter scaffold, preview/QA/deletion workflow, and guided desktop UI.
+Phase 0: project framing, first desktop runtime vertical slice, local source-image intake, scripted generation-adapter vertical slice, real image-to-character adapter design spike, cloud-adapter scaffold, preview/QA/deletion workflow, and guided desktop UI with mock-cloud selection.
 
-Exit criteria: Electron loads a validated `pet bundle v0.1` fixture and generated bundle, renders idle animation in a transparent desktop window, generation flows through replaceable scripted/cloud adapter boundaries, cloud scaffold uses mocked provider tests with explicit opt-in, review CLI can QA/accept/delete bundles, the guided UI can click through local generate/QA/accept/delete/launch, and validator/unit/build/runtime/app smoke checks pass.
+Exit criteria: Electron loads a validated `pet bundle v0.1` fixture and generated bundle, renders idle animation in a transparent desktop window, generation flows through replaceable scripted/cloud adapter boundaries, cloud scaffold uses mocked provider tests with explicit opt-in, review CLI can QA/accept/delete bundles, the guided UI can click through mock-cloud generate/QA/accept/delete/launch with explicit confirmation, and validator/unit/build/runtime/app smoke checks pass.
 
 ## Next Vertical Slices
 

@@ -98,6 +98,9 @@ function createWindow(): void {
 function registerIpcHandlers(): void {
   ipcMain.handle("app:get-state", () => flow.getPublicState());
   ipcMain.handle("app:get-smoke-config", (): GuidedAppSmokeConfig => ({ enabled: options.smoke }));
+  ipcMain.handle("app:set-generation-settings", async (_event, settings) =>
+    withState(() => flow.setGenerationSettings(settings))
+  );
   ipcMain.handle("app:select-source-image", async () =>
     withState(async () => {
       const sourceImagePath = await selectSourceImagePath();

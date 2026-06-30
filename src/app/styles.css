@@ -28,6 +28,16 @@ button:disabled {
   background: #eef1f4;
 }
 
+select {
+  min-height: 34px;
+  border: 1px solid #aeb7c2;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #1f2933;
+  font: inherit;
+}
+
 .studio-shell {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -85,6 +95,67 @@ button:disabled {
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.generation-panel {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.generation-panel legend {
+  padding: 0 4px;
+  color: #3e4c59;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.generation-panel label {
+  color: #52606d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.provider-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: #52606d;
+  font-size: 12px;
+}
+
+#provider-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#provider-status {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #eef1f4;
+  color: #3e4c59;
+  font-weight: 700;
+}
+
+#provider-status.ready {
+  background: #e5f7ed;
+  color: #146c43;
+}
+
+.confirm-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.confirm-row input {
+  margin-top: 2px;
 }
 
 .actions {

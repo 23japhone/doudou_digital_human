@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("doudouApp", {
   getState: () => ipcRenderer.invoke("app:get-state"),
+  setGenerationSettings: (settings) => ipcRenderer.invoke("app:set-generation-settings", settings),
   selectSourceImage: () => ipcRenderer.invoke("app:select-source-image"),
   generatePet: () => ipcRenderer.invoke("app:generate-pet"),
   createReview: () => ipcRenderer.invoke("app:create-review"),

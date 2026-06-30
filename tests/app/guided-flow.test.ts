@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { PNG } from "pngjs";
@@ -89,6 +89,112 @@ describe("GuidedPetFlow", () => {
     await expect(flow.createReview()).rejects.toMatchObject({ code: "DRAFT_BUNDLE_REQUIRED" });
     await expect(flow.acceptPet()).rejects.toMatchObject({ code: "DRAFT_BUNDLE_REQUIRED" });
     await expect(flow.launchPet()).rejects.toMatchObject({ code: "ACCEPTED_BUNDLE_REQUIRED" });
+  });
+
+  test("requires explicit confirmation before mock cloud generation creates a draft", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    const appDataDir = path.join(workspace, "app-data");
+    await writeFile(sourcePath, createPngSource());
+    const flow = new GuidedPetFlow({
+      workspaceDir: appDataDir,
+      env: { DOUDOU_MOCK_CLOUD_API_KEY: "secret-test-key" },
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.setGenerationSettings({
+      mode: "mock_cloud",
+      providerId: "mock-provider",
+      confirmCloudUpload: false
+    });
+
+    expect(flow.getPublicState()).toMatchObject({
+      generation: {
+        mode: "mock_cloud",
+        providerId: "mock-provider",
+        cloudUploadConfirmed: false,
+        cloudProviderConfigured: true
+      },
+      actions: expect.objectContaining({ canGenerate: false })
+    });
+    expect(JSON.stringify(flow.getPublicState())).not.toContain("secret-test-key");
+
+    await expect(flow.generatePet()).rejects.toMatchObject({ code: "CLOUD_OPT_IN_REQUIRED" });
+    await expect(readdir(path.join(appDataDir, "drafts"))).resolves.toEqual([]);
+  });
+
+  test("generates a mock cloud bundle after explicit confirmation without exposing source paths or provider secrets", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    await writeFile(sourcePath, createPngSource());
+    const flow = new GuidedPetFlow({
+      workspaceDir: path.join(workspace, "app-data"),
+      env: { DOUDOU_MOCK_CLOUD_API_KEY: "secret-test-key" },
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.setGenerationSettings({
+      mode: "mock_cloud",
+      providerId: "mock-provider",
+      confirmCloudUpload: true
+    });
+
+    const generated = await flow.generatePet();
+    const validated = await validatePetBundle(generated.bundleDir);
+    expect(validated.manifest).toMatchObject({
+      id: "generated_cloud_pet",
+      privacy: {
+        sourceImageStored: false,
+        cloudGenerated: true
+      }
+    });
+    expect(flow.getPublicState()).toMatchObject({
+      status: "generated",
+      petId: "generated_cloud_pet",
+      generation: {
+        mode: "mock_cloud",
+        providerId: "mock-provider",
+        cloudUploadConfirmed: true,
+        cloudProviderConfigured: true
+      }
+    });
+    const sourceMetaText = await readFile(path.join(generated.bundleDir, "source.meta.json"), "utf8");
+    expect(sourceMetaText).toContain("cloud-image-adapter.mock-provider");
+    expect(sourceMetaText).not.toContain(sourcePath);
+    expect(JSON.stringify(flow.getPublicState())).not.toContain(sourcePath);
+    expect(JSON.stringify(flow.getPublicState())).not.toContain("secret-test-key");
+  });
+
+  test("requires mock cloud provider config before generation", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    const appDataDir = path.join(workspace, "app-data");
+    await writeFile(sourcePath, createPngSource());
+    const flow = new GuidedPetFlow({
+      workspaceDir: appDataDir,
+      env: {},
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.setGenerationSettings({
+      mode: "mock_cloud",
+      providerId: "mock-provider",
+      confirmCloudUpload: true
+    });
+
+    expect(flow.getPublicState()).toMatchObject({
+      generation: {
+        mode: "mock_cloud",
+        cloudUploadConfirmed: true,
+        cloudProviderConfigured: false
+      },
+      actions: expect.objectContaining({ canGenerate: false })
+    });
+    await expect(flow.generatePet()).rejects.toMatchObject({ code: "PROVIDER_NOT_CONFIGURED" });
+    await expect(readdir(path.join(appDataDir, "drafts"))).resolves.toEqual([]);
   });
 });
 

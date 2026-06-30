@@ -2,13 +2,16 @@ import type {
   AppActionResult,
   GuidedAppSmokeResult
 } from "./app-types.js";
-import type { PublicGuidedPetState } from "./guided-flow.js";
+import type { GuidedGenerationMode, PublicGuidedPetState } from "./guided-flow.js";
 
 const sourceName = query("#source-name");
 const statusLine = query("#status-line");
 const qaChecks = query("#qa-checks");
 const previewImage = queryImage("#preview-image");
 const contactSheetImage = queryImage("#contact-sheet-image");
+const generationMode = querySelect("#generation-mode");
+const providerStatus = query("#provider-status");
+const cloudConfirm = queryInput("#cloud-confirm");
 const selectButton = queryButton("#select-source");
 const generateButton = queryButton("#generate-pet");
 const qaButton = queryButton("#qa-pet");
@@ -22,6 +25,12 @@ let currentState = await window.doudouApp.getState();
 let busy = false;
 render(currentState);
 
+generationMode.addEventListener("change", () => {
+  void updateGenerationSettings();
+});
+cloudConfirm.addEventListener("change", () => {
+  void updateGenerationSettings();
+});
 selectButton.addEventListener("click", () => runAction(() => window.doudouApp.selectSourceImage()));
 generateButton.addEventListener("click", () => runAction(() => window.doudouApp.generatePet()));
 qaButton.addEventListener("click", () => runAction(() => window.doudouApp.createReview()));
@@ -45,12 +54,35 @@ async function runAction<T>(action: () => Promise<AppActionResult<T>>): Promise<
   return result;
 }
 
+async function updateGenerationSettings(): Promise<void> {
+  const mode: GuidedGenerationMode = generationMode.value === "mock_cloud" ? "mock_cloud" : "local";
+  const settings = {
+    mode,
+    providerId: "mock-provider" as const,
+    confirmCloudUpload: mode === "mock_cloud" && cloudConfirm.checked
+  };
+  const result = await runAction(() =>
+    window.doudouApp.setGenerationSettings(settings)
+  );
+  currentState = result.state;
+  render(currentState, result.error?.message);
+}
+
 function render(state: PublicGuidedPetState, errorMessage?: string): void {
   sourceName.textContent = state.sourceImageName ?? "No image selected";
   statusLine.textContent = errorMessage ?? statusText(state);
+  renderGenerationSettings(state);
   renderActions(state);
   renderSteps(state);
   renderReview(state);
+}
+
+function renderGenerationSettings(state: PublicGuidedPetState): void {
+  generationMode.value = state.generation.mode;
+  cloudConfirm.checked = state.generation.cloudUploadConfirmed;
+  cloudConfirm.disabled = busy || state.generation.mode !== "mock_cloud";
+  providerStatus.textContent = providerStatusText(state);
+  providerStatus.classList.toggle("ready", state.generation.cloudProviderConfigured);
 }
 
 function renderActions(state: PublicGuidedPetState): void {
@@ -61,6 +93,13 @@ function renderActions(state: PublicGuidedPetState): void {
   launchButton.disabled = busy || !state.actions.canLaunch;
   deleteDraftButton.disabled = busy || !state.actions.canDeleteDraft;
   deleteAcceptedButton.disabled = busy || !state.actions.canDeleteAccepted;
+}
+
+function providerStatusText(state: PublicGuidedPetState): string {
+  if (state.generation.mode === "local") {
+    return "Not used";
+  }
+  return state.generation.cloudProviderConfigured ? "Configured" : "Missing config";
 }
 
 function renderSteps(state: PublicGuidedPetState): void {
@@ -131,16 +170,26 @@ async function runSmokeFlow(): Promise<void> {
     contactSheetLoaded: false,
     accepted: false,
     launched: false,
+    generationMode: null,
+    petId: null,
+    cloudGenerated: false,
     deletedDraft: false,
     deletedAccepted: false,
     finalStatus: currentState.status
   };
 
+  generationMode.value = "mock_cloud";
+  cloudConfirm.checked = true;
+  await updateGenerationSettings();
+  smokeResult.generationMode = currentState.generation.mode;
+
   const selected = await clickAndWait(selectButton, () => currentState.sourceImageName !== null);
   smokeResult.sourceSelected = selected.ok && currentState.sourceImageName !== null;
 
   const generated = await clickAndWait(generateButton, () => currentState.petId !== null);
-  smokeResult.generated = generated.ok && currentState.petId === "generated_local_pet";
+  smokeResult.generated = generated.ok && currentState.petId === "generated_cloud_pet";
+  smokeResult.petId = currentState.petId;
+  smokeResult.cloudGenerated = currentState.generation.mode === "mock_cloud";
 
   const reviewed = await clickAndWait(qaButton, () => currentState.review !== null);
   smokeResult.reviewed = reviewed.ok && currentState.review !== null;
@@ -148,7 +197,7 @@ async function runSmokeFlow(): Promise<void> {
   smokeResult.contactSheetLoaded = await waitForImage(contactSheetImage, 1024, 512);
 
   const accepted = await clickAndWait(acceptButton, () => currentState.accepted !== null);
-  smokeResult.accepted = accepted.ok && currentState.accepted?.petId === "generated_local_pet";
+  smokeResult.accepted = accepted.ok && currentState.accepted?.petId === "generated_cloud_pet";
 
   const launched = await clickAndWait(launchButton, () => currentState.launch?.launched === true);
   smokeResult.launched = launched.ok && currentState.launch?.launched === true;
@@ -223,6 +272,22 @@ function queryButton(selector: string): HTMLButtonElement {
     throw new Error(`Missing button ${selector}.`);
   }
   return button;
+}
+
+function querySelect(selector: string): HTMLSelectElement {
+  const select = document.querySelector<HTMLSelectElement>(selector);
+  if (!select) {
+    throw new Error(`Missing select ${selector}.`);
+  }
+  return select;
+}
+
+function queryInput(selector: string): HTMLInputElement {
+  const input = document.querySelector<HTMLInputElement>(selector);
+  if (!input) {
+    throw new Error(`Missing input ${selector}.`);
+  }
+  return input;
 }
 
 function queryImage(selector: string): HTMLImageElement {
