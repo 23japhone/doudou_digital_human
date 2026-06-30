@@ -22,6 +22,8 @@ Potential developer interfaces:
 - `npm run review:pet -- qa <bundle-dir> <review-dir>` validates a generated bundle and writes `review.json`, `preview.png`, and `contact-sheet.png` for user inspection.
 - `npm run review:pet -- accept <bundle-dir> <library-dir>` validates and copies the bundle into `<library-dir>/<pet-id>` without adding files to the bundle.
 - `npm run review:pet -- delete <target-dir> --root <allowed-root>` deletes an accepted or review directory only when the target is a child directory inside the allowed root.
+- `npm run dev:app` launches the guided desktop manager UI for the local `generate -> QA -> accept/delete -> launch` flow.
+- `npm run smoke:app` launches the guided UI in smoke mode and clicks through the local flow, including runtime launch smoke.
 - `npm run dev` launches the fixture in the Electron desktop runtime.
 - `npm run smoke:runtime` runs Electron runtime negative cases, then launches both the fixture bundle and a generated bundle before exiting after structured renderer smoke results.
 
@@ -53,6 +55,10 @@ Real cloud adapters must fail with `CLOUD_OPT_IN_REQUIRED` unless the user expli
 ## Review Flow Contract
 
 The review layer consumes only validated pet bundles. `qa` writes a separate `pet-review.v0.1` report and generated preview artifacts outside the bundle, so the bundle remains unchanged. `accept` installs a clean copy of the validated bundle into a local library directory. `delete` requires an explicit allowed root and refuses to delete that root itself or any target outside it.
+
+## Guided App Contract
+
+The guided app is a local Electron manager UI. It lets the user select a PNG/JPEG source image, run the existing local generator, create QA preview artifacts, accept the validated bundle into the local library, delete draft or accepted assets, and launch the accepted bundle in the desktop runtime. The UI does not add fields to `pet bundle v0.1` and does not pass source-image details to the runtime.
 
 ## Examples
 

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Doudou Pet Studio</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="studio-shell">
+      <header class="app-header">
+        <div>
+          <h1>Doudou Pet Studio</h1>
+          <p id="status-line">Idle</p>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="controls" aria-label="Pet workflow">
+          <div class="source-row">
+            <span id="source-name">No image selected</span>
+            <button id="select-source" type="button">Select Image</button>
+          </div>
+
+          <div class="actions">
+            <button id="generate-pet" type="button">Generate</button>
+            <button id="qa-pet" type="button">QA Preview</button>
+            <button id="accept-pet" type="button">Accept</button>
+            <button id="launch-pet" type="button">Launch</button>
+            <button id="delete-draft" type="button">Delete Draft</button>
+            <button id="delete-accepted" type="button">Delete Accepted</button>
+          </div>
+
+          <ol class="steps" aria-label="Workflow status">
+            <li data-step="source">Source</li>
+            <li data-step="generated">Generated</li>
+            <li data-step="review">Reviewed</li>
+            <li data-step="accepted">Accepted</li>
+            <li data-step="launched">Launched</li>
+          </ol>
+
+          <div class="qa-panel">
+            <h2>QA Checks</h2>
+            <ul id="qa-checks"></ul>
+          </div>
+        </aside>
+
+        <section class="preview-area" aria-label="Pet preview">
+          <figure>
+            <figcaption>Preview</figcaption>
+            <img id="preview-image" alt="Generated pet preview" />
+          </figure>
+          <figure>
+            <figcaption>Sprite Sheet</figcaption>
+            <img id="contact-sheet-image" alt="Generated pet sprite sheet" />
+          </figure>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>

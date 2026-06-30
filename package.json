@@ -9,7 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "npm run typecheck",
     "test": "vitest run --root .",
-    "build:main": "tsc -p tsconfig.build.json && cp src/runtime/preload.cjs dist/src/runtime/preload.cjs",
+    "build:main": "tsc -p tsconfig.build.json && cp src/runtime/preload.cjs dist/src/runtime/preload.cjs && mkdir -p dist/src/app && cp src/app/index.html src/app/styles.css src/app/preload.cjs dist/src/app/",
     "build:renderer": "vite build",
     "build": "npm run build:main && npm run build:renderer",
     "generate:fixture": "npm run build:main && node dist/src/scripts/generate-fixture.js",
@@ -18,7 +18,9 @@
     "review:pet": "npm run build:main && node dist/src/cli/review-pet.js",
     "validate:fixture": "npm run build:main && node dist/src/cli/validate-pet.js fixtures/pet_bundles/valid_minimal_atlas_pet",
     "dev": "npm run build && NODE_OPTIONS= electron dist/src/runtime/main.js --bundle fixtures/pet_bundles/valid_minimal_atlas_pet",
-    "smoke:runtime": "npm run build && NODE_OPTIONS= node dist/src/scripts/runtime-smoke.js"
+    "dev:app": "npm run build && NODE_OPTIONS= electron dist/src/app/main.js",
+    "smoke:runtime": "npm run build && NODE_OPTIONS= node dist/src/scripts/runtime-smoke.js",
+    "smoke:app": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-smoke.js"
   },
   "dependencies": {
     "jpeg-js": "0.4.4",

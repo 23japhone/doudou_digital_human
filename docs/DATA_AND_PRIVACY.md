@@ -22,6 +22,7 @@ Data handled by the product:
 - Source normalization creates temporary source-derived PNG files outside the final bundle for cloud adapters. The scaffold deletes those files after success and after mapped provider failures.
 - Review/QA artifacts are derived from generated bundle assets only: `review.json`, copied `preview.png`, and copied `contact-sheet.png`. They must not contain source image paths, prompts, raw responses, tokens, or secrets.
 - Accepting a bundle copies only the validated pet bundle files into the local library; it must not add installation metadata inside the bundle because unreferenced files break the bundle contract.
+- The guided desktop app keeps source image paths in app process state only long enough to call the local generator. Its renderer-facing state uses the source filename and generated review artifact URLs; runtime launch receives only the accepted bundle directory.
 - When passing personal source-image paths through npm scripts, prefer `npm --silent run generate:pet -- <source> <output>` because npm may echo command arguments in terminal output.
 - Do not commit personal images, generated likenesses, API keys, or raw model responses containing private data.
 - Fixtures must use rights-safe synthetic images or explicitly licensed assets.
