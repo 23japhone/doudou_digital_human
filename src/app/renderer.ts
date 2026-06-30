@@ -10,6 +10,7 @@ const qaChecks = query("#qa-checks");
 const previewImage = queryImage("#preview-image");
 const contactSheetImage = queryImage("#contact-sheet-image");
 const generationMode = querySelect("#generation-mode");
+const providerName = query("#provider-name");
 const providerStatus = query("#provider-status");
 const cloudConfirm = queryInput("#cloud-confirm");
 const selectButton = queryButton("#select-source");
@@ -55,11 +56,11 @@ async function runAction<T>(action: () => Promise<AppActionResult<T>>): Promise<
 }
 
 async function updateGenerationSettings(): Promise<void> {
-  const mode: GuidedGenerationMode = generationMode.value === "mock_cloud" ? "mock_cloud" : "local";
+  const mode = readGenerationMode(generationMode.value);
   const settings = {
     mode,
-    providerId: "mock-provider" as const,
-    confirmCloudUpload: mode === "mock_cloud" && cloudConfirm.checked
+    providerId: mode === "openai_live" ? "openai-image" as const : "mock-provider" as const,
+    confirmCloudUpload: isCloudGenerationMode(mode) && cloudConfirm.checked
   };
   const result = await runAction(() =>
     window.doudouApp.setGenerationSettings(settings)
@@ -79,10 +80,15 @@ function render(state: PublicGuidedPetState, errorMessage?: string): void {
 
 function renderGenerationSettings(state: PublicGuidedPetState): void {
   generationMode.value = state.generation.mode;
+  providerName.textContent = state.generation.providerId ?? "none";
   cloudConfirm.checked = state.generation.cloudUploadConfirmed;
-  cloudConfirm.disabled = busy || state.generation.mode !== "mock_cloud";
+  cloudConfirm.disabled = busy || !isCloudGenerationMode(state.generation.mode);
   providerStatus.textContent = providerStatusText(state);
   providerStatus.classList.toggle("ready", state.generation.cloudProviderConfigured);
+  providerStatus.classList.toggle(
+    "blocked",
+    state.generation.mode === "openai_live" && !state.generation.liveProviderEnabled
+  );
 }
 
 function renderActions(state: PublicGuidedPetState): void {
@@ -98,6 +104,9 @@ function renderActions(state: PublicGuidedPetState): void {
 function providerStatusText(state: PublicGuidedPetState): string {
   if (state.generation.mode === "local") {
     return "Not used";
+  }
+  if (state.generation.mode === "openai_live" && !state.generation.liveProviderEnabled) {
+    return "Live disabled";
   }
   return state.generation.cloudProviderConfigured ? "Configured" : "Missing config";
 }
@@ -178,7 +187,7 @@ async function runSmokeFlow(): Promise<void> {
     finalStatus: currentState.status
   };
 
-  generationMode.value = "mock_cloud";
+  generationMode.value = smokeConfig.generationMode;
   cloudConfirm.checked = true;
   await updateGenerationSettings();
   smokeResult.generationMode = currentState.generation.mode;
@@ -189,7 +198,7 @@ async function runSmokeFlow(): Promise<void> {
   const generated = await clickAndWait(generateButton, () => currentState.petId !== null);
   smokeResult.generated = generated.ok && currentState.petId === "generated_cloud_pet";
   smokeResult.petId = currentState.petId;
-  smokeResult.cloudGenerated = currentState.generation.mode === "mock_cloud";
+  smokeResult.cloudGenerated = isCloudGenerationMode(currentState.generation.mode);
 
   const reviewed = await clickAndWait(qaButton, () => currentState.review !== null);
   smokeResult.reviewed = reviewed.ok && currentState.review !== null;
@@ -256,6 +265,17 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function readGenerationMode(value: string): GuidedGenerationMode {
+  if (value === "mock_cloud" || value === "openai_live") {
+    return value;
+  }
+  return "local";
+}
+
+function isCloudGenerationMode(mode: GuidedGenerationMode): boolean {
+  return mode === "mock_cloud" || mode === "openai_live";
 }
 
 function query(selector: string): HTMLElement {

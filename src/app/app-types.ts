@@ -4,6 +4,7 @@ import type {
   AcceptFlowResult,
   DeleteFlowResult,
   GenerateFlowResult,
+  GuidedGenerationMode,
   GuidedGenerationSettings,
   LaunchFlowResult,
   ReviewFlowResult,
@@ -22,6 +23,7 @@ export interface AppActionResult<T = unknown> {
 
 export interface GuidedAppSmokeConfig {
   enabled: boolean;
+  generationMode: GuidedGenerationMode;
 }
 
 export interface GuidedAppSmokeResult {

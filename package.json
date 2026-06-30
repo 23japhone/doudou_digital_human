@@ -20,7 +20,8 @@
     "dev": "npm run build && NODE_OPTIONS= electron dist/src/runtime/main.js --bundle fixtures/pet_bundles/valid_minimal_atlas_pet",
     "dev:app": "npm run build && NODE_OPTIONS= electron dist/src/app/main.js",
     "smoke:runtime": "npm run build && NODE_OPTIONS= node dist/src/scripts/runtime-smoke.js",
-    "smoke:app": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-smoke.js"
+    "smoke:app": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-smoke.js",
+    "smoke:app:live": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-live-smoke.js"
   },
   "dependencies": {
     "jpeg-js": "0.4.4",

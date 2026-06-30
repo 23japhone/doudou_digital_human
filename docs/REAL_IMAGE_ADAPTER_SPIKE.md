@@ -2,7 +2,7 @@
 
 Date: 2026-06-30
 
-Status: Scaffold implemented with `mock-provider`; no live provider is connected.
+Status: Scaffold implemented with `mock-provider`; `openai-image` is connected only through the guided manager behind `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and per-generation UI upload confirmation.
 
 ## Decision
 
@@ -145,7 +145,7 @@ Future cloud command should make upload intent visible:
 npm run generate:pet:cloud -- <source-image-path> <output-bundle-dir> --provider mock-provider --confirm-cloud-upload
 ```
 
-The current scaffold supports `mock-provider` only and requires `DOUDOU_MOCK_CLOUD_API_KEY`. The CLI must fail with `CLOUD_OPT_IN_REQUIRED` if cloud mode is selected without explicit confirmation.
+The current CLI scaffold supports `mock-provider` only and requires `DOUDOU_MOCK_CLOUD_API_KEY`. The guided manager also supports `openai-image` live generation, but only when `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and the UI confirmation checkbox are all present. Cloud mode must fail with `CLOUD_OPT_IN_REQUIRED` if selected without explicit confirmation.
 
 ## Test Plan
 

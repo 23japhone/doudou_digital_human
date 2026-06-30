@@ -4,14 +4,14 @@
 
 ## Current Phase
 
-Phase 0: project framing, first desktop runtime vertical slice, local source-image intake, scripted generation-adapter vertical slice, real image-to-character adapter design spike, cloud-adapter scaffold, preview/QA/deletion workflow, and guided desktop UI with mock-cloud selection.
+Phase 0: project framing, first desktop runtime vertical slice, local source-image intake, scripted generation-adapter vertical slice, real image-to-character adapter design spike, cloud-adapter scaffold, preview/QA/deletion workflow, guided desktop UI with mock-cloud selection, and OpenAI live provider scaffold behind explicit opt-in.
 
-Exit criteria: Electron loads a validated `pet bundle v0.1` fixture and generated bundle, renders idle animation in a transparent desktop window, generation flows through replaceable scripted/cloud adapter boundaries, cloud scaffold uses mocked provider tests with explicit opt-in, review CLI can QA/accept/delete bundles, the guided UI can click through mock-cloud generate/QA/accept/delete/launch with explicit confirmation, and validator/unit/build/runtime/app smoke checks pass.
+Exit criteria: Electron loads a validated `pet bundle v0.1` fixture and generated bundle, renders idle animation in a transparent desktop window, generation flows through replaceable scripted/cloud adapter boundaries, cloud scaffold uses mocked provider tests with explicit opt-in, OpenAI live smoke is available but skipped by default unless env-gated, review CLI can QA/accept/delete bundles, the guided UI can click through mock-cloud generate/QA/accept/delete/launch with explicit confirmation, and validator/unit/build/runtime/app smoke checks pass.
 
 ## Next Vertical Slices
 
 1. Harden click-through behavior beyond fallbackRect/alpha hit area if macOS manual testing shows input interference.
-2. Replace the mocked provider with a real image-to-character provider path behind opt-in live smoke.
+2. Manually run and evaluate the opt-in OpenAI live smoke with a non-sensitive source image, then tune prompt/post-processing quality.
 3. Add local model adapter experiments after cache paths and deletion behavior are designed.
 
 ## Deferred Work

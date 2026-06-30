@@ -10,6 +10,7 @@ import type {
 import {
   GuidedPetFlow,
   GuidedPetFlowError,
+  type GuidedGenerationMode,
   type PublicGuidedPetState
 } from "./guided-flow.js";
 import { PetGenerationError, SourceImageIntakeError, SourceImageNormalizationError } from "../generation/generate-pet.js";
@@ -20,6 +21,7 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 
 interface AppOptions {
   smoke: boolean;
+  smokeGenerationMode: GuidedGenerationMode;
   smokeSourceImagePath?: string;
   workspaceDir?: string;
 }
@@ -51,11 +53,14 @@ async function main(): Promise<void> {
 }
 
 function parseArgs(args: string[]): AppOptions {
-  const parsed: AppOptions = { smoke: false };
+  const parsed: AppOptions = { smoke: false, smokeGenerationMode: "mock_cloud" };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--smoke") {
       parsed.smoke = true;
+    } else if (arg === "--provider" || arg === "--generation-mode") {
+      parsed.smokeGenerationMode = parseGenerationMode(args[index + 1]);
+      index += 1;
     } else if (arg === "--source") {
       parsed.smokeSourceImagePath = args[index + 1];
       index += 1;
@@ -65,6 +70,19 @@ function parseArgs(args: string[]): AppOptions {
     }
   }
   return parsed;
+}
+
+function parseGenerationMode(value: string | undefined): GuidedGenerationMode {
+  if (value === "openai-image") {
+    return "openai_live";
+  }
+  if (value === "mock-provider") {
+    return "mock_cloud";
+  }
+  if (value === "local" || value === "mock_cloud" || value === "openai_live") {
+    return value;
+  }
+  return "mock_cloud";
 }
 
 function createWindow(): void {
@@ -97,7 +115,10 @@ function createWindow(): void {
 
 function registerIpcHandlers(): void {
   ipcMain.handle("app:get-state", () => flow.getPublicState());
-  ipcMain.handle("app:get-smoke-config", (): GuidedAppSmokeConfig => ({ enabled: options.smoke }));
+  ipcMain.handle("app:get-smoke-config", (): GuidedAppSmokeConfig => ({
+    enabled: options.smoke,
+    generationMode: options.smokeGenerationMode
+  }));
   ipcMain.handle("app:set-generation-settings", async (_event, settings) =>
     withState(() => flow.setGenerationSettings(settings))
   );

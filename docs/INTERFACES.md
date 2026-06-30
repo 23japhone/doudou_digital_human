@@ -24,6 +24,7 @@ Potential developer interfaces:
 - `npm run review:pet -- delete <target-dir> --root <allowed-root>` deletes an accepted or review directory only when the target is a child directory inside the allowed root.
 - `npm run dev:app` launches the guided desktop manager UI for local or mock-cloud `generate -> QA -> accept/delete -> launch` flows.
 - `npm run smoke:app` launches the guided UI in smoke mode and clicks through the mock-cloud flow with explicit upload confirmation, including runtime launch smoke.
+- `npm run smoke:app:live` launches the same guided UI smoke against `openai_live` only when `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set; otherwise it prints a skipped result and exits 0.
 - `npm run dev` launches the fixture in the Electron desktop runtime.
 - `npm run smoke:runtime` runs Electron runtime negative cases, then launches both the fixture bundle and a generated bundle before exiting after structured renderer smoke results.
 
@@ -50,7 +51,7 @@ Generation adapters receive validated local source-image metadata and return gen
 
 The bundle generator validates adapter output, packs frames into `atlases/main.png`, writes `preview.png`, and then validates the final bundle. Runtime consumes only the final bundle.
 
-Real cloud adapters must fail with `CLOUD_OPT_IN_REQUIRED` unless the user explicitly confirms upload. Provider-specific failures map to project-owned codes such as `PROVIDER_NOT_CONFIGURED`, `MODEL_REFUSED`, `MODEL_RATE_LIMITED`, `MODEL_TIMEOUT`, `MODEL_PROVIDER_ERROR`, `MODEL_OUTPUT_INVALID`, and `POSTPROCESSING_FAILED`. The current scaffold supports only `mock-provider` and requires `DOUDOU_MOCK_CLOUD_API_KEY` to exercise provider-config gating without a live provider.
+Real cloud adapters must fail with `CLOUD_OPT_IN_REQUIRED` unless the user explicitly confirms upload. Provider-specific failures map to project-owned codes such as `PROVIDER_NOT_CONFIGURED`, `MODEL_REFUSED`, `MODEL_RATE_LIMITED`, `MODEL_TIMEOUT`, `MODEL_PROVIDER_ERROR`, `MODEL_OUTPUT_INVALID`, and `POSTPROCESSING_FAILED`. The guided app supports `mock-provider` with `DOUDOU_MOCK_CLOUD_API_KEY` and `openai-image` with `DOUDOU_ENABLE_OPENAI_LIVE=1` plus `OPENAI_API_KEY`. `openai-image` uses OpenAI image edits with a normalized PNG input and expects a base64 PNG image response; raw provider responses, prompts, source paths, and secrets must not be returned from the adapter or written into the bundle.
 
 ## Review Flow Contract
 
@@ -58,7 +59,7 @@ The review layer consumes only validated pet bundles. `qa` writes a separate `pe
 
 ## Guided App Contract
 
-The guided app is a local Electron manager UI. It lets the user select a PNG/JPEG source image, choose local or `mock-provider` generation, explicitly confirm cloud upload for mock-cloud mode, create QA preview artifacts, accept the validated bundle into the local library, delete draft or accepted assets, and launch the accepted bundle in the desktop runtime. The UI does not add fields to `pet bundle v0.1` and does not pass source-image details to the runtime. Mock-cloud mode requires `DOUDOU_MOCK_CLOUD_API_KEY` in the app process environment and still performs no live network call.
+The guided app is a local Electron manager UI. It lets the user select a PNG/JPEG source image, choose local, `mock-provider`, or `openai-image` generation, explicitly confirm cloud upload for each cloud generation attempt, create QA preview artifacts, accept the validated bundle into the local library, delete draft or accepted assets, and launch the accepted bundle in the desktop runtime. The UI does not add fields to `pet bundle v0.1` and does not pass source-image details to the runtime. Mock-cloud mode requires `DOUDOU_MOCK_CLOUD_API_KEY` in the app process environment and still performs no live network call. OpenAI live mode requires `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and the UI confirmation checkbox.
 
 ## Examples
 

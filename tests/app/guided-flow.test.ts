@@ -196,6 +196,132 @@ describe("GuidedPetFlow", () => {
     await expect(flow.generatePet()).rejects.toMatchObject({ code: "PROVIDER_NOT_CONFIGURED" });
     await expect(readdir(path.join(appDataDir, "drafts"))).resolves.toEqual([]);
   });
+
+  test("keeps OpenAI live generation disabled unless the live env gate is enabled", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    const appDataDir = path.join(workspace, "app-data");
+    await writeFile(sourcePath, createPngSource());
+    const flow = new GuidedPetFlow({
+      workspaceDir: appDataDir,
+      env: { OPENAI_API_KEY: "secret-openai-key" },
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.setGenerationSettings({
+      mode: "openai_live",
+      providerId: "openai-image",
+      confirmCloudUpload: true
+    });
+
+    expect(flow.getPublicState()).toMatchObject({
+      generation: {
+        mode: "openai_live",
+        providerId: "openai-image",
+        cloudUploadConfirmed: true,
+        cloudProviderConfigured: false,
+        liveProviderEnabled: false
+      },
+      actions: expect.objectContaining({ canGenerate: false })
+    });
+    await expect(flow.generatePet()).rejects.toMatchObject({ code: "LIVE_PROVIDER_NOT_ENABLED" });
+    await expect(readdir(path.join(appDataDir, "drafts"))).resolves.toEqual([]);
+    expect(JSON.stringify(flow.getPublicState())).not.toContain("secret-openai-key");
+  });
+
+  test("requires explicit UI confirmation before OpenAI live generation creates a draft", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    const appDataDir = path.join(workspace, "app-data");
+    await writeFile(sourcePath, createPngSource());
+    const flow = new GuidedPetFlow({
+      workspaceDir: appDataDir,
+      env: { DOUDOU_ENABLE_OPENAI_LIVE: "1", OPENAI_API_KEY: "secret-openai-key" },
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.setGenerationSettings({
+      mode: "openai_live",
+      providerId: "openai-image",
+      confirmCloudUpload: false
+    });
+
+    expect(flow.getPublicState()).toMatchObject({
+      generation: {
+        mode: "openai_live",
+        providerId: "openai-image",
+        cloudUploadConfirmed: false,
+        cloudProviderConfigured: true,
+        liveProviderEnabled: true
+      },
+      actions: expect.objectContaining({ canGenerate: false })
+    });
+    await expect(flow.generatePet()).rejects.toMatchObject({ code: "CLOUD_OPT_IN_REQUIRED" });
+    await expect(readdir(path.join(appDataDir, "drafts"))).resolves.toEqual([]);
+    expect(JSON.stringify(flow.getPublicState())).not.toContain("secret-openai-key");
+  });
+
+  test("generates an OpenAI live bundle through mocked fetch without exposing source paths or API keys", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    await writeFile(sourcePath, createPngSource());
+    const calls: RequestInit[] = [];
+    const flow = new GuidedPetFlow({
+      workspaceDir: path.join(workspace, "app-data"),
+      env: {
+        DOUDOU_ENABLE_OPENAI_LIVE: "1",
+        OPENAI_API_KEY: "secret-openai-key",
+        DOUDOU_OPENAI_IMAGE_ENDPOINT: "https://api.openai.test/v1/images/edits"
+      },
+      openAiFetch: async (_url, init) => {
+        calls.push(init ?? {});
+        return new Response(
+          JSON.stringify({
+            data: [{ b64_json: createPngSource(256, 256).toString("base64") }]
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      },
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.setGenerationSettings({
+      mode: "openai_live",
+      providerId: "openai-image",
+      confirmCloudUpload: true
+    });
+
+    const generated = await flow.generatePet();
+    const validated = await validatePetBundle(generated.bundleDir);
+    expect(validated.manifest).toMatchObject({
+      id: "generated_cloud_pet",
+      privacy: {
+        sourceImageStored: false,
+        cloudGenerated: true
+      }
+    });
+    expect(calls).toHaveLength(1);
+    expect(flow.getPublicState()).toMatchObject({
+      status: "generated",
+      petId: "generated_cloud_pet",
+      generation: {
+        mode: "openai_live",
+        providerId: "openai-image",
+        cloudUploadConfirmed: true,
+        cloudProviderConfigured: true,
+        liveProviderEnabled: true
+      }
+    });
+    const sourceMetaText = await readFile(path.join(generated.bundleDir, "source.meta.json"), "utf8");
+    expect(sourceMetaText).toContain("cloud-image-adapter.openai-image");
+    expect(sourceMetaText).not.toContain(sourcePath);
+    expect(sourceMetaText).not.toContain("secret-openai-key");
+    expect(JSON.stringify(flow.getPublicState())).not.toContain(sourcePath);
+    expect(JSON.stringify(flow.getPublicState())).not.toContain("secret-openai-key");
+  });
 });
 
 async function createTempDir(): Promise<string> {

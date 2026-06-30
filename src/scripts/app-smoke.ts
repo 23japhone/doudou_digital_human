@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import type { GuidedAppSmokeResult } from "../app/app-types.js";
+import type { GuidedGenerationMode } from "../app/guided-flow.js";
 
 const repoRoot = process.cwd();
 const electronBin = path.join(repoRoot, "node_modules/.bin/electron");
@@ -15,22 +16,28 @@ interface SpawnResult {
   output: string;
 }
 
+export interface GuidedAppSmokeRunOptions {
+  generationMode?: GuidedGenerationMode;
+}
+
 async function main(): Promise<void> {
+  const smokeResult = await runGuidedAppSmoke({ generationMode: "mock_cloud" });
+  console.log(`guided app smoke: ${JSON.stringify(smokeResult)}`);
+}
+
+export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}): Promise<GuidedAppSmokeResult> {
+  const generationMode = options.generationMode ?? "mock_cloud";
   const tempRoot = await mkdtemp(path.join(tmpdir(), "guided-app-smoke-"));
   try {
     const sourceImagePath = path.join(tempRoot, "source.png");
     const workspaceDir = path.join(tempRoot, "workspace");
     await writeFile(sourceImagePath, createSmokeSourcePng());
 
-    const result = await runAppSmoke(sourceImagePath, workspaceDir);
+    const result = await runAppSmoke(sourceImagePath, workspaceDir, generationMode);
     if (result.code !== 0) {
       throw new Error(`guided app smoke exited ${result.code}\n${result.output}`);
     }
-    if (
-      result.output.includes(sourceImagePath) ||
-      result.output.includes(tempRoot) ||
-      result.output.includes("secret-test-key")
-    ) {
+    if (leaksPrivateData(result.output, sourceImagePath, tempRoot)) {
       throw new Error(`guided app smoke leaked local paths\n${result.output}`);
     }
     const smokeResult = parseSmokeResult(result.output);
@@ -40,7 +47,7 @@ async function main(): Promise<void> {
       !smokeResult.reviewed ||
       !smokeResult.previewLoaded ||
       !smokeResult.contactSheetLoaded ||
-      smokeResult.generationMode !== "mock_cloud" ||
+      smokeResult.generationMode !== generationMode ||
       smokeResult.petId !== "generated_cloud_pet" ||
       !smokeResult.cloudGenerated ||
       !smokeResult.accepted ||
@@ -55,24 +62,30 @@ async function main(): Promise<void> {
     ) {
       throw new Error(`guided app smoke returned incomplete result\n${result.output}`);
     }
-    console.log(`guided app smoke: ${JSON.stringify(smokeResult)}`);
+    return smokeResult;
   } finally {
     await rm(tempRoot, { force: true, recursive: true });
   }
 }
 
-function runAppSmoke(sourceImagePath: string, workspaceDir: string): Promise<SpawnResult> {
+function runAppSmoke(
+  sourceImagePath: string,
+  workspaceDir: string,
+  generationMode: GuidedGenerationMode
+): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(electronBin, [
       appMain,
       "--smoke",
+      "--generation-mode",
+      generationMode,
       "--source",
       sourceImagePath,
       "--workspace",
       workspaceDir
     ], {
       cwd: repoRoot,
-      env: { ...process.env, NODE_OPTIONS: "", DOUDOU_MOCK_CLOUD_API_KEY: "secret-test-key" },
+      env: createSmokeEnv(generationMode),
       stdio: ["ignore", "pipe", "pipe"]
     });
     let output = "";
@@ -93,6 +106,21 @@ function runAppSmoke(sourceImagePath: string, workspaceDir: string): Promise<Spa
       resolve({ code, output });
     });
   });
+}
+
+function createSmokeEnv(generationMode: GuidedGenerationMode): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, NODE_OPTIONS: "" };
+  if (generationMode === "mock_cloud") {
+    env.DOUDOU_MOCK_CLOUD_API_KEY = "secret-test-key";
+  }
+  return env;
+}
+
+function leaksPrivateData(output: string, sourceImagePath: string, tempRoot: string): boolean {
+  const sensitiveValues = [sourceImagePath, tempRoot, "secret-test-key", process.env.OPENAI_API_KEY].filter(
+    (value): value is string => Boolean(value)
+  );
+  return sensitiveValues.some((value) => output.includes(value));
 }
 
 function parseSmokeResult(output: string): GuidedAppSmokeResult {

@@ -147,6 +147,11 @@ select {
   color: #146c43;
 }
 
+#provider-status.blocked {
+  background: #f8e8e8;
+  color: #8f1d1d;
+}
+
 .confirm-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

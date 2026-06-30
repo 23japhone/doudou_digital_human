@@ -7,6 +7,7 @@ import {
   createCloudImageAdapter,
   createMockCloudImageProvider
 } from "../generation/adapters/cloud-image-adapter.js";
+import { createOpenAiImageProvider } from "../generation/adapters/openai-image-provider.js";
 import type { PetGenerationAdapter } from "../generation/adapters/types.js";
 import {
   acceptPetBundle,
@@ -23,12 +24,14 @@ export type GuidedPetFlowStatus =
   | "accepted"
   | "launched";
 
-export type GuidedGenerationMode = "local" | "mock_cloud";
+export type GuidedGenerationMode = "local" | "mock_cloud" | "openai_live";
+export type GuidedCloudProviderId = "mock-provider" | "openai-image";
 
 export type GuidedPetFlowErrorCode =
   | "SOURCE_IMAGE_REQUIRED"
   | "DRAFT_BUNDLE_REQUIRED"
   | "ACCEPTED_BUNDLE_REQUIRED"
+  | "LIVE_PROVIDER_NOT_ENABLED"
   | "RUNTIME_LAUNCH_FAILED";
 
 export class GuidedPetFlowError extends Error {
@@ -47,11 +50,12 @@ export interface GuidedPetFlowOptions {
   runtimeElectronPath?: string;
   runtimeMainPath?: string;
   env?: NodeJS.ProcessEnv;
+  openAiFetch?: typeof fetch;
 }
 
 export interface GuidedGenerationSettings {
   mode: GuidedGenerationMode;
-  providerId?: "mock-provider";
+  providerId?: GuidedCloudProviderId;
   confirmCloudUpload?: boolean;
 }
 
@@ -78,6 +82,7 @@ export interface PublicGuidedPetState {
     providerId: string | null;
     cloudUploadConfirmed: boolean;
     cloudProviderConfigured: boolean;
+    liveProviderEnabled: boolean;
   };
   actions: {
     canGenerate: boolean;
@@ -159,6 +164,7 @@ export class GuidedPetFlow {
   private readonly runtimeElectronPath: string;
   private readonly runtimeMainPath?: string;
   private readonly env: NodeJS.ProcessEnv;
+  private readonly openAiFetch?: typeof fetch;
   private generationSettings: Required<GuidedGenerationSettings> = {
     mode: "local",
     providerId: "mock-provider",
@@ -183,6 +189,7 @@ export class GuidedPetFlow {
     this.runtimeElectronPath = options.runtimeElectronPath ?? process.execPath;
     this.runtimeMainPath = options.runtimeMainPath;
     this.env = options.env ?? process.env;
+    this.openAiFetch = options.openAiFetch;
   }
 
   async initialize(): Promise<void> {
@@ -200,11 +207,11 @@ export class GuidedPetFlow {
   }
 
   async setGenerationSettings(settings: Partial<GuidedGenerationSettings> = {}): Promise<PublicGuidedPetState> {
-    const mode: GuidedGenerationMode = settings.mode === "mock_cloud" ? "mock_cloud" : "local";
+    const mode = normalizeGenerationMode(settings.mode);
     this.generationSettings = {
       mode,
-      providerId: "mock-provider",
-      confirmCloudUpload: mode === "mock_cloud" ? settings.confirmCloudUpload ?? false : false
+      providerId: providerIdForMode(mode),
+      confirmCloudUpload: mode === "local" ? false : settings.confirmCloudUpload ?? false
     };
     this.lastError = null;
     return this.getPublicState();
@@ -381,10 +388,11 @@ export class GuidedPetFlow {
       launch: this.launch,
       generation: {
         mode: this.generationSettings.mode,
-        providerId: this.generationSettings.mode === "mock_cloud" ? this.generationSettings.providerId : null,
+        providerId: this.generationSettings.mode === "local" ? null : this.generationSettings.providerId,
         cloudUploadConfirmed:
-          this.generationSettings.mode === "mock_cloud" && this.generationSettings.confirmCloudUpload,
-        cloudProviderConfigured: this.isCloudProviderConfigured()
+          this.generationSettings.mode !== "local" && this.generationSettings.confirmCloudUpload,
+        cloudProviderConfigured: this.isCloudProviderConfigured(),
+        liveProviderEnabled: this.isLiveProviderEnabled()
       },
       actions: {
         canGenerate: Boolean(this.sourceImagePath) && this.canGenerateWithCurrentSettings(),
@@ -408,6 +416,22 @@ export class GuidedPetFlow {
     if (this.generationSettings.mode === "local") {
       return undefined;
     }
+    if (this.generationSettings.mode === "openai_live") {
+      this.assertOpenAiLiveEnabled();
+      return createCloudImageAdapter({
+        confirmCloudUpload: this.generationSettings.confirmCloudUpload,
+        config: {
+          providerId: this.generationSettings.providerId,
+          apiKey: this.env.OPENAI_API_KEY
+        },
+        provider: createOpenAiImageProvider({
+          apiKey: this.env.OPENAI_API_KEY ?? "",
+          endpoint: this.env.DOUDOU_OPENAI_IMAGE_ENDPOINT,
+          model: this.env.DOUDOU_OPENAI_IMAGE_MODEL,
+          fetch: this.openAiFetch
+        })
+      });
+    }
     return createCloudImageAdapter({
       confirmCloudUpload: this.generationSettings.confirmCloudUpload,
       config: {
@@ -429,7 +453,33 @@ export class GuidedPetFlow {
     if (this.generationSettings.mode === "local") {
       return false;
     }
-    return this.generationSettings.providerId === "mock-provider" && Boolean(this.env.DOUDOU_MOCK_CLOUD_API_KEY);
+    if (this.generationSettings.mode === "mock_cloud") {
+      return this.generationSettings.providerId === "mock-provider" && Boolean(this.env.DOUDOU_MOCK_CLOUD_API_KEY);
+    }
+    return (
+      this.generationSettings.providerId === "openai-image" &&
+      this.isOpenAiLiveEnabled() &&
+      Boolean(this.env.OPENAI_API_KEY)
+    );
+  }
+
+  private isLiveProviderEnabled(): boolean {
+    return this.generationSettings.mode === "openai_live" && this.isOpenAiLiveEnabled();
+  }
+
+  private isOpenAiLiveEnabled(): boolean {
+    return this.env.DOUDOU_ENABLE_OPENAI_LIVE === "1";
+  }
+
+  private assertOpenAiLiveEnabled(): void {
+    if (!this.isOpenAiLiveEnabled()) {
+      throw this.setError(
+        new GuidedPetFlowError(
+          "LIVE_PROVIDER_NOT_ENABLED",
+          "OpenAI live generation requires DOUDOU_ENABLE_OPENAI_LIVE=1 and explicit upload confirmation."
+        )
+      );
+    }
   }
 
   private async runRuntimeSmoke(bundleDir: string): Promise<RuntimeSmokeResult> {
@@ -498,4 +548,15 @@ export class GuidedPetFlow {
     };
     return error;
   }
+}
+
+function normalizeGenerationMode(mode: GuidedGenerationSettings["mode"] | undefined): GuidedGenerationMode {
+  if (mode === "mock_cloud" || mode === "openai_live") {
+    return mode;
+  }
+  return "local";
+}
+
+function providerIdForMode(mode: GuidedGenerationMode): GuidedCloudProviderId {
+  return mode === "openai_live" ? "openai-image" : "mock-provider";
 }
