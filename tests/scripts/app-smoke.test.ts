@@ -4,7 +4,10 @@ import path from "node:path";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, test } from "vitest";
 import { prepareGuidedAppSmokeSource } from "../../src/scripts/app-smoke.js";
-import { resolveLiveSmokeSourceImage } from "../../src/scripts/app-live-smoke.js";
+import {
+  getLiveSmokeSkipReason,
+  resolveLiveSmokeSourceImage
+} from "../../src/scripts/app-live-smoke.js";
 
 const tempDirs: string[] = [];
 
@@ -49,6 +52,18 @@ describe("app smoke source selection", () => {
     expect(resolveLiveSmokeSourceImage(["node", "app-live-smoke"], {
       DOUDOU_APP_SMOKE_SOURCE_IMAGE: "/tmp/from-env.jpg"
     })).toBe("/tmp/from-env.jpg");
+  });
+
+  test("requires explicit source upload consent for live smoke with an external source image", () => {
+    expect(getLiveSmokeSkipReason({
+      DOUDOU_ENABLE_OPENAI_LIVE: "1",
+      OPENAI_API_KEY: "secret-openai-key"
+    }, "/tmp/source.jpg")).toContain("DOUDOU_CONFIRM_SOURCE_UPLOAD=1");
+    expect(getLiveSmokeSkipReason({
+      DOUDOU_ENABLE_OPENAI_LIVE: "1",
+      OPENAI_API_KEY: "secret-openai-key",
+      DOUDOU_CONFIRM_SOURCE_UPLOAD: "1"
+    }, "/tmp/source.jpg")).toBeNull();
   });
 });
 

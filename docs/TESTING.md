@@ -14,7 +14,8 @@
 - Delete review or accepted assets: `npm run review:pet -- delete <target-dir> --root <allowed-root>`
 - Guided desktop app: `npm run dev:app`
 - Guided desktop app smoke: `npm run smoke:app`
-- Guided desktop app live smoke: `npm run smoke:app:live` (skips unless `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set). Use `npm run smoke:app:live -- --source <image-path>` or `DOUDOU_APP_SMOKE_SOURCE_IMAGE=<image-path>` to run the live smoke against a specific local source image.
+- Guided desktop app live smoke: `npm run smoke:app:live` (skips unless `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set). Use `npm run smoke:app:live -- --source <image-path>` or `DOUDOU_APP_SMOKE_SOURCE_IMAGE=<image-path>` to run the live smoke against a specific local source image; explicit source-image smoke also requires `DOUDOU_CONFIRM_SOURCE_UPLOAD=1`.
+- OpenAI-compatible image provider probe: `npm run probe:openai-image` uploads only a synthetic PNG and verifies that the configured endpoint supports image edits before any user source image is used.
 - Fixture validation: `npm run validate:fixture`
 - Runtime smoke: `npm run smoke:runtime`
 
@@ -22,7 +23,7 @@
 
 - Unit test image validation, manifest parsing, bundle validation, and behavior state transitions.
 - Use fake/scripted model adapters for deterministic generation tests and verify adapter outputs before bundle packaging.
-- Real cloud adapter scaffold tests use mocked provider calls only. OpenAI live-provider smoke requires explicit environment opt-in and is skipped by default.
+- Real cloud adapter scaffold tests use mocked provider calls only. OpenAI live-provider smoke requires explicit environment opt-in and is skipped by default. Run `npm run probe:openai-image` against a new custom endpoint before using `smoke:app:live -- --source <image-path>`.
 - Keep a tiny rights-safe golden fixture bundle for regression tests.
 - Add smoke tests for preview rendering and desktop runtime launch once a runtime stack exists.
 - Add visual QA snapshots/contact sheets for generated sprite assets.
