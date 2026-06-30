@@ -1,0 +1,30 @@
+<!-- codex-project-bootstrap:generated -->
+# Data and Privacy
+
+
+## Data Inventory
+
+Data handled by the product:
+
+- Source images provided by users.
+- Normalized working images and masks.
+- Generated character references, sprite frames, thumbnails, and pet bundles.
+- Model prompts, generation parameters, and validation logs.
+- User preferences for the desktop runtime.
+
+## Retention and Redaction
+
+- Default posture: keep source images and generated bundles local.
+- `pet bundle v0.1` must not store source image copies or source image paths; later formats need an explicit deletion contract before allowing that.
+- The local `generate:pet` CLI validates the source image and records only allowlisted provenance such as MIME type, byte size, creation time, generator name, and `sourceImageStored:false`.
+- When passing personal source-image paths through npm scripts, prefer `npm --silent run generate:pet -- <source> <output>` because npm may echo command arguments in terminal output.
+- Do not commit personal images, generated likenesses, API keys, or raw model responses containing private data.
+- Fixtures must use rights-safe synthetic images or explicitly licensed assets.
+- Provide a deletion path that removes source image copies, derived assets, caches, and generation logs for a pet project.
+- Logs should record file IDs or hashes only when useful; avoid absolute personal file paths in shareable logs.
+
+## Cloud and Local Boundary
+
+Cloud generation is allowed only when the user explicitly chooses it or configures a cloud model provider. The UI and docs must make clear which data leaves the machine.
+
+Local-only mode should remain possible for privacy-sensitive users, even if quality or speed is lower.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stage Module Loop"
+  short_description: "Implement, review, fix, verify, and commit"
+  default_prompt: "Use $stage-module-loop to implement the next project module, internally review and fix it, verify it, then commit it."

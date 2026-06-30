@@ -1,0 +1,8 @@
+{
+  "fixture": true,
+  "generatedBy": "src/scripts/generate-fixture.ts",
+  "sourceType": "synthetic-geometric-shapes",
+  "license": "project-owned-test-fixture",
+  "containsPersonalImage": false,
+  "containsExternalAsset": false
+}
