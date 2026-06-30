@@ -6,7 +6,7 @@
 
 The system is a local-first desktop product with an asset-generation pipeline. Data flows from a user-supplied source image through validation, digital-character generation, asset packaging, preview, and finally a desktop overlay runtime that displays and animates the pet.
 
-The first vertical slice uses Electron and TypeScript for a macOS-first desktop runtime. It loads a local `pet bundle v0.1`, validates the bundle before launch, then renders the pet in a transparent, frameless, always-on-top window. The second vertical slice adds local source-image intake. The third vertical slice routes generation through a scripted adapter that returns frame PNGs shaped like future model output, without connecting a real model provider. The real image-to-character adapter spike chooses a cloud adapter behind explicit opt-in for the first real model path, with local model mode kept behind the same adapter contract for a later slice.
+The first vertical slice uses Electron and TypeScript for a macOS-first desktop runtime. It loads a local `pet bundle v0.1`, validates the bundle before launch, then renders the pet in a transparent, frameless, always-on-top window. The second vertical slice adds local source-image intake. The third vertical slice routes generation through a scripted adapter that returns frame PNGs shaped like future model output, without connecting a real model provider. The real image-to-character adapter spike chooses a cloud adapter behind explicit opt-in for the first real model path, with local model mode kept behind the same adapter contract for a later slice. The current cloud scaffold uses a mock provider, opt-in gating, provider config checks, source normalization, provider error mapping, and temp cleanup without live network calls.
 
 Initial components:
 
@@ -34,6 +34,7 @@ Current implementation layout:
 - `src/intake/` for local source-image validation.
 - `src/generation/` for bundle generation, adapter contracts, and model-adapter boundaries.
 - `src/generation/adapters/` for fake/scripted adapters now and real local/cloud adapters later.
+- `src/generation/normalization/` for source-derived temporary working images used by provider adapters.
 - `src/runtime/` for desktop overlay and behavior state machine.
 - `tests/<domain>/` for tests mirroring source domains.
 - `fixtures/<domain>/` for small, rights-safe sample assets.
@@ -57,6 +58,7 @@ Root files should be limited to stable entrypoints, project config, and compatib
 - Adapter output is a transparent 256x256 PNG frame sequence plus preview metadata; bundle packaging converts those frames into the v0.1 atlas consumed by runtime.
 - Real cloud generation must require explicit user confirmation before upload and must not change the runtime/bundle boundary.
 - Source image normalization is a generation concern: decode, orient, strip metadata, resize, create temporary working images, then delete temporary source-derived files outside the final bundle.
+- Cloud scaffold bundles set `privacy.cloudGenerated:true`; scripted/local bundles keep it false.
 
 ## Open Questions
 

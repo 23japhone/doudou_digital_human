@@ -2,6 +2,8 @@
 
 Date: 2026-06-30
 
+Status: Scaffold implemented with `mock-provider`; no live provider is connected.
+
 ## Decision
 
 The first real image-to-character adapter should be a cloud adapter behind explicit user opt-in. The existing scripted adapter remains the default local/no-network path. A local model adapter should use the same adapter contract later, but it is not the first real adapter because local packaging, model weights, GPU/CPU variance, and cache deletion are larger product risks than the adapter boundary itself.
@@ -140,10 +142,10 @@ npm run generate:pet -- <source-image-path> <output-bundle-dir>
 Future cloud command should make upload intent visible:
 
 ```bash
-npm run generate:pet:cloud -- <source-image-path> <output-bundle-dir> --provider <provider-id> --confirm-cloud-upload
+npm run generate:pet:cloud -- <source-image-path> <output-bundle-dir> --provider mock-provider --confirm-cloud-upload
 ```
 
-The CLI must fail with `CLOUD_OPT_IN_REQUIRED` if cloud mode is selected without explicit confirmation.
+The current scaffold supports `mock-provider` only and requires `DOUDOU_MOCK_CLOUD_API_KEY`. The CLI must fail with `CLOUD_OPT_IN_REQUIRED` if cloud mode is selected without explicit confirmation.
 
 ## Test Plan
 

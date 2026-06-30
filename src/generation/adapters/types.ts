@@ -1,9 +1,11 @@
 import type { SourceImageInfo } from "../../intake/source-image.js";
+import type { NormalizedSourceImage } from "../normalization/source-normalizer.js";
 
 export type GeneratedPetFrameRole = "idle" | "tap_react";
 
 export interface PetGenerationRequest {
   sourceImage: SourceImageInfo;
+  normalizedSourceImage?: NormalizedSourceImage;
 }
 
 export interface GeneratedPetFrame {
@@ -25,5 +27,8 @@ export interface GeneratedPetAdapterOutput {
 export interface PetGenerationAdapter {
   id: string;
   version: string;
+  cloudGenerated?: boolean;
+  requiresNormalizedSourceImage?: boolean;
+  preflight?(): void;
   generate(request: PetGenerationRequest): Promise<GeneratedPetAdapterOutput>;
 }

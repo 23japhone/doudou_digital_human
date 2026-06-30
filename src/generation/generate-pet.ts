@@ -6,14 +6,20 @@ import { validatePetBundle } from "../pet_bundle/validate.js";
 import { SourceImageIntakeError, validateSourceImage, type SourceImageInfo } from "../intake/source-image.js";
 import { createScriptedPetAdapter } from "./adapters/scripted-pet-adapter.js";
 import type { GeneratedPetAdapterOutput, GeneratedPetFrame, PetGenerationAdapter } from "./adapters/types.js";
+import {
+  normalizeSourceImage,
+  SourceImageNormalizationError,
+  type NormalizedSourceImageHandle
+} from "./normalization/source-normalizer.js";
 
-export { SourceImageIntakeError };
+export { SourceImageIntakeError, SourceImageNormalizationError };
 
 export interface GeneratePetBundleOptions {
   sourceImagePath: string;
   outputBundleDir: string;
   now?: Date;
   adapter?: PetGenerationAdapter;
+  normalizationTempRoot?: string;
 }
 
 export interface GeneratePetBundleResult {
@@ -45,15 +51,33 @@ export async function generatePetBundleFromSource(options: GeneratePetBundleOpti
     throw new PetGenerationError("MISSING_OUTPUT_DIR", "An output bundle directory is required.");
   }
 
+  const adapter = options.adapter ?? createScriptedPetAdapter();
+  adapter.preflight?.();
+
   const sourceImage = await validateSourceImage(options.sourceImagePath);
   const bundleDir = path.resolve(options.outputBundleDir);
   await prepareOutputDir(bundleDir);
 
-  const adapter = options.adapter ?? createScriptedPetAdapter();
-  const generatedPet = await adapter.generate({ sourceImage });
-  validateAdapterOutput(adapter, generatedPet);
+  let normalizedSourceImage: NormalizedSourceImageHandle | null = null;
+  let generatedPet: GeneratedPetAdapterOutput;
+  try {
+    if (adapter.requiresNormalizedSourceImage) {
+      normalizedSourceImage = await normalizeSourceImage({
+        sourceImagePath: options.sourceImagePath,
+        sourceImage,
+        tempRoot: options.normalizationTempRoot
+      });
+    }
+    generatedPet = await adapter.generate({
+      sourceImage,
+      normalizedSourceImage: normalizedSourceImage?.image
+    });
+    validateAdapterOutput(adapter, generatedPet);
+  } finally {
+    await normalizedSourceImage?.cleanup();
+  }
 
-  const manifest = createManifest(generatedPet);
+  const manifest = createManifest(generatedPet, adapter);
   await mkdir(path.join(bundleDir, "atlases"), { recursive: true });
   await writeFile(path.join(bundleDir, "atlases/main.png"), createAtlasPng(generatedPet.frames));
   await writeFile(path.join(bundleDir, "preview.png"), generatedPet.previewPng);
@@ -94,7 +118,7 @@ function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoExcepti
   return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
 }
 
-function createManifest(generatedPet: GeneratedPetAdapterOutput): PetManifest {
+function createManifest(generatedPet: GeneratedPetAdapterOutput, adapter: PetGenerationAdapter): PetManifest {
   return {
     schemaVersion: "0.1.0",
     id: generatedPet.petId,
@@ -154,7 +178,7 @@ function createManifest(generatedPet: GeneratedPetAdapterOutput): PetManifest {
     },
     privacy: {
       sourceImageStored: false,
-      cloudGenerated: false
+      cloudGenerated: adapter.cloudGenerated ?? false
     },
     provenance: {
       sourceMeta: "source.meta.json"
