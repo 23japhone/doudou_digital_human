@@ -9,6 +9,9 @@
 - Unit tests: `npm test`
 - Build: `npm run build`
 - Generate local pet bundle: `npm run generate:pet -- <source-image-path> <output-bundle-dir>`
+- Review generated pet bundle: `npm run review:pet -- qa <bundle-dir> <review-dir>`
+- Accept generated pet bundle: `npm run review:pet -- accept <bundle-dir> <library-dir>`
+- Delete review or accepted assets: `npm run review:pet -- delete <target-dir> --root <allowed-root>`
 - Fixture validation: `npm run validate:fixture`
 - Runtime smoke: `npm run smoke:runtime`
 
@@ -20,6 +23,7 @@
 - Keep a tiny rights-safe golden fixture bundle for regression tests.
 - Add smoke tests for preview rendering and desktop runtime launch once a runtime stack exists.
 - Add visual QA snapshots/contact sheets for generated sprite assets.
+- Review workflow tests cover QA report creation, accepted bundle validation, deletion safety, and privacy-safe review/install metadata.
 - Runtime smoke covers missing manifest, missing asset, unsupported schema, then launches the fixture and a generated bundle. Both require structured renderer evidence: bundle loaded, atlas loaded, nontransparent canvas pixel, and idle animation advance.
 
 ## Test Layout
@@ -45,3 +49,4 @@ Fixtures must be small, rights-safe, and documented.
 - Bundle validation changes must keep negative coverage for unreferenced files, source-like payloads, bad preview images, missing assets, and unsupported schema versions.
 - Generation adapter changes must cover valid frame output, missing frames, out-of-range frame indexes, bad preview assets, and sanitized provenance metadata.
 - Real adapter changes must cover cloud confirmation gating, provider config failures, source normalization cleanup, provider error mapping, `privacy.cloudGenerated`, and no leakage of raw prompts, raw responses, tokens, or source paths.
+- Review/deletion changes must cover invalid bundle rejection before artifact creation, accepted bundle validation, refusal to overwrite installs, refusal to delete outside the allowed root, and no absolute path or secret leakage in review/install records.

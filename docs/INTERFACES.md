@@ -19,6 +19,9 @@ Potential developer interfaces:
 - `node dist/src/cli/validate-pet.js <bundle-dir>` validates any local bundle after `npm run build:main`.
 - `npm run generate:pet -- <source-image-path> <output-bundle-dir>` validates and decodes a local PNG/JPEG source image, runs the default scripted generation adapter, then writes a deterministic `pet bundle v0.1`.
 - Cloud scaffold entrypoint: `npm run generate:pet:cloud -- <source-image-path> <output-bundle-dir> --provider mock-provider --confirm-cloud-upload`. This uses a mocked provider and does not perform live network calls.
+- `npm run review:pet -- qa <bundle-dir> <review-dir>` validates a generated bundle and writes `review.json`, `preview.png`, and `contact-sheet.png` for user inspection.
+- `npm run review:pet -- accept <bundle-dir> <library-dir>` validates and copies the bundle into `<library-dir>/<pet-id>` without adding files to the bundle.
+- `npm run review:pet -- delete <target-dir> --root <allowed-root>` deletes an accepted or review directory only when the target is a child directory inside the allowed root.
 - `npm run dev` launches the fixture in the Electron desktop runtime.
 - `npm run smoke:runtime` runs Electron runtime negative cases, then launches both the fixture bundle and a generated bundle before exiting after structured renderer smoke results.
 
@@ -46,6 +49,10 @@ Generation adapters receive validated local source-image metadata and return gen
 The bundle generator validates adapter output, packs frames into `atlases/main.png`, writes `preview.png`, and then validates the final bundle. Runtime consumes only the final bundle.
 
 Real cloud adapters must fail with `CLOUD_OPT_IN_REQUIRED` unless the user explicitly confirms upload. Provider-specific failures map to project-owned codes such as `PROVIDER_NOT_CONFIGURED`, `MODEL_REFUSED`, `MODEL_RATE_LIMITED`, `MODEL_TIMEOUT`, `MODEL_PROVIDER_ERROR`, `MODEL_OUTPUT_INVALID`, and `POSTPROCESSING_FAILED`. The current scaffold supports only `mock-provider` and requires `DOUDOU_MOCK_CLOUD_API_KEY` to exercise provider-config gating without a live provider.
+
+## Review Flow Contract
+
+The review layer consumes only validated pet bundles. `qa` writes a separate `pet-review.v0.1` report and generated preview artifacts outside the bundle, so the bundle remains unchanged. `accept` installs a clean copy of the validated bundle into a local library directory. `delete` requires an explicit allowed root and refuses to delete that root itself or any target outside it.
 
 ## Examples
 

@@ -20,10 +20,12 @@ Data handled by the product:
 - Scripted and future real generation adapters must return sanitized asset outputs. Adapter outputs must not include source image paths, raw prompts, raw model responses, provider payloads, tokens, or secrets.
 - Real cloud adapters must show explicit confirmation before upload. Confirmation must state that the selected image and generation instructions leave the machine, that provider retention/policy rules may apply, and that the pet bundle still stores only generated assets plus non-sensitive provenance.
 - Source normalization creates temporary source-derived PNG files outside the final bundle for cloud adapters. The scaffold deletes those files after success and after mapped provider failures.
+- Review/QA artifacts are derived from generated bundle assets only: `review.json`, copied `preview.png`, and copied `contact-sheet.png`. They must not contain source image paths, prompts, raw responses, tokens, or secrets.
+- Accepting a bundle copies only the validated pet bundle files into the local library; it must not add installation metadata inside the bundle because unreferenced files break the bundle contract.
 - When passing personal source-image paths through npm scripts, prefer `npm --silent run generate:pet -- <source> <output>` because npm may echo command arguments in terminal output.
 - Do not commit personal images, generated likenesses, API keys, or raw model responses containing private data.
 - Fixtures must use rights-safe synthetic images or explicitly licensed assets.
-- Provide a deletion path that removes source image copies, derived assets, caches, and generation logs for a pet project.
+- Provide a deletion path that removes source image copies, derived assets, caches, and generation logs for a pet project. The first deletion CLI requires an explicit allowed root and deletes only child directories under that root.
 - Logs should record file IDs or hashes only when useful; avoid absolute personal file paths in shareable logs.
 
 ## Cloud and Local Boundary
