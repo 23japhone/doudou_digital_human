@@ -4,6 +4,8 @@ import { PNG } from "pngjs";
 import type { PetManifest } from "../pet_bundle/manifest.js";
 import { validatePetBundle } from "../pet_bundle/validate.js";
 import { SourceImageIntakeError, validateSourceImage, type SourceImageInfo } from "../intake/source-image.js";
+import { createScriptedPetAdapter } from "./adapters/scripted-pet-adapter.js";
+import type { GeneratedPetAdapterOutput, GeneratedPetFrame, PetGenerationAdapter } from "./adapters/types.js";
 
 export { SourceImageIntakeError };
 
@@ -11,16 +13,25 @@ export interface GeneratePetBundleOptions {
   sourceImagePath: string;
   outputBundleDir: string;
   now?: Date;
+  adapter?: PetGenerationAdapter;
 }
 
 export interface GeneratePetBundleResult {
   bundleDir: string;
   manifest: PetManifest;
   sourceImage: SourceImageInfo;
+  generation: {
+    adapterId: string;
+    adapterVersion: string;
+  };
 }
 
 export class PetGenerationError extends Error {
-  readonly code: "MISSING_OUTPUT_DIR" | "OUTPUT_PATH_NOT_DIRECTORY" | "OUTPUT_DIR_NOT_EMPTY";
+  readonly code:
+    | "MISSING_OUTPUT_DIR"
+    | "OUTPUT_PATH_NOT_DIRECTORY"
+    | "OUTPUT_DIR_NOT_EMPTY"
+    | "ADAPTER_OUTPUT_INVALID";
 
   constructor(code: PetGenerationError["code"], message: string) {
     super(message);
@@ -38,15 +49,30 @@ export async function generatePetBundleFromSource(options: GeneratePetBundleOpti
   const bundleDir = path.resolve(options.outputBundleDir);
   await prepareOutputDir(bundleDir);
 
-  const manifest = createManifest();
+  const adapter = options.adapter ?? createScriptedPetAdapter();
+  const generatedPet = await adapter.generate({ sourceImage });
+  validateAdapterOutput(adapter, generatedPet);
+
+  const manifest = createManifest(generatedPet);
   await mkdir(path.join(bundleDir, "atlases"), { recursive: true });
-  await writeFile(path.join(bundleDir, "atlases/main.png"), createAtlasPng(sourceImage));
-  await writeFile(path.join(bundleDir, "preview.png"), createPreviewPng(sourceImage));
-  await writeFile(path.join(bundleDir, "source.meta.json"), `${JSON.stringify(createSourceMeta(sourceImage, options.now), null, 2)}\n`);
+  await writeFile(path.join(bundleDir, "atlases/main.png"), createAtlasPng(generatedPet.frames));
+  await writeFile(path.join(bundleDir, "preview.png"), generatedPet.previewPng);
+  await writeFile(
+    path.join(bundleDir, "source.meta.json"),
+    `${JSON.stringify(createSourceMeta(sourceImage, generatedPet, options.now), null, 2)}\n`
+  );
   await writeFile(path.join(bundleDir, "pet.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   await validatePetBundle(bundleDir);
-  return { bundleDir, manifest, sourceImage };
+  return {
+    bundleDir,
+    manifest,
+    sourceImage,
+    generation: {
+      adapterId: generatedPet.adapterId,
+      adapterVersion: generatedPet.adapterVersion
+    }
+  };
 }
 
 async function prepareOutputDir(bundleDir: string): Promise<void> {
@@ -68,11 +94,11 @@ function isNodeError(error: unknown, code: string): error is NodeJS.ErrnoExcepti
   return error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === code;
 }
 
-function createManifest(): PetManifest {
+function createManifest(generatedPet: GeneratedPetAdapterOutput): PetManifest {
   return {
     schemaVersion: "0.1.0",
-    id: "generated_local_pet",
-    name: "Generated Local Pet",
+    id: generatedPet.petId,
+    name: generatedPet.petName,
     assetFormat: "png_sprite_atlas_grid",
     canvas: {
       width: 256,
@@ -136,10 +162,16 @@ function createManifest(): PetManifest {
   };
 }
 
-function createSourceMeta(sourceImage: SourceImageInfo, now = new Date()): Record<string, unknown> {
+function createSourceMeta(
+  sourceImage: SourceImageInfo,
+  generatedPet: GeneratedPetAdapterOutput,
+  now = new Date()
+): Record<string, unknown> {
   return {
     fixture: false,
     generatedBy: "src/generation/generate-pet.ts",
+    generationAdapter: generatedPet.adapterId,
+    generationAdapterVersion: generatedPet.adapterVersion,
     sourceType: "local-image-intake",
     inputMime: sourceImage.mime,
     inputBytes: sourceImage.bytes,
@@ -148,80 +180,102 @@ function createSourceMeta(sourceImage: SourceImageInfo, now = new Date()): Recor
   };
 }
 
-function createAtlasPng(sourceImage: SourceImageInfo): Buffer {
+function validateAdapterOutput(adapter: PetGenerationAdapter, output: GeneratedPetAdapterOutput): void {
+  assertAllowedKeys(output, [
+    "adapterId",
+    "adapterVersion",
+    "petId",
+    "petName",
+    "previewFrameIndex",
+    "previewPng",
+    "frames"
+  ], "Generation adapter output");
+  if (output.adapterId !== adapter.id || output.adapterVersion !== adapter.version) {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", "Generation adapter output identity does not match the adapter.");
+  }
+  if (!output.petId || !output.petName) {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", "Generation adapter output must include pet identity.");
+  }
+  if (!Array.isArray(output.frames)) {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", "Generation adapter output frames must be an array.");
+  }
+  const frameByIndex = new Map<number, GeneratedPetFrame>();
+  for (const frame of output.frames) {
+    assertAllowedKeys(frame, ["index", "role", "png"], "Generation adapter frame output");
+    if (!Number.isInteger(frame.index) || frame.index < 0 || frame.index > 7) {
+      throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", "Generation adapter output frame indexes must be 0 through 7.");
+    }
+    if (frameByIndex.has(frame.index)) {
+      throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", "Generation adapter output contains duplicate frame indexes.");
+    }
+    frameByIndex.set(frame.index, frame);
+    assertFramePng(frame.png, `frame ${frame.index}`);
+  }
+  for (let index = 0; index < 8; index += 1) {
+    if (!frameByIndex.has(index)) {
+      throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", "Generation adapter output must include frame indexes 0 through 7.");
+    }
+  }
+  if (!Number.isInteger(output.previewFrameIndex) || !frameByIndex.has(output.previewFrameIndex)) {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", "Generation adapter output preview frame index must reference a generated frame.");
+  }
+  assertFramePng(output.previewPng, "preview");
+}
+
+function assertAllowedKeys(value: unknown, allowedKeys: string[], label: string): void {
+  if (!value || typeof value !== "object") {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", `${label} must be an object.`);
+  }
+  const allowed = new Set(allowedKeys);
+  const unexpectedKey = Object.keys(value).find((key) => !allowed.has(key));
+  if (unexpectedKey) {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", `${label} contains unsupported field ${unexpectedKey}.`);
+  }
+}
+
+function assertFramePng(buffer: Buffer, label: string): PNG {
+  let png: PNG;
+  try {
+    png = PNG.sync.read(buffer);
+  } catch {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", `Generation adapter output ${label} is not a valid PNG.`);
+  }
+  if (png.width !== 256 || png.height !== 256) {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", `Generation adapter output ${label} must be 256x256.`);
+  }
+  if (isTransparent(png)) {
+    throw new PetGenerationError("ADAPTER_OUTPUT_INVALID", `Generation adapter output ${label} must not be fully transparent.`);
+  }
+  return png;
+}
+
+function createAtlasPng(frames: GeneratedPetFrame[]): Buffer {
   const png = new PNG({ width: 1024, height: 512 });
-  for (let frameIndex = 0; frameIndex < 8; frameIndex += 1) {
-    drawPetFrame(png, (frameIndex % 4) * 256, Math.floor(frameIndex / 4) * 256, frameIndex, sourceImage);
+  for (const frame of frames) {
+    const framePng = assertFramePng(frame.png, `frame ${frame.index}`);
+    blitFrame(png, framePng, (frame.index % 4) * 256, Math.floor(frame.index / 4) * 256);
   }
   return PNG.sync.write(png);
 }
 
-function createPreviewPng(sourceImage: SourceImageInfo): Buffer {
-  const png = new PNG({ width: 256, height: 256 });
-  drawPetFrame(png, 0, 0, 1, sourceImage);
-  return PNG.sync.write(png);
-}
-
-function drawPetFrame(png: PNG, offsetX: number, offsetY: number, frameIndex: number, sourceImage: SourceImageInfo): void {
-  const bounce = frameIndex % 3;
-  const react = frameIndex >= 4;
-  const accent = sourceImage.mime === "image/jpeg" ? [235, 154, 84] : [86, 179, 222];
-  const bodyColor = react ? [255, 181, 96] : accent;
-  const earColor = react ? [245, 126, 92] : [45, 137, 201];
-  const eyeColor = [23, 35, 64];
-
-  fillCircle(png, offsetX + 128, offsetY + 142 - bounce * 2, 58, bodyColor, 255);
-  fillCircle(png, offsetX + 92, offsetY + 96 - bounce, 24, earColor, 255);
-  fillCircle(png, offsetX + 164, offsetY + 96 - bounce, 24, earColor, 255);
-  fillCircle(png, offsetX + 109, offsetY + 132 - bounce, react ? 6 : 8, eyeColor, 255);
-  fillCircle(png, offsetX + 147, offsetY + 132 - bounce, react ? 6 : 8, eyeColor, 255);
-
-  if (react) {
-    fillCircle(png, offsetX + 128, offsetY + 164 - bounce, 10, [255, 255, 255], 255);
-    fillRect(png, offsetX + 124, offsetY + 160 - bounce, 8, 8, eyeColor, 255);
-    fillCircle(png, offsetX + 70, offsetY + 52, 6, [255, 226, 95], 255);
-    fillCircle(png, offsetX + 186, offsetY + 56, 5, [255, 226, 95], 255);
-  } else {
-    fillRect(png, offsetX + 106, offsetY + 168 - bounce, 44, 7, eyeColor, 255);
-  }
-
-  fillRect(png, offsetX + 92, offsetY + 202 - bounce, 72, 8, [38, 90, 150], 180);
-}
-
-function fillCircle(
-  png: PNG,
-  centerX: number,
-  centerY: number,
-  radius: number,
-  rgb: number[],
-  alpha: number
-): void {
-  for (let y = centerY - radius; y <= centerY + radius; y += 1) {
-    for (let x = centerX - radius; x <= centerX + radius; x += 1) {
-      const dx = x - centerX;
-      const dy = y - centerY;
-      if (dx * dx + dy * dy <= radius * radius) {
-        setPixel(png, x, y, rgb, alpha);
-      }
+function blitFrame(atlas: PNG, frame: PNG, offsetX: number, offsetY: number): void {
+  for (let y = 0; y < frame.height; y += 1) {
+    for (let x = 0; x < frame.width; x += 1) {
+      const sourceIndex = (frame.width * y + x) << 2;
+      const targetIndex = (atlas.width * (offsetY + y) + offsetX + x) << 2;
+      atlas.data[targetIndex] = frame.data[sourceIndex];
+      atlas.data[targetIndex + 1] = frame.data[sourceIndex + 1];
+      atlas.data[targetIndex + 2] = frame.data[sourceIndex + 2];
+      atlas.data[targetIndex + 3] = frame.data[sourceIndex + 3];
     }
   }
 }
 
-function fillRect(png: PNG, x: number, y: number, width: number, height: number, rgb: number[], alpha: number): void {
-  for (let yy = y; yy < y + height; yy += 1) {
-    for (let xx = x; xx < x + width; xx += 1) {
-      setPixel(png, xx, yy, rgb, alpha);
+function isTransparent(png: PNG): boolean {
+  for (let index = 3; index < png.data.length; index += 4) {
+    if (png.data[index] > 0) {
+      return false;
     }
   }
-}
-
-function setPixel(png: PNG, x: number, y: number, rgb: number[], alpha: number): void {
-  if (x < 0 || y < 0 || x >= png.width || y >= png.height) {
-    return;
-  }
-  const index = (png.width * y + x) << 2;
-  png.data[index] = rgb[0] ?? 0;
-  png.data[index + 1] = rgb[1] ?? 0;
-  png.data[index + 2] = rgb[2] ?? 0;
-  png.data[index + 3] = alpha;
+  return true;
 }

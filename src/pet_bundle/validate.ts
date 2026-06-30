@@ -47,6 +47,8 @@ export class PetBundleValidationError extends Error {
 const sourceMetaSchema = z.object({
   fixture: z.boolean().optional(),
   generatedBy: z.string().min(1).max(160).optional(),
+  generationAdapter: z.string().min(1).max(160).optional(),
+  generationAdapterVersion: z.string().min(1).max(80).optional(),
   sourceType: z.enum(["synthetic-geometric-shapes", "local-image-intake"]).optional(),
   license: z.string().min(1).max(160).optional(),
   containsPersonalImage: z.boolean().optional(),

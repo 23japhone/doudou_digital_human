@@ -6,6 +6,7 @@ import { PNG } from "pngjs";
 import { afterEach, describe, expect, test } from "vitest";
 import { runGeneratePetCli } from "../../src/cli/generate-pet.js";
 import { generatePetBundleFromSource } from "../../src/generation/generate-pet.js";
+import type { PetGenerationAdapter } from "../../src/generation/adapters/types.js";
 import { validatePetBundle } from "../../src/pet_bundle/validate.js";
 
 const tempDirs: string[] = [];
@@ -46,6 +47,8 @@ describe("generatePetBundleFromSource", () => {
       "createdAt",
       "fixture",
       "generatedBy",
+      "generationAdapter",
+      "generationAdapterVersion",
       "inputBytes",
       "inputMime",
       "sourceImageStored",
@@ -54,6 +57,8 @@ describe("generatePetBundleFromSource", () => {
     expect(sourceMeta).toMatchObject({
       fixture: false,
       generatedBy: "src/generation/generate-pet.ts",
+      generationAdapter: "scripted-pet-adapter",
+      generationAdapterVersion: "0.1.0",
       sourceType: "local-image-intake",
       inputMime: "image/png",
       inputBytes: sourceBytes.length,
@@ -61,6 +66,8 @@ describe("generatePetBundleFromSource", () => {
       sourceImageStored: false
     });
     expect(JSON.stringify(sourceMeta)).not.toContain(sourcePath);
+    expect(JSON.stringify(sourceMeta)).not.toContain("prompt");
+    expect(JSON.stringify(sourceMeta)).not.toContain("rawResponse");
   });
 
   test("generates a validated v0.1 bundle from a local JPEG", async () => {
@@ -111,6 +118,162 @@ describe("generatePetBundleFromSource", () => {
     await expect(validatePetBundle(outputDir)).resolves.toMatchObject({
       manifest: expect.objectContaining({ id: "generated_local_pet" })
     });
+  });
+
+  test("rejects adapter output that does not provide all required frame PNGs", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "input.png");
+    await writeFile(sourcePath, createPngSource());
+
+    const badAdapter: PetGenerationAdapter = {
+      id: "bad-test-adapter",
+      version: "0.1.0",
+      async generate() {
+        return {
+          adapterId: "bad-test-adapter",
+          adapterVersion: "0.1.0",
+          petId: "generated_local_pet",
+          petName: "Generated Local Pet",
+          previewFrameIndex: 0,
+          previewPng: createPngSource(256, 256),
+          frames: []
+        };
+      }
+    };
+
+    await expect(
+      generatePetBundleFromSource({
+        sourceImagePath: sourcePath,
+        outputBundleDir: path.join(workspace, "out"),
+        now: fixedNow,
+        adapter: badAdapter
+      })
+    ).rejects.toMatchObject({ code: "ADAPTER_OUTPUT_INVALID" });
+  });
+
+  test("rejects adapter output with frame indexes outside the bundle grid", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "input.png");
+    await writeFile(sourcePath, createPngSource());
+
+    const badAdapter: PetGenerationAdapter = {
+      id: "bad-test-adapter",
+      version: "0.1.0",
+      async generate() {
+        return {
+          adapterId: "bad-test-adapter",
+          adapterVersion: "0.1.0",
+          petId: "generated_local_pet",
+          petName: "Generated Local Pet",
+          previewFrameIndex: 0,
+          previewPng: createPngSource(256, 256),
+          frames: [...createFramePngOutputs(), { index: 8, role: "idle", png: createPngSource(256, 256) }]
+        };
+      }
+    };
+
+    await expect(
+      generatePetBundleFromSource({
+        sourceImagePath: sourcePath,
+        outputBundleDir: path.join(workspace, "out"),
+        now: fixedNow,
+        adapter: badAdapter
+      })
+    ).rejects.toMatchObject({ code: "ADAPTER_OUTPUT_INVALID" });
+  });
+
+  test("rejects adapter output with an invalid preview frame index", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "input.png");
+    await writeFile(sourcePath, createPngSource());
+
+    const badAdapter: PetGenerationAdapter = {
+      id: "bad-test-adapter",
+      version: "0.1.0",
+      async generate() {
+        return {
+          adapterId: "bad-test-adapter",
+          adapterVersion: "0.1.0",
+          petId: "generated_local_pet",
+          petName: "Generated Local Pet",
+          previewFrameIndex: 8,
+          previewPng: createPngSource(256, 256),
+          frames: createFramePngOutputs()
+        };
+      }
+    };
+
+    await expect(
+      generatePetBundleFromSource({
+        sourceImagePath: sourcePath,
+        outputBundleDir: path.join(workspace, "out"),
+        now: fixedNow,
+        adapter: badAdapter
+      })
+    ).rejects.toMatchObject({ code: "ADAPTER_OUTPUT_INVALID" });
+  });
+
+  test("rejects adapter output with an invalid preview PNG", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "input.png");
+    await writeFile(sourcePath, createPngSource());
+
+    const badAdapter: PetGenerationAdapter = {
+      id: "bad-test-adapter",
+      version: "0.1.0",
+      async generate() {
+        return {
+          adapterId: "bad-test-adapter",
+          adapterVersion: "0.1.0",
+          petId: "generated_local_pet",
+          petName: "Generated Local Pet",
+          previewFrameIndex: 0,
+          previewPng: Buffer.from("not a png"),
+          frames: createFramePngOutputs()
+        };
+      }
+    };
+
+    await expect(
+      generatePetBundleFromSource({
+        sourceImagePath: sourcePath,
+        outputBundleDir: path.join(workspace, "out"),
+        now: fixedNow,
+        adapter: badAdapter
+      })
+    ).rejects.toMatchObject({ code: "ADAPTER_OUTPUT_INVALID" });
+  });
+
+  test("rejects adapter output with fields outside the adapter contract", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "input.png");
+    await writeFile(sourcePath, createPngSource());
+
+    const badAdapter: PetGenerationAdapter = {
+      id: "bad-test-adapter",
+      version: "0.1.0",
+      async generate() {
+        return {
+          adapterId: "bad-test-adapter",
+          adapterVersion: "0.1.0",
+          petId: "generated_local_pet",
+          petName: "Generated Local Pet",
+          previewFrameIndex: 0,
+          previewPng: createPngSource(256, 256),
+          frames: createFramePngOutputs(),
+          rawResponse: { id: "provider-payload" }
+        } as never;
+      }
+    };
+
+    await expect(
+      generatePetBundleFromSource({
+        sourceImagePath: sourcePath,
+        outputBundleDir: path.join(workspace, "out"),
+        now: fixedNow,
+        adapter: badAdapter
+      })
+    ).rejects.toMatchObject({ code: "ADAPTER_OUTPUT_INVALID" });
   });
 
   test.each([
@@ -221,8 +384,8 @@ async function listRelativeFiles(rootDir: string): Promise<string[]> {
   return files.sort();
 }
 
-function createPngSource(): Buffer {
-  const png = new PNG({ width: 24, height: 24 });
+function createPngSource(width = 24, height = 24): Buffer {
+  const png = new PNG({ width, height });
   for (let y = 0; y < png.height; y += 1) {
     for (let x = 0; x < png.width; x += 1) {
       const index = (png.width * y + x) << 2;
@@ -247,6 +410,14 @@ function createJpegSource(width: number, height: number): Buffer {
     }
   }
   return encodeJpeg({ data, width, height }, 80).data;
+}
+
+function createFramePngOutputs() {
+  return Array.from({ length: 8 }, (_value, index) => ({
+    index,
+    role: index >= 4 ? "tap_react" as const : "idle" as const,
+    png: createPngSource(256, 256)
+  }));
 }
 
 function createJpegHeaderOnlySource(width: number, height: number): Buffer {

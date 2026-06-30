@@ -17,7 +17,7 @@ Potential developer interfaces:
 
 - `npm run validate:fixture` validates the committed fixture bundle.
 - `node dist/src/cli/validate-pet.js <bundle-dir>` validates any local bundle after `npm run build:main`.
-- `npm run generate:pet -- <source-image-path> <output-bundle-dir>` validates and decodes a local PNG/JPEG source image, then writes a deterministic placeholder `pet bundle v0.1`.
+- `npm run generate:pet -- <source-image-path> <output-bundle-dir>` validates and decodes a local PNG/JPEG source image, runs the default scripted generation adapter, then writes a deterministic `pet bundle v0.1`.
 - `npm run dev` launches the fixture in the Electron desktop runtime.
 - `npm run smoke:runtime` runs Electron runtime negative cases, then launches both the fixture bundle and a generated bundle before exiting after structured renderer smoke results.
 
@@ -28,9 +28,21 @@ Potential developer interfaces:
 - `pet bundle v0.1` uses a strict file allowlist. Files not referenced by `pet.json` are rejected.
 - `preview.png` and atlas assets must decode as PNGs and match declared dimensions.
 - `pet bundle v0.1` requires `privacy.sourceImageStored` to be false; source images, source image paths, raw prompts, raw model responses, secrets, and other private payloads must not be present in the bundle.
-- `source.meta.json` uses a strict v0.1 allowlist for non-sensitive provenance fields such as `fixture`, `generatedBy`, `sourceType`, `inputMime`, `inputBytes`, `createdAt`, and `sourceImageStored:false`.
+- `source.meta.json` uses a strict v0.1 allowlist for non-sensitive provenance fields such as `fixture`, `generatedBy`, `generationAdapter`, `generationAdapterVersion`, `sourceType`, `inputMime`, `inputBytes`, `createdAt`, and `sourceImageStored:false`.
 - Add migrations only after at least one real bundle format exists.
 - Keep generated assets deterministic enough for regression tests where possible.
+
+## Generation Adapter Contract
+
+Generation adapters receive validated local source-image metadata and return generated pet assets. For `pet bundle v0.1`, adapter output is constrained to:
+
+- `adapterId` and `adapterVersion`
+- `petId` and `petName`
+- eight transparent 256x256 PNG frames indexed `0..7`
+- one transparent 256x256 `previewPng`
+- no source image paths, prompts, raw model responses, tokens, secrets, or provider payloads
+
+The bundle generator validates adapter output, packs frames into `atlases/main.png`, writes `preview.png`, and then validates the final bundle. Runtime consumes only the final bundle.
 
 ## Examples
 

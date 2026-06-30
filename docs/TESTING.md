@@ -15,7 +15,7 @@
 ## Test Strategy
 
 - Unit test image validation, manifest parsing, bundle validation, and behavior state transitions.
-- Use fake model adapters for deterministic generation tests.
+- Use fake/scripted model adapters for deterministic generation tests and verify adapter outputs before bundle packaging.
 - Keep a tiny rights-safe golden fixture bundle for regression tests.
 - Add smoke tests for preview rendering and desktop runtime launch once a runtime stack exists.
 - Add visual QA snapshots/contact sheets for generated sprite assets.
@@ -42,3 +42,4 @@ Fixtures must be small, rights-safe, and documented.
 - Privacy-sensitive changes verify logs, fixtures, and errors do not expose source images or secrets.
 - Fixture assets must be synthetic or explicitly licensed. The current fixture is generated from simple project-owned geometric shapes.
 - Bundle validation changes must keep negative coverage for unreferenced files, source-like payloads, bad preview images, missing assets, and unsupported schema versions.
+- Generation adapter changes must cover valid frame output, missing frames, out-of-range frame indexes, bad preview assets, and sanitized provenance metadata.
