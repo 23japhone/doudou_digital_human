@@ -14,7 +14,7 @@
 - Delete review or accepted assets: `npm run review:pet -- delete <target-dir> --root <allowed-root>`
 - Guided desktop app: `npm run dev:app`
 - Guided desktop app smoke: `npm run smoke:app`
-- Guided desktop app live smoke: `npm run smoke:app:live` (skips unless `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set)
+- Guided desktop app live smoke: `npm run smoke:app:live` (skips unless `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set). Use `npm run smoke:app:live -- --source <image-path>` or `DOUDOU_APP_SMOKE_SOURCE_IMAGE=<image-path>` to run the live smoke against a specific local source image.
 - Fixture validation: `npm run validate:fixture`
 - Runtime smoke: `npm run smoke:runtime`
 
@@ -28,7 +28,7 @@
 - Add visual QA snapshots/contact sheets for generated sprite assets.
 - Review workflow tests cover QA report creation, accepted bundle validation, deletion safety, and privacy-safe review/install metadata.
 - Runtime smoke covers missing manifest, missing asset, unsupported schema, then launches the fixture and a generated bundle. Both require structured renderer evidence: bundle loaded, atlas loaded, nontransparent canvas pixel, and idle animation advance.
-- Guided app smoke launches the Electron manager UI, selects mock-cloud generation, confirms upload, clicks through source selection, generation, QA, accept, runtime launch, draft deletion, and accepted deletion, then verifies the runtime smoke evidence returned through the UI flow. The live smoke reuses this flow with `openai_live` only when the required env vars are present.
+- Guided app smoke launches the Electron manager UI, selects mock-cloud generation, confirms upload, clicks through source selection, generation, QA, accept, runtime launch, draft deletion, and accepted deletion, then verifies the runtime smoke evidence returned through the UI flow. The live smoke reuses this flow with `openai_live` only when the required env vars are present, and can use either its synthetic source image or an explicit `--source` / `DOUDOU_APP_SMOKE_SOURCE_IMAGE` path.
 
 ## Test Layout
 

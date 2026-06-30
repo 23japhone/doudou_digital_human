@@ -12,8 +12,23 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = await runGuidedAppSmoke({ generationMode: "openai_live" });
+  const result = await runGuidedAppSmoke({
+    generationMode: "openai_live",
+    sourceImagePath: resolveLiveSmokeSourceImage(process.argv, process.env)
+  });
   console.log(`guided app live smoke: ${JSON.stringify(result)}`);
+}
+
+export function resolveLiveSmokeSourceImage(argv: string[], env: NodeJS.ProcessEnv): string | undefined {
+  return readFlagValue(argv, "--source") ?? env.DOUDOU_APP_SMOKE_SOURCE_IMAGE;
+}
+
+function readFlagValue(argv: string[], flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  if (index === -1) {
+    return undefined;
+  }
+  return argv[index + 1];
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

@@ -24,6 +24,7 @@ const stepItems = [...document.querySelectorAll<HTMLElement>("[data-step]")];
 
 let currentState = await window.doudouApp.getState();
 let busy = false;
+let lastActionError: AppActionResult<unknown>["error"] | null = null;
 render(currentState);
 
 generationMode.addEventListener("change", () => {
@@ -47,9 +48,11 @@ if (smokeConfig.enabled) {
 
 async function runAction<T>(action: () => Promise<AppActionResult<T>>): Promise<AppActionResult<T>> {
   busy = true;
+  lastActionError = null;
   render(currentState);
   const result = await action();
   currentState = result.state;
+  lastActionError = result.error ?? null;
   busy = false;
   render(currentState, result.error?.message);
   return result;
@@ -187,39 +190,60 @@ async function runSmokeFlow(): Promise<void> {
     finalStatus: currentState.status
   };
 
-  generationMode.value = smokeConfig.generationMode;
-  cloudConfirm.checked = true;
-  await updateGenerationSettings();
-  smokeResult.generationMode = currentState.generation.mode;
+  try {
+    generationMode.value = smokeConfig.generationMode;
+    cloudConfirm.checked = true;
+    await updateGenerationSettings();
+    smokeResult.generationMode = currentState.generation.mode;
 
-  const selected = await clickAndWait(selectButton, () => currentState.sourceImageName !== null);
-  smokeResult.sourceSelected = selected.ok && currentState.sourceImageName !== null;
+    const selected = await clickAndWait(selectButton, () => currentState.sourceImageName !== null);
+    assertSmokeAction("select source", selected);
+    smokeResult.sourceSelected = selected.ok && currentState.sourceImageName !== null;
 
-  const generated = await clickAndWait(generateButton, () => currentState.petId !== null);
-  smokeResult.generated = generated.ok && currentState.petId === "generated_cloud_pet";
-  smokeResult.petId = currentState.petId;
-  smokeResult.cloudGenerated = isCloudGenerationMode(currentState.generation.mode);
+    const generated = await clickAndWait(generateButton, () => currentState.petId !== null);
+    assertSmokeAction("generate", generated);
+    smokeResult.generated = generated.ok && currentState.petId === "generated_cloud_pet";
+    smokeResult.petId = currentState.petId;
+    smokeResult.cloudGenerated = isCloudGenerationMode(currentState.generation.mode);
 
-  const reviewed = await clickAndWait(qaButton, () => currentState.review !== null);
-  smokeResult.reviewed = reviewed.ok && currentState.review !== null;
-  smokeResult.previewLoaded = await waitForImage(previewImage, 256, 256);
-  smokeResult.contactSheetLoaded = await waitForImage(contactSheetImage, 1024, 512);
+    const reviewed = await clickAndWait(qaButton, () => currentState.review !== null);
+    assertSmokeAction("QA", reviewed);
+    smokeResult.reviewed = reviewed.ok && currentState.review !== null;
+    smokeResult.previewLoaded = await waitForImage(previewImage, 256, 256);
+    smokeResult.contactSheetLoaded = await waitForImage(contactSheetImage, 1024, 512);
 
-  const accepted = await clickAndWait(acceptButton, () => currentState.accepted !== null);
-  smokeResult.accepted = accepted.ok && currentState.accepted?.petId === "generated_cloud_pet";
+    const accepted = await clickAndWait(acceptButton, () => currentState.accepted !== null);
+    assertSmokeAction("accept", accepted);
+    smokeResult.accepted = accepted.ok && currentState.accepted?.petId === "generated_cloud_pet";
 
-  const launched = await clickAndWait(launchButton, () => currentState.launch?.launched === true);
-  smokeResult.launched = launched.ok && currentState.launch?.launched === true;
-  smokeResult.runtimeSmoke = currentState.launch?.smokeResult;
+    const launched = await clickAndWait(launchButton, () => currentState.launch?.launched === true);
+    assertSmokeAction("launch", launched);
+    smokeResult.launched = launched.ok && currentState.launch?.launched === true;
+    smokeResult.runtimeSmoke = currentState.launch?.smokeResult;
 
-  const draftDeleted = await clickAndWait(deleteDraftButton, () => !currentState.actions.canDeleteDraft);
-  smokeResult.deletedDraft = draftDeleted.ok && !currentState.actions.canDeleteDraft;
+    const draftDeleted = await clickAndWait(deleteDraftButton, () => !currentState.actions.canDeleteDraft);
+    assertSmokeAction("delete draft", draftDeleted);
+    smokeResult.deletedDraft = draftDeleted.ok && !currentState.actions.canDeleteDraft;
 
-  const acceptedDeleted = await clickAndWait(deleteAcceptedButton, () => currentState.accepted === null);
-  smokeResult.deletedAccepted = acceptedDeleted.ok && currentState.accepted === null;
+    const acceptedDeleted = await clickAndWait(deleteAcceptedButton, () => currentState.accepted === null);
+    assertSmokeAction("delete accepted", acceptedDeleted);
+    smokeResult.deletedAccepted = acceptedDeleted.ok && currentState.accepted === null;
+  } catch (error) {
+    smokeResult.error = currentState.lastError ?? lastActionError ?? {
+      code: error instanceof Error ? error.name : "SMOKE_ERROR",
+      message: error instanceof Error ? error.message : "Smoke flow failed."
+    };
+  }
   smokeResult.finalStatus = currentState.status;
 
   window.doudouApp.reportSmokeResult(smokeResult);
+}
+
+function assertSmokeAction(actionName: string, result: AppActionResult<unknown>): void {
+  if (result.ok) {
+    return;
+  }
+  throw new Error(result.error?.message ?? `Smoke ${actionName} action failed.`);
 }
 
 async function clickAndWait(
@@ -227,7 +251,14 @@ async function clickAndWait(
   predicate: () => boolean
 ): Promise<AppActionResult<unknown>> {
   if (button.disabled) {
-    throw new Error(`Smoke action ${button.id} is disabled.`);
+    return {
+      ok: false,
+      state: currentState,
+      error: currentState.lastError ?? {
+        code: "SMOKE_ACTION_DISABLED",
+        message: `Smoke action ${button.id} is disabled.`
+      }
+    };
   }
   const completion = waitFor(predicate);
   button.click();
@@ -238,6 +269,20 @@ async function waitFor(predicate: () => boolean): Promise<AppActionResult<unknow
   for (let attempt = 0; attempt < 400; attempt += 1) {
     if (predicate()) {
       return { ok: true, state: currentState };
+    }
+    if (currentState.lastError) {
+      return {
+        ok: false,
+        state: currentState,
+        error: currentState.lastError
+      };
+    }
+    if (lastActionError) {
+      return {
+        ok: false,
+        state: currentState,
+        error: lastActionError
+      };
     }
     await delay(25);
   }

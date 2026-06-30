@@ -14,6 +14,7 @@ import {
   type PublicGuidedPetState
 } from "./guided-flow.js";
 import { PetGenerationError, SourceImageIntakeError, SourceImageNormalizationError } from "../generation/generate-pet.js";
+import { CloudImageAdapterError } from "../generation/adapters/cloud-image-adapter.js";
 import { PetReviewError } from "../review/pet-review.js";
 import { PetBundleValidationError } from "../pet_bundle/validate.js";
 
@@ -189,6 +190,7 @@ function serializeActionError(error: unknown): { code: string; message: string }
     error instanceof GuidedPetFlowError ||
     error instanceof SourceImageIntakeError ||
     error instanceof SourceImageNormalizationError ||
+    error instanceof CloudImageAdapterError ||
     error instanceof PetGenerationError ||
     error instanceof PetReviewError
   ) {

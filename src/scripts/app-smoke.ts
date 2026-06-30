@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,6 +18,7 @@ interface SpawnResult {
 
 export interface GuidedAppSmokeRunOptions {
   generationMode?: GuidedGenerationMode;
+  sourceImagePath?: string;
 }
 
 async function main(): Promise<void> {
@@ -29,9 +30,8 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
   const generationMode = options.generationMode ?? "mock_cloud";
   const tempRoot = await mkdtemp(path.join(tmpdir(), "guided-app-smoke-"));
   try {
-    const sourceImagePath = path.join(tempRoot, "source.png");
+    const sourceImagePath = await prepareGuidedAppSmokeSource(options, tempRoot);
     const workspaceDir = path.join(tempRoot, "workspace");
-    await writeFile(sourceImagePath, createSmokeSourcePng());
 
     const result = await runAppSmoke(sourceImagePath, workspaceDir, generationMode);
     if (result.code !== 0) {
@@ -66,6 +66,19 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
   } finally {
     await rm(tempRoot, { force: true, recursive: true });
   }
+}
+
+export async function prepareGuidedAppSmokeSource(
+  options: Pick<GuidedAppSmokeRunOptions, "sourceImagePath">,
+  tempRoot: string
+): Promise<string> {
+  if (options.sourceImagePath) {
+    return options.sourceImagePath;
+  }
+  const sourceImagePath = path.join(tempRoot, "source.png");
+  await mkdir(tempRoot, { recursive: true });
+  await writeFile(sourceImagePath, createSmokeSourcePng());
+  return sourceImagePath;
 }
 
 function runAppSmoke(

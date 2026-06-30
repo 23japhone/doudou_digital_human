@@ -41,6 +41,10 @@ export interface GuidedAppSmokeResult {
   deletedDraft: boolean;
   deletedAccepted: boolean;
   finalStatus: string;
+  error?: {
+    code: string;
+    message: string;
+  };
 }
 
 export interface DoudouAppBridge {

@@ -267,16 +267,17 @@ describe("GuidedPetFlow", () => {
     const workspace = await createTempDir();
     const sourcePath = path.join(workspace, "source.png");
     await writeFile(sourcePath, createPngSource());
-    const calls: RequestInit[] = [];
+    const calls: Array<{ url: string; init: RequestInit }> = [];
     const flow = new GuidedPetFlow({
       workspaceDir: path.join(workspace, "app-data"),
       env: {
         DOUDOU_ENABLE_OPENAI_LIVE: "1",
         OPENAI_API_KEY: "secret-openai-key",
-        DOUDOU_OPENAI_IMAGE_ENDPOINT: "https://api.openai.test/v1/images/edits"
+        DOUDOU_OPENAI_BASE_URL: "https://api.openai.test/custom/v1",
+        OPENAI_MODEL: "test-image-model"
       },
-      openAiFetch: async (_url, init) => {
-        calls.push(init ?? {});
+      openAiFetch: async (url, init) => {
+        calls.push({ url: String(url), init: init ?? {} });
         return new Response(
           JSON.stringify({
             data: [{ b64_json: createPngSource(256, 256).toString("base64") }]
@@ -304,6 +305,8 @@ describe("GuidedPetFlow", () => {
       }
     });
     expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ url: "https://api.openai.test/custom/v1/images/edits" });
+    expect((calls[0]!.init.body as FormData).get("model")).toBe("test-image-model");
     expect(flow.getPublicState()).toMatchObject({
       status: "generated",
       petId: "generated_cloud_pet",

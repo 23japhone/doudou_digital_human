@@ -426,8 +426,8 @@ export class GuidedPetFlow {
         },
         provider: createOpenAiImageProvider({
           apiKey: this.env.OPENAI_API_KEY ?? "",
-          endpoint: this.env.DOUDOU_OPENAI_IMAGE_ENDPOINT,
-          model: this.env.DOUDOU_OPENAI_IMAGE_MODEL,
+          endpoint: resolveOpenAiImageEndpoint(this.env),
+          model: this.env.DOUDOU_OPENAI_IMAGE_MODEL ?? this.env.OPENAI_MODEL,
           fetch: this.openAiFetch
         })
       });
@@ -559,4 +559,15 @@ function normalizeGenerationMode(mode: GuidedGenerationSettings["mode"] | undefi
 
 function providerIdForMode(mode: GuidedGenerationMode): GuidedCloudProviderId {
   return mode === "openai_live" ? "openai-image" : "mock-provider";
+}
+
+function resolveOpenAiImageEndpoint(env: NodeJS.ProcessEnv): string | undefined {
+  if (env.DOUDOU_OPENAI_IMAGE_ENDPOINT) {
+    return env.DOUDOU_OPENAI_IMAGE_ENDPOINT;
+  }
+  const baseUrl = env.DOUDOU_OPENAI_BASE_URL ?? env.OPENAI_BASE_URL;
+  if (!baseUrl) {
+    return undefined;
+  }
+  return `${baseUrl.replace(/\/+$/, "")}/images/edits`;
 }
