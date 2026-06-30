@@ -6,7 +6,7 @@
 
 The system is a local-first desktop product with an asset-generation pipeline. Data flows from a user-supplied source image through validation, digital-character generation, asset packaging, preview, and finally a desktop overlay runtime that displays and animates the pet.
 
-The first vertical slice uses Electron and TypeScript for a macOS-first desktop runtime. It loads a local `pet bundle v0.1`, validates the bundle before launch, then renders the pet in a transparent, frameless, always-on-top window. The second vertical slice adds local source-image intake. The third vertical slice routes generation through a scripted adapter that returns frame PNGs shaped like future model output, without connecting a real model provider.
+The first vertical slice uses Electron and TypeScript for a macOS-first desktop runtime. It loads a local `pet bundle v0.1`, validates the bundle before launch, then renders the pet in a transparent, frameless, always-on-top window. The second vertical slice adds local source-image intake. The third vertical slice routes generation through a scripted adapter that returns frame PNGs shaped like future model output, without connecting a real model provider. The real image-to-character adapter spike chooses a cloud adapter behind explicit opt-in for the first real model path, with local model mode kept behind the same adapter contract for a later slice.
 
 Initial components:
 
@@ -55,9 +55,11 @@ Root files should be limited to stable entrypoints, project config, and compatib
 - Use a fixed-grid PNG sprite atlas for `pet bundle v0.1`: 256x256 frames, 4x2 atlas, `idle` and `tap_react` animations.
 - Use `pngjs` for PNG decode and `jpeg-js` for JPEG decode in local source-image intake; Node and the existing PNG-only dependency cannot fully decode JPEG inputs.
 - Adapter output is a transparent 256x256 PNG frame sequence plus preview metadata; bundle packaging converts those frames into the v0.1 atlas consumed by runtime.
+- Real cloud generation must require explicit user confirmation before upload and must not change the runtime/bundle boundary.
+- Source image normalization is a generation concern: decode, orient, strip metadata, resize, create temporary working images, then delete temporary source-derived files outside the final bundle.
 
 ## Open Questions
 
-- Will image-to-character generation run locally, in cloud services, or support both?
+- Which cloud provider should implement the first opt-in real adapter?
 - Should the next runtime milestone improve pixel-accurate click-through beyond the current fallbackRect/alpha hit area strategy?
-- What minimum image intake controls are required before connecting a real generation provider?
+- What normalized image dimension limits should the first provider adapter enforce?
