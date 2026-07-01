@@ -7,7 +7,7 @@
   "main": "dist/src/runtime/main.js",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "npm run typecheck",
+    "lint": "npm run typecheck && npm run qa:stylizer:default-gate",
     "test": "vitest run --root .",
     "build:main": "tsc -p tsconfig.build.json && cp src/runtime/preload.cjs dist/src/runtime/preload.cjs && mkdir -p dist/src/app && cp src/app/index.html src/app/styles.css src/app/preload.cjs dist/src/app/",
     "build:renderer": "vite build",
@@ -17,6 +17,7 @@
     "generate:pet:cloud": "npm run build:main && node dist/src/cli/generate-pet-cloud.js",
     "qa:stylizer": "npm run build:main && node dist/src/scripts/stylizer-qa.js",
     "qa:stylizer:check": "npm run build:main && node dist/src/scripts/stylizer-qa-check.js",
+    "qa:stylizer:default-gate": "npm run build:main && node dist/src/scripts/stylizer-default-gate.js",
     "review:pet": "npm run build:main && node dist/src/cli/review-pet.js",
     "validate:fixture": "npm run build:main && node dist/src/cli/validate-pet.js fixtures/pet_bundles/valid_minimal_atlas_pet",
     "dev": "npm run build && NODE_OPTIONS= electron dist/src/runtime/main.js --bundle fixtures/pet_bundles/valid_minimal_atlas_pet",

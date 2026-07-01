@@ -15,3 +15,9 @@ Default deterministic stylizer parameter changes require completed manual scorin
 ```sh
 npm run qa:stylizer:check -- <manual-scoring-template.json> <candidate-preset>
 ```
+
+Use the change-aware repository gate when checking a diff:
+
+```sh
+npm run qa:stylizer:default-gate -- --staged <manual-scoring-template.json> <candidate-preset>
+```
