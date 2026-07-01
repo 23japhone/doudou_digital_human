@@ -1,6 +1,7 @@
 import { createAnimationPlayer } from "./animation.js";
 import type { PetAtlas } from "../pet_bundle/manifest.js";
 import type { RuntimeBundle, RuntimeSmokeResult } from "./runtime-types.js";
+import { isPointInsideRuntimeHitArea, type CanvasAlphaSampler } from "./hit-area.js";
 import "./styles.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
@@ -20,6 +21,21 @@ console.log(`pet renderer: loaded bundle ${bundle.manifest.id}`);
 const player = createAnimationPlayer(bundle.manifest);
 const atlasImages = await loadAtlases(bundle);
 console.log(`pet renderer: loaded ${atlasImages.size} atlas image(s)`);
+const canvasAlphaSampler: CanvasAlphaSampler = {
+  get width() {
+    return petCanvas.width;
+  },
+  get height() {
+    return petCanvas.height;
+  },
+  alphaAt: (x, y) => {
+    try {
+      return drawingContext.getImageData(x, y, 1, 1).data[3] ?? 0;
+    } catch {
+      return null;
+    }
+  }
+};
 let lastTimestamp = performance.now();
 let drawCount = 0;
 let initialFrameIndex: number | null = null;
@@ -41,11 +57,11 @@ window.addEventListener("contextmenu", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
-  window.petRuntime.setIgnoreMouseEvents(!isInsideFallbackHitArea(event.offsetX, event.offsetY, bundle));
+  window.petRuntime.setIgnoreMouseEvents(!isInsidePetHitArea(event.offsetX, event.offsetY, bundle));
 });
 
 petCanvas.addEventListener("pointerdown", (event) => {
-  if (isInsideFallbackHitArea(event.offsetX, event.offsetY, bundle)) {
+  if (isInsidePetHitArea(event.offsetX, event.offsetY, bundle)) {
     player.tap();
   }
 });
@@ -97,9 +113,8 @@ function recordDraw(frameIndex: number): void {
   drawCount += 1;
 }
 
-function isInsideFallbackHitArea(x: number, y: number, runtimeBundle: RuntimeBundle): boolean {
-  const rect = runtimeBundle.manifest.hitArea.fallbackRect;
-  return x >= rect.x && y >= rect.y && x <= rect.x + rect.width && y <= rect.y + rect.height;
+function isInsidePetHitArea(x: number, y: number, runtimeBundle: RuntimeBundle): boolean {
+  return isPointInsideRuntimeHitArea(x, y, runtimeBundle.manifest.hitArea, canvasAlphaSampler);
 }
 
 async function loadAtlases(runtimeBundle: RuntimeBundle): Promise<Map<string, HTMLImageElement>> {

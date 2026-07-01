@@ -11,7 +11,7 @@ Exit criteria: Electron loads a validated `pet bundle v0.1` fixture and generate
 ## Next Vertical Slices
 
 1. Optionally wire the npm gate script into the team's actual PR required check or local pre-commit hook once the repository hosting workflow is chosen.
-2. Harden click-through behavior beyond fallbackRect/alpha hit area if macOS manual testing shows input interference.
+2. Manually validate pixel-alpha click-through on macOS; harden beyond the current canvas-alpha/fallbackRect strategy if input interference remains.
 3. Manually run and evaluate the opt-in OpenAI live smoke with a non-sensitive source image, then compare model quality with the local deterministic fallback.
 4. Add local model adapter experiments after cache paths and deletion behavior are designed.
 
