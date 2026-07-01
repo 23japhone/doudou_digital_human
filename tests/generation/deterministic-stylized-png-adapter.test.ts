@@ -1,10 +1,21 @@
 import { PNG } from "pngjs";
 import { describe, expect, test } from "vitest";
-import { createDeterministicStylizedPngAdapter } from "../../src/generation/adapters/deterministic-stylized-png-adapter.js";
+import {
+  DEFAULT_DETERMINISTIC_STYLIZER_PARAMS,
+  createDeterministicStylizedPngAdapter
+} from "../../src/generation/adapters/deterministic-stylized-png-adapter.js";
+import { STYLIZER_QA_PRESETS } from "../../src/generation/stylizer-qa.js";
 import type { NormalizedSourceImage } from "../../src/generation/normalization/source-normalizer.js";
 import type { SourceImageInfo } from "../../src/intake/source-image.js";
 
 describe("createDeterministicStylizedPngAdapter", () => {
+  test("uses the manually approved bold_edges QA preset as the default", () => {
+    const approvedPreset = STYLIZER_QA_PRESETS.find((preset) => preset.id === "bold_edges");
+
+    expect(approvedPreset).toBeDefined();
+    expect(DEFAULT_DETERMINISTIC_STYLIZER_PARAMS).toMatchObject(approvedPreset!.params);
+  });
+
   test("turns normalized source pixels into a deterministic stylized frame sequence", async () => {
     const adapter = createDeterministicStylizedPngAdapter();
     const normalizedImage = createSplitNormalizedImage();
@@ -67,7 +78,11 @@ describe("createDeterministicStylizedPngAdapter", () => {
       width: 256,
       height: 256
     };
-    const defaultOutput = await createDeterministicStylizedPngAdapter().generate({
+    const legacyBaselinePreset = STYLIZER_QA_PRESETS.find((preset) => preset.id === "balanced");
+    expect(legacyBaselinePreset).toBeDefined();
+    const baselineOutput = await createDeterministicStylizedPngAdapter({
+      params: legacyBaselinePreset!.params
+    }).generate({
       sourceImage,
       normalizedSourceImage: normalizedImage
     });
@@ -80,9 +95,9 @@ describe("createDeterministicStylizedPngAdapter", () => {
       }
     }).generate({ sourceImage, normalizedSourceImage: normalizedImage });
 
-    expect(tunedOutput.previewPng.equals(defaultOutput.previewPng)).toBe(false);
+    expect(tunedOutput.previewPng.equals(baselineOutput.previewPng)).toBe(false);
     expect(countDarkEdgePixels(PNG.sync.read(tunedOutput.previewPng))).toBeGreaterThan(
-      countDarkEdgePixels(PNG.sync.read(defaultOutput.previewPng))
+      countDarkEdgePixels(PNG.sync.read(baselineOutput.previewPng))
     );
   });
 });

@@ -58,27 +58,27 @@ const CANVAS_SIZE = 256;
 
 export const DEFAULT_DETERMINISTIC_STYLIZER_PARAMS: DeterministicStylizerParams = {
   crop: {
-    visibleBoundsPaddingPx: 0
+    visibleBoundsPaddingPx: 18
   },
   mask: {
-    headRadiusX: 82,
+    headRadiusX: 92,
     headRadiusY: 88,
-    bodyRadiusX: 70,
+    bodyRadiusX: 74,
     bodyRadiusY: 52,
-    edgeFeather: 0.08,
-    outlineRadiusPx: 3
+    edgeFeather: 0.1,
+    outlineRadiusPx: 4
   },
   color: {
-    saturation: 1.28,
-    contrast: 1.08,
-    brightness: 4,
-    posterizeStep: 32
+    saturation: 1.55,
+    contrast: 1.16,
+    brightness: 0,
+    posterizeStep: 24
   },
   edge: {
-    weakThreshold: 32,
-    strongThreshold: 52,
-    weakMix: 0.34,
-    strongMix: 0.72,
+    weakThreshold: 18,
+    strongThreshold: 24,
+    weakMix: 0.48,
+    strongMix: 0.88,
     weakColor: [42, 51, 72],
     strongColor: [25, 32, 48]
   }

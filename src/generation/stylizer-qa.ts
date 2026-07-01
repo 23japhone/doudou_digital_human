@@ -189,8 +189,13 @@ export const STYLIZER_SCORE_DIMENSIONS: StylizerScoreDimension[] = [
 export const STYLIZER_QA_PRESETS: StylizerQaPreset[] = [
   {
     id: "balanced",
-    title: "Balanced default",
-    params: {}
+    title: "Legacy balanced baseline",
+    params: {
+      crop: { visibleBoundsPaddingPx: 0 },
+      mask: { headRadiusX: 82, bodyRadiusX: 70, edgeFeather: 0.08, outlineRadiusPx: 3 },
+      color: { saturation: 1.28, contrast: 1.08, brightness: 4, posterizeStep: 32 },
+      edge: { weakThreshold: 32, strongThreshold: 52, weakMix: 0.34, strongMix: 0.72 }
+    }
   },
   {
     id: "soft_mask",
