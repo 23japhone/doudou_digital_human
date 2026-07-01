@@ -16,7 +16,7 @@
 - Review generated pet bundle: `npm run review:pet -- qa <bundle-dir> <review-dir>`
 - Accept generated pet bundle: `npm run review:pet -- accept <bundle-dir> <library-dir>`
 - Delete review or accepted assets: `npm run review:pet -- delete <target-dir> --root <allowed-root>`
-- Guided desktop app: `npm run dev:app`
+- Guided desktop app: `npm run dev:app` (full manager flow; launched pets can be stopped from the Stop button)
 - Guided desktop app smoke: `npm run smoke:app`
 - Guided desktop app live smoke: `npm run smoke:app:live` (skips unless `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set). Use `npm run smoke:app:live -- --source <image-path>` or `DOUDOU_APP_SMOKE_SOURCE_IMAGE=<image-path>` to run the live smoke against a specific local source image; explicit source-image smoke also requires `DOUDOU_CONFIRM_SOURCE_UPLOAD=1`.
 - OpenAI-compatible image provider probe: `npm run probe:openai-image` uploads only a synthetic PNG and verifies that the configured endpoint supports image edits before any user source image is used.
@@ -36,7 +36,7 @@
 - Add visual QA snapshots/contact sheets for generated sprite assets.
 - Review workflow tests cover QA report creation, accepted bundle validation, deletion safety, and privacy-safe review/install metadata.
 - Runtime smoke covers missing manifest, missing asset, unsupported schema, then launches the fixture and a generated bundle. Both require structured renderer evidence: bundle loaded, atlas loaded, nontransparent canvas pixel, and idle animation advance.
-- Guided app smoke launches the Electron manager UI, selects mock-cloud generation, confirms upload, clicks through source selection, local Style Compare developer preview, generation, QA, accept, runtime launch, draft deletion, and accepted deletion, then verifies the developer preview images and runtime smoke evidence returned through the UI flow. The live smoke reuses this flow with `openai_live` only when the required env vars are present, and can use either its synthetic source image or an explicit `--source` / `DOUDOU_APP_SMOKE_SOURCE_IMAGE` path.
+- Guided app smoke launches the Electron manager UI, selects mock-cloud generation, confirms upload, clicks through source selection, local Style Compare developer preview, generation, QA, accept, runtime launch, draft deletion, and accepted deletion, then verifies the developer preview images and runtime smoke evidence returned through the UI flow. Flow-level unit tests cover managed runtime launch/stop behavior, including keeping Stop available after draft cleanup while a pet is running. The live smoke reuses this flow with `openai_live` only when the required env vars are present, and can use either its synthetic source image or an explicit `--source` / `DOUDOU_APP_SMOKE_SOURCE_IMAGE` path.
 
 ## Test Layout
 

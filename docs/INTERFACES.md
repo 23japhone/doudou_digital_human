@@ -26,10 +26,10 @@ Potential developer interfaces:
 - `npm run review:pet -- qa <bundle-dir> <review-dir>` validates a generated bundle and writes `review.json`, `preview.png`, and `contact-sheet.png` for user inspection.
 - `npm run review:pet -- accept <bundle-dir> <library-dir>` validates and copies the bundle into `<library-dir>/<pet-id>` without adding files to the bundle.
 - `npm run review:pet -- delete <target-dir> --root <allowed-root>` deletes an accepted or review directory only when the target is a child directory inside the allowed root.
-- `npm run dev:app` launches the guided desktop manager UI for local stylizer comparison preview plus local or mock-cloud `generate -> QA -> accept/delete -> launch` flows.
+- `npm run dev:app` launches the guided desktop manager UI for local stylizer comparison preview plus local or mock-cloud `generate -> QA -> accept/delete -> launch/stop` flows.
 - `npm run smoke:app` launches the guided UI in smoke mode and clicks through the mock-cloud flow with explicit upload confirmation, including local stylizer developer preview and runtime launch smoke.
 - `npm run smoke:app:live` launches the same guided UI smoke against `openai_live` only when `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set; otherwise it prints a skipped result and exits 0. Pass `-- --source <image-path>` or set `DOUDOU_APP_SMOKE_SOURCE_IMAGE=<image-path>` to use a specific local source image for the smoke. Explicit source-image smoke also requires `DOUDOU_CONFIRM_SOURCE_UPLOAD=1`.
-- `npm run dev` launches the fixture in the Electron desktop runtime.
+- `npm run dev` launches the fixture directly in the Electron desktop runtime. This is the lower-level runtime entrypoint; use `Ctrl+C` in the terminal to stop it during development.
 - `npm run smoke:runtime` runs Electron runtime negative cases, then launches both the fixture bundle and a generated bundle before exiting after structured renderer smoke results.
 
 ## Compatibility
@@ -75,7 +75,7 @@ The review layer consumes only validated pet bundles. `qa` writes a separate `pe
 
 ## Guided App Contract
 
-The guided app is a local Electron manager UI. It lets the user select a PNG/JPEG source image, create a local Style Compare developer preview from derived stylizer previews/contact sheet, choose local, `mock-provider`, or `openai-image` generation, explicitly confirm cloud upload for each cloud generation attempt, create QA preview artifacts, accept the validated bundle into the local library, delete draft or accepted assets, and launch the accepted bundle in the desktop runtime. The UI does not add fields to `pet bundle v0.1` and does not pass source-image details to the runtime. Mock-cloud mode requires `DOUDOU_MOCK_CLOUD_API_KEY` in the app process environment and still performs no live network call. OpenAI live mode requires `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and the UI confirmation checkbox.
+The guided app is a local Electron manager UI. It lets the user select a PNG/JPEG source image, create a local Style Compare developer preview from derived stylizer previews/contact sheet, choose local, `mock-provider`, or `openai-image` generation, explicitly confirm cloud upload for each cloud generation attempt, create QA preview artifacts, accept the validated bundle into the local library, delete draft or accepted assets, launch the accepted bundle in the desktop runtime, and stop the runtime process it launched. The UI does not add fields to `pet bundle v0.1` and does not pass source-image details to the runtime. Runtime stop is app workflow state only: the manager keeps the child-process handle, sends termination to that managed process, also stops it during app quit, and keeps the runtime/bundle contract unchanged. Mock-cloud mode requires `DOUDOU_MOCK_CLOUD_API_KEY` in the app process environment and still performs no live network call. OpenAI live mode requires `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and the UI confirmation checkbox.
 
 ## Examples
 

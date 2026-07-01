@@ -21,6 +21,7 @@ const generateButton = queryButton("#generate-pet");
 const qaButton = queryButton("#qa-pet");
 const acceptButton = queryButton("#accept-pet");
 const launchButton = queryButton("#launch-pet");
+const stopButton = queryButton("#stop-pet");
 const deleteDraftButton = queryButton("#delete-draft");
 const deleteAcceptedButton = queryButton("#delete-accepted");
 const stepItems = [...document.querySelectorAll<HTMLElement>("[data-step]")];
@@ -42,6 +43,7 @@ generateButton.addEventListener("click", () => runAction(() => window.doudouApp.
 qaButton.addEventListener("click", () => runAction(() => window.doudouApp.createReview()));
 acceptButton.addEventListener("click", () => runAction(() => window.doudouApp.acceptPet()));
 launchButton.addEventListener("click", () => runAction(() => window.doudouApp.launchPet()));
+stopButton.addEventListener("click", () => runAction(() => window.doudouApp.stopPet()));
 deleteDraftButton.addEventListener("click", () => runAction(() => window.doudouApp.deleteDraftAssets()));
 deleteAcceptedButton.addEventListener("click", () => runAction(() => window.doudouApp.deleteAcceptedPet()));
 
@@ -106,6 +108,7 @@ function renderActions(state: PublicGuidedPetState): void {
   qaButton.disabled = busy || !state.actions.canReview;
   acceptButton.disabled = busy || !state.actions.canAccept;
   launchButton.disabled = busy || !state.actions.canLaunch;
+  stopButton.disabled = busy || !state.actions.canStopLaunch;
   deleteDraftButton.disabled = busy || !state.actions.canDeleteDraft;
   deleteAcceptedButton.disabled = busy || !state.actions.canDeleteAccepted;
 }
@@ -180,6 +183,9 @@ function renderReview(state: PublicGuidedPetState): void {
 function statusText(state: PublicGuidedPetState): string {
   if (state.lastError) {
     return state.lastError.message;
+  }
+  if (state.launch?.running) {
+    return "Launched";
   }
   if (state.launch?.launched) {
     return "Launched";

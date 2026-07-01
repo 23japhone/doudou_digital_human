@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -36,7 +36,8 @@ export type GuidedPetFlowErrorCode =
   | "DRAFT_BUNDLE_REQUIRED"
   | "ACCEPTED_BUNDLE_REQUIRED"
   | "LIVE_PROVIDER_NOT_ENABLED"
-  | "RUNTIME_LAUNCH_FAILED";
+  | "RUNTIME_LAUNCH_FAILED"
+  | "RUNTIME_STOP_FAILED";
 
 export class GuidedPetFlowError extends Error {
   readonly code: GuidedPetFlowErrorCode;
@@ -89,6 +90,7 @@ export interface PublicGuidedPetState {
   } | null;
   launch: {
     launched: boolean;
+    running: boolean;
     smokeResult?: RuntimeSmokeResult;
   } | null;
   generation: {
@@ -104,6 +106,7 @@ export interface PublicGuidedPetState {
     canReview: boolean;
     canAccept: boolean;
     canLaunch: boolean;
+    canStopLaunch: boolean;
     canDeleteDraft: boolean;
     canDeleteAccepted: boolean;
   };
@@ -151,6 +154,10 @@ export interface LaunchFlowOptions {
 export interface LaunchFlowResult {
   launched: true;
   smokeResult?: RuntimeSmokeResult;
+}
+
+export interface StopFlowResult {
+  stopped: boolean;
 }
 
 interface DraftState {
@@ -211,6 +218,7 @@ export class GuidedPetFlow {
   private developerPreview: DeveloperPreviewState | null = null;
   private accepted: AcceptedState | null = null;
   private launch: PublicGuidedPetState["launch"] = null;
+  private runtimeProcess: ChildProcess | null = null;
   private lastError: PublicGuidedPetState["lastError"] = null;
   private runCounter = 0;
 
@@ -257,6 +265,11 @@ export class GuidedPetFlow {
   async generatePet(): Promise<GenerateFlowResult> {
     if (!this.sourceImagePath) {
       throw this.setError(new GuidedPetFlowError("SOURCE_IMAGE_REQUIRED", "Select a source image before generating."));
+    }
+    await this.stopRuntimeProcess();
+    this.launch = null;
+    if (this.status === "launched") {
+      this.status = this.statusAfterRuntimeStops();
     }
     const adapter = this.createGenerationAdapter();
     adapter?.preflight?.();
@@ -396,11 +409,33 @@ export class GuidedPetFlow {
       throw this.setError(new GuidedPetFlowError("ACCEPTED_BUNDLE_REQUIRED", "Accept a pet before launching."));
     }
     const smokeResult = options.smoke ? await this.runRuntimeSmoke(this.accepted.installedBundleDir) : undefined;
+    let running = false;
     if (!options.smoke) {
-      this.spawnRuntime(this.accepted.installedBundleDir, false);
+      await this.stopRuntimeProcess();
+      const child = this.spawnRuntime(this.accepted.installedBundleDir, false);
+      this.runtimeProcess = child;
+      child.once("close", () => {
+        if (this.runtimeProcess === child) {
+          this.runtimeProcess = null;
+          if (this.launch?.running) {
+            this.launch = null;
+            this.status = this.statusAfterRuntimeStops();
+          }
+        }
+      });
+      child.once("error", (error) => {
+        if (this.runtimeProcess === child) {
+          this.runtimeProcess = null;
+          this.launch = null;
+          this.status = this.statusAfterRuntimeStops();
+          this.setError(new GuidedPetFlowError("RUNTIME_LAUNCH_FAILED", error.message));
+        }
+      });
+      running = true;
     }
     this.launch = {
       launched: true,
+      running,
       smokeResult
     };
     this.status = "launched";
@@ -409,6 +444,16 @@ export class GuidedPetFlow {
       launched: true,
       smokeResult
     };
+  }
+
+  async stopPet(): Promise<StopFlowResult> {
+    const stopped = await this.stopRuntimeProcess();
+    if (!this.runtimeProcess) {
+      this.launch = null;
+    }
+    this.status = this.runtimeProcess ? "launched" : this.statusAfterRuntimeStops();
+    this.lastError = null;
+    return { stopped };
   }
 
   async deleteDraftAssets(): Promise<DeleteFlowResult> {
@@ -432,8 +477,10 @@ export class GuidedPetFlow {
       this.draft = null;
       deleted = true;
     }
-    this.launch = null;
-    this.status = this.accepted ? "accepted" : this.sourceImagePath ? "source_selected" : "idle";
+    if (!this.runtimeProcess) {
+      this.launch = null;
+    }
+    this.status = this.runtimeProcess ? "launched" : this.statusAfterRuntimeStops();
     this.lastError = null;
     return { deleted };
   }
@@ -442,6 +489,7 @@ export class GuidedPetFlow {
     if (!this.accepted) {
       return { deleted: false };
     }
+    await this.stopRuntimeProcess();
     await deletePetAssets({
       targetDir: this.accepted.installedBundleDir,
       allowedRoot: this.libraryRoot
@@ -494,11 +542,12 @@ export class GuidedPetFlow {
         liveProviderEnabled: this.isLiveProviderEnabled()
       },
       actions: {
-        canGenerate: Boolean(this.sourceImagePath) && this.canGenerateWithCurrentSettings(),
-        canCreateDeveloperPreview: Boolean(this.sourceImagePath),
-        canReview: Boolean(this.draft),
-        canAccept: Boolean(this.draft),
-        canLaunch: Boolean(this.accepted),
+        canGenerate: Boolean(this.sourceImagePath) && !this.runtimeProcess && this.canGenerateWithCurrentSettings(),
+        canCreateDeveloperPreview: Boolean(this.sourceImagePath) && !this.runtimeProcess,
+        canReview: Boolean(this.draft) && !this.runtimeProcess,
+        canAccept: Boolean(this.draft) && !this.runtimeProcess,
+        canLaunch: Boolean(this.accepted) && !this.runtimeProcess,
+        canStopLaunch: Boolean(this.runtimeProcess),
         canDeleteDraft: Boolean(this.draft || this.review || this.developerPreview),
         canDeleteAccepted: Boolean(this.accepted)
       },
@@ -510,6 +559,10 @@ export class GuidedPetFlow {
     this.runCounter += 1;
     const stamp = (this.now ?? new Date()).toISOString().replaceAll(/[^0-9]/g, "").slice(0, 14);
     return `run-${stamp}-${this.runCounter}`;
+  }
+
+  private statusAfterRuntimeStops(): GuidedPetFlowStatus {
+    return this.accepted ? "accepted" : this.sourceImagePath ? "source_selected" : "idle";
   }
 
   private async deleteDeveloperPreviewAssets(): Promise<boolean> {
@@ -605,9 +658,9 @@ export class GuidedPetFlow {
     return JSON.parse(smokeLine.slice("runtime smoke: ".length)) as RuntimeSmokeResult;
   }
 
-  private spawnRuntime(bundleDir: string, smoke: false): string;
   private spawnRuntime(bundleDir: string, smoke: true): Promise<string>;
-  private spawnRuntime(bundleDir: string, smoke: boolean): string | Promise<string> {
+  private spawnRuntime(bundleDir: string, smoke: false): ChildProcess;
+  private spawnRuntime(bundleDir: string, smoke: boolean): ChildProcess | Promise<string> {
     if (!this.runtimeMainPath) {
       throw this.setError(new GuidedPetFlowError("RUNTIME_LAUNCH_FAILED", "Runtime entrypoint is not configured."));
     }
@@ -644,13 +697,39 @@ export class GuidedPetFlow {
       });
     }
 
-    const child = spawn(this.runtimeElectronPath, args, {
-      detached: true,
+    return spawn(this.runtimeElectronPath, args, {
       env: { ...process.env, NODE_OPTIONS: "" },
       stdio: "ignore"
     });
-    child.unref();
-    return "";
+  }
+
+  private async stopRuntimeProcess(): Promise<boolean> {
+    const child = this.runtimeProcess;
+    if (!child) {
+      return false;
+    }
+    this.runtimeProcess = null;
+    if (child.exitCode !== null || child.signalCode !== null) {
+      return false;
+    }
+
+    return new Promise<boolean>((resolvePromise, reject) => {
+      const timeout = setTimeout(() => {
+        child.kill("SIGKILL");
+      }, 3000);
+      child.once("close", () => {
+        clearTimeout(timeout);
+        resolvePromise(true);
+      });
+      child.once("error", (error) => {
+        clearTimeout(timeout);
+        reject(this.setError(new GuidedPetFlowError("RUNTIME_STOP_FAILED", error.message)));
+      });
+      if (!child.kill("SIGTERM")) {
+        clearTimeout(timeout);
+        resolvePromise(false);
+      }
+    });
   }
 
   private setError<T extends Error & { code?: string }>(error: T): T {

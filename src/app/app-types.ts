@@ -9,7 +9,8 @@ import type {
   GuidedGenerationSettings,
   LaunchFlowResult,
   ReviewFlowResult,
-  SelectSourceImageResult
+  SelectSourceImageResult,
+  StopFlowResult
 } from "./guided-flow.js";
 
 export interface AppActionResult<T = unknown> {
@@ -60,6 +61,7 @@ export interface DoudouAppBridge {
   createReview(): Promise<AppActionResult<ReviewFlowResult>>;
   acceptPet(): Promise<AppActionResult<AcceptFlowResult>>;
   launchPet(): Promise<AppActionResult<LaunchFlowResult>>;
+  stopPet(): Promise<AppActionResult<StopFlowResult>>;
   deleteDraftAssets(): Promise<AppActionResult<DeleteFlowResult>>;
   deleteAcceptedPet(): Promise<AppActionResult<DeleteFlowResult>>;
   getSmokeConfig(): Promise<GuidedAppSmokeConfig>;

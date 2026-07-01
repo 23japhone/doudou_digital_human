@@ -166,6 +166,65 @@ describe("GuidedPetFlow", () => {
     await expect(flow.launchPet()).rejects.toMatchObject({ code: "ACCEPTED_BUNDLE_REQUIRED" });
   });
 
+  test("can stop a launched desktop runtime process", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    const runtimeStartedPath = path.join(workspace, "runtime-started.txt");
+    const runtimeStoppedPath = path.join(workspace, "runtime-stopped.txt");
+    const fakeRuntimePath = path.join(workspace, "fake-runtime.cjs");
+    await writeFile(sourcePath, createPngSource());
+    await writeFile(fakeRuntimePath, createFakeRuntimeScript(runtimeStartedPath, runtimeStoppedPath));
+    const flow = new GuidedPetFlow({
+      workspaceDir: path.join(workspace, "app-data"),
+      runtimeElectronPath: process.execPath,
+      runtimeMainPath: fakeRuntimePath,
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.generatePet();
+    await flow.acceptPet();
+
+    await expect(flow.launchPet()).resolves.toEqual({ launched: true });
+    await waitForFile(runtimeStartedPath);
+    expect(flow.getPublicState()).toMatchObject({
+      status: "launched",
+      launch: {
+        launched: true,
+        running: true
+      },
+      actions: expect.objectContaining({
+        canGenerate: false,
+        canLaunch: false,
+        canStopLaunch: true
+      })
+    });
+
+    await expect(flow.deleteDraftAssets()).resolves.toEqual({ deleted: true });
+    expect(flow.getPublicState()).toMatchObject({
+      status: "launched",
+      launch: {
+        launched: true,
+        running: true
+      },
+      actions: expect.objectContaining({
+        canDeleteDraft: false,
+        canStopLaunch: true
+      })
+    });
+
+    await expect(flow.stopPet()).resolves.toEqual({ stopped: true });
+    await waitForFile(runtimeStoppedPath);
+    expect(flow.getPublicState()).toMatchObject({
+      status: "accepted",
+      launch: null,
+      actions: expect.objectContaining({
+        canLaunch: true,
+        canStopLaunch: false
+      })
+    });
+  });
+
   test("requires explicit confirmation before mock cloud generation creates a draft", async () => {
     const workspace = await createTempDir();
     const sourcePath = path.join(workspace, "source.png");
@@ -420,6 +479,31 @@ function createPngSource(width = 32, height = 32): Buffer {
     }
   }
   return PNG.sync.write(png);
+}
+
+function createFakeRuntimeScript(startedPath: string, stoppedPath: string): string {
+  return `
+const { writeFileSync } = require("node:fs");
+writeFileSync(${JSON.stringify(startedPath)}, String(process.pid));
+process.on("SIGTERM", () => {
+  writeFileSync(${JSON.stringify(stoppedPath)}, "stopped");
+  process.exit(0);
+});
+setTimeout(() => process.exit(0), 5000);
+setInterval(() => undefined, 1000);
+`;
+}
+
+async function waitForFile(filePath: string): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      await stat(filePath);
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+  throw new Error(`Timed out waiting for ${filePath}.`);
 }
 
 async function listRelativeFiles(rootDir: string): Promise<string[]> {

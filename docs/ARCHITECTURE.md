@@ -66,7 +66,7 @@ Root files should be limited to stable entrypoints, project config, and compatib
 - Source image normalization is a generation concern: decode, orient, strip metadata, resize, create temporary working images, then delete temporary source-derived files outside the final bundle. Both deterministic local stylization and cloud adapters consume normalized source-derived PNGs rather than raw source paths.
 - Cloud scaffold bundles set `privacy.cloudGenerated:true`; scripted/local bundles keep it false.
 - Review artifacts are outside the pet bundle contract. Accepted bundles remain valid `pet bundle v0.1` directories without extra installation metadata files.
-- The guided app owns user workflow state and local workspace paths, but launch still hands only an accepted bundle path to the desktop runtime.
+- The guided app owns user workflow state and local workspace paths, but launch still hands only an accepted bundle path to the desktop runtime. When launched from the guided app, the app keeps the child-process handle so the user can stop that managed desktop pet, including during app quit, without changing the runtime or pet bundle contract.
 - The guided app's developer style comparison wraps `qa:stylizer:compare` as a manager-only preview surface. It writes local derived preview PNGs, a contact sheet, and a sanitized report under the app workspace; renderer state exposes only artifact URLs and never source paths. These artifacts are not pet bundles and are not consumed by the runtime.
 - Guided cloud mode supports `mock-provider` by default and an `openai-image` live provider only when `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set. Both cloud modes still require explicit upload confirmation before generation.
 

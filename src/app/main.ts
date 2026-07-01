@@ -32,6 +32,7 @@ let mainWindow: BrowserWindow | null = null;
 let flow: GuidedPetFlow;
 let options: AppOptions;
 let smokeTimeout: NodeJS.Timeout | null = null;
+let quitAfterRuntimeStop = false;
 
 async function main(): Promise<void> {
   options = parseArgs(process.argv.slice(2));
@@ -42,6 +43,7 @@ async function main(): Promise<void> {
     runtimeMainPath: resolve(currentDir, "../runtime/main.js")
   });
   await flow.initialize();
+  registerQuitHandler();
 
   await app.whenReady();
   registerIpcHandlers();
@@ -138,6 +140,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("app:create-review", async () => withState(() => flow.createReview()));
   ipcMain.handle("app:accept-pet", async () => withState(() => flow.acceptPet()));
   ipcMain.handle("app:launch-pet", async () => withState(() => flow.launchPet({ smoke: options.smoke })));
+  ipcMain.handle("app:stop-pet", async () => withState(() => flow.stopPet()));
   ipcMain.handle("app:delete-draft-assets", async () => withState(() => flow.deleteDraftAssets()));
   ipcMain.handle("app:delete-accepted-pet", async () => withState(() => flow.deleteAcceptedPet()));
   ipcMain.on("app:smoke-result", (_event, result: GuidedAppSmokeResult) => {
@@ -150,6 +153,24 @@ function registerIpcHandlers(): void {
     }
     console.log(`app smoke: ${JSON.stringify(result)}`);
     setTimeout(() => app.quit(), 250);
+  });
+}
+
+function registerQuitHandler(): void {
+  app.on("before-quit", (event) => {
+    if (quitAfterRuntimeStop) {
+      return;
+    }
+    event.preventDefault();
+    quitAfterRuntimeStop = true;
+    void flow
+      .stopPet()
+      .catch((error: unknown) => {
+        console.error("Failed to stop managed runtime before quitting.", error);
+      })
+      .finally(() => {
+        app.quit();
+      });
   });
 }
 

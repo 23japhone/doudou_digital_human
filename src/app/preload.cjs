@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("doudouApp", {
   createReview: () => ipcRenderer.invoke("app:create-review"),
   acceptPet: () => ipcRenderer.invoke("app:accept-pet"),
   launchPet: () => ipcRenderer.invoke("app:launch-pet"),
+  stopPet: () => ipcRenderer.invoke("app:stop-pet"),
   deleteDraftAssets: () => ipcRenderer.invoke("app:delete-draft-assets"),
   deleteAcceptedPet: () => ipcRenderer.invoke("app:delete-accepted-pet"),
   getSmokeConfig: () => ipcRenderer.invoke("app:get-smoke-config"),
