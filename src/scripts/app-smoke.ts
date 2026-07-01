@@ -47,6 +47,9 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.reviewed ||
       !smokeResult.previewLoaded ||
       !smokeResult.contactSheetLoaded ||
+      !smokeResult.developerPreviewed ||
+      !smokeResult.developerPreviewContactSheetLoaded ||
+      !smokeResult.developerPreviewPreviewsLoaded ||
       smokeResult.generationMode !== generationMode ||
       smokeResult.petId !== "generated_cloud_pet" ||
       !smokeResult.cloudGenerated ||

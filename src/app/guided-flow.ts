@@ -4,6 +4,10 @@ import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { generatePetBundleFromSource } from "../generation/generate-pet.js";
 import {
+  runStylizerPreviewComparison,
+  type StylizerPreviewComparisonReport
+} from "../generation/stylizer-preview-comparison.js";
+import {
   createCloudImageAdapter,
   createMockCloudImageProvider
 } from "../generation/adapters/cloud-image-adapter.js";
@@ -69,6 +73,16 @@ export interface PublicGuidedPetState {
     contactSheetUrl: string;
     checks: string[];
   } | null;
+  developerPreview: {
+    contactSheetUrl: string;
+    previews: Array<{
+      presetId: string;
+      title: string;
+      currentDefault: boolean;
+      previewUrl: string;
+      metrics: StylizerPreviewComparisonReport["previews"][number]["metrics"];
+    }>;
+  } | null;
   accepted: {
     petId: string;
     petName: string;
@@ -86,6 +100,7 @@ export interface PublicGuidedPetState {
   };
   actions: {
     canGenerate: boolean;
+    canCreateDeveloperPreview: boolean;
     canReview: boolean;
     canAccept: boolean;
     canLaunch: boolean;
@@ -106,6 +121,11 @@ export interface GenerateFlowResult {
   bundleDir: string;
   petId: string;
   petName: string;
+}
+
+export interface DeveloperPreviewFlowResult {
+  presetIds: string[];
+  previewCount: number;
 }
 
 export interface ReviewFlowResult {
@@ -149,6 +169,18 @@ interface ReviewState {
   checks: string[];
 }
 
+interface DeveloperPreviewState {
+  runDir: string;
+  contactSheetPath: string;
+  previews: Array<{
+    presetId: string;
+    title: string;
+    currentDefault: boolean;
+    previewPath: string;
+    metrics: StylizerPreviewComparisonReport["previews"][number]["metrics"];
+  }>;
+}
+
 interface AcceptedState {
   installedBundleDir: string;
   petId: string;
@@ -159,6 +191,7 @@ export class GuidedPetFlow {
   private readonly workspaceDir: string;
   private readonly draftsRoot: string;
   private readonly reviewsRoot: string;
+  private readonly developerPreviewsRoot: string;
   private readonly libraryRoot: string;
   private readonly now?: Date;
   private readonly runtimeElectronPath: string;
@@ -175,6 +208,7 @@ export class GuidedPetFlow {
   private status: GuidedPetFlowStatus = "idle";
   private draft: DraftState | null = null;
   private review: ReviewState | null = null;
+  private developerPreview: DeveloperPreviewState | null = null;
   private accepted: AcceptedState | null = null;
   private launch: PublicGuidedPetState["launch"] = null;
   private lastError: PublicGuidedPetState["lastError"] = null;
@@ -184,6 +218,7 @@ export class GuidedPetFlow {
     this.workspaceDir = resolve(options.workspaceDir);
     this.draftsRoot = join(this.workspaceDir, "drafts");
     this.reviewsRoot = join(this.workspaceDir, "reviews");
+    this.developerPreviewsRoot = join(this.workspaceDir, "developer-previews");
     this.libraryRoot = join(this.workspaceDir, "library");
     this.now = options.now;
     this.runtimeElectronPath = options.runtimeElectronPath ?? process.execPath;
@@ -195,10 +230,12 @@ export class GuidedPetFlow {
   async initialize(): Promise<void> {
     await mkdir(this.draftsRoot, { recursive: true });
     await mkdir(this.reviewsRoot, { recursive: true });
+    await mkdir(this.developerPreviewsRoot, { recursive: true });
     await mkdir(this.libraryRoot, { recursive: true });
   }
 
   async setSourceImagePath(sourceImagePath: string): Promise<SelectSourceImageResult> {
+    await this.deleteDeveloperPreviewAssets();
     this.sourceImagePath = sourceImagePath;
     this.sourceImageName = basename(sourceImagePath);
     this.status = "source_selected";
@@ -252,6 +289,53 @@ export class GuidedPetFlow {
       bundleDir,
       petId: result.manifest.id,
       petName: result.manifest.name
+    };
+  }
+
+  async createDeveloperPreview(): Promise<DeveloperPreviewFlowResult> {
+    if (!this.sourceImagePath) {
+      throw this.setError(new GuidedPetFlowError("SOURCE_IMAGE_REQUIRED", "Select a source image before previewing."));
+    }
+    await this.deleteDeveloperPreviewAssets();
+
+    const runId = this.createRunId();
+    const runDir = join(this.developerPreviewsRoot, runId);
+    const outputDir = join(runDir, "comparison");
+    await mkdir(runDir, { recursive: true });
+    let result: Awaited<ReturnType<typeof runStylizerPreviewComparison>>;
+    try {
+      result = await runStylizerPreviewComparison({
+        sourceImagePath: this.sourceImagePath,
+        outputDir,
+        normalizationTempRoot: join(runDir, "normalization"),
+        now: this.now
+      });
+    } catch (error) {
+      await deletePetAssets({
+        targetDir: runDir,
+        allowedRoot: this.developerPreviewsRoot
+      }).catch(() => undefined);
+      throw error;
+    }
+    const presetsById = new Map(result.report.presets.map((preset) => [preset.id, preset]));
+    this.developerPreview = {
+      runDir,
+      contactSheetPath: result.contactSheetPath,
+      previews: result.report.previews.map((preview) => {
+        const preset = presetsById.get(preview.presetId);
+        return {
+          presetId: preview.presetId,
+          title: preset?.title ?? preview.presetId,
+          currentDefault: preset?.currentDefault ?? false,
+          previewPath: join(outputDir, preview.path),
+          metrics: preview.metrics
+        };
+      })
+    };
+    this.lastError = null;
+    return {
+      presetIds: this.developerPreview.previews.map((preview) => preview.presetId),
+      previewCount: this.developerPreview.previews.length
     };
   }
 
@@ -329,6 +413,9 @@ export class GuidedPetFlow {
 
   async deleteDraftAssets(): Promise<DeleteFlowResult> {
     let deleted = false;
+    if (await this.deleteDeveloperPreviewAssets()) {
+      deleted = true;
+    }
     if (this.review) {
       await deletePetAssets({
         targetDir: this.review.runDir,
@@ -379,6 +466,18 @@ export class GuidedPetFlow {
             checks: this.review.checks
           }
         : null,
+      developerPreview: this.developerPreview
+        ? {
+            contactSheetUrl: pathToFileURL(this.developerPreview.contactSheetPath).href,
+            previews: this.developerPreview.previews.map((preview) => ({
+              presetId: preview.presetId,
+              title: preview.title,
+              currentDefault: preview.currentDefault,
+              previewUrl: pathToFileURL(preview.previewPath).href,
+              metrics: preview.metrics
+            }))
+          }
+        : null,
       accepted: this.accepted
         ? {
             petId: this.accepted.petId,
@@ -396,10 +495,11 @@ export class GuidedPetFlow {
       },
       actions: {
         canGenerate: Boolean(this.sourceImagePath) && this.canGenerateWithCurrentSettings(),
+        canCreateDeveloperPreview: Boolean(this.sourceImagePath),
         canReview: Boolean(this.draft),
         canAccept: Boolean(this.draft),
         canLaunch: Boolean(this.accepted),
-        canDeleteDraft: Boolean(this.draft || this.review),
+        canDeleteDraft: Boolean(this.draft || this.review || this.developerPreview),
         canDeleteAccepted: Boolean(this.accepted)
       },
       lastError: this.lastError
@@ -410,6 +510,18 @@ export class GuidedPetFlow {
     this.runCounter += 1;
     const stamp = (this.now ?? new Date()).toISOString().replaceAll(/[^0-9]/g, "").slice(0, 14);
     return `run-${stamp}-${this.runCounter}`;
+  }
+
+  private async deleteDeveloperPreviewAssets(): Promise<boolean> {
+    if (!this.developerPreview) {
+      return false;
+    }
+    await deletePetAssets({
+      targetDir: this.developerPreview.runDir,
+      allowedRoot: this.developerPreviewsRoot
+    });
+    this.developerPreview = null;
+    return true;
   }
 
   private createGenerationAdapter(): PetGenerationAdapter | undefined {

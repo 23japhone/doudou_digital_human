@@ -41,6 +41,7 @@
           </fieldset>
 
           <div class="actions">
+            <button id="developer-preview" type="button">Style Compare</button>
             <button id="generate-pet" type="button">Generate</button>
             <button id="qa-pet" type="button">QA Preview</button>
             <button id="accept-pet" type="button">Accept</button>
@@ -64,6 +65,13 @@
         </aside>
 
         <section class="preview-area" aria-label="Pet preview">
+          <section class="developer-preview-panel" aria-label="Developer style comparison">
+            <figure>
+              <figcaption>Style Comparison</figcaption>
+              <img id="developer-preview-contact-sheet" alt="Local stylizer comparison contact sheet" />
+            </figure>
+            <div id="developer-preview-list" class="style-preview-list"></div>
+          </section>
           <figure>
             <figcaption>Preview</figcaption>
             <img id="preview-image" alt="Generated pet preview" />

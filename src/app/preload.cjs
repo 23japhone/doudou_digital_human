@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("doudouApp", {
   getState: () => ipcRenderer.invoke("app:get-state"),
   setGenerationSettings: (settings) => ipcRenderer.invoke("app:set-generation-settings", settings),
   selectSourceImage: () => ipcRenderer.invoke("app:select-source-image"),
+  createDeveloperPreview: () => ipcRenderer.invoke("app:create-developer-preview"),
   generatePet: () => ipcRenderer.invoke("app:generate-pet"),
   createReview: () => ipcRenderer.invoke("app:create-review"),
   acceptPet: () => ipcRenderer.invoke("app:accept-pet"),

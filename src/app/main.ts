@@ -14,6 +14,7 @@ import {
   type PublicGuidedPetState
 } from "./guided-flow.js";
 import { PetGenerationError, SourceImageIntakeError, SourceImageNormalizationError } from "../generation/generate-pet.js";
+import { StylizerPreviewComparisonError } from "../generation/stylizer-preview-comparison.js";
 import { CloudImageAdapterError } from "../generation/adapters/cloud-image-adapter.js";
 import { PetReviewError } from "../review/pet-review.js";
 import { PetBundleValidationError } from "../pet_bundle/validate.js";
@@ -133,6 +134,7 @@ function registerIpcHandlers(): void {
     })
   );
   ipcMain.handle("app:generate-pet", async () => withState(() => flow.generatePet()));
+  ipcMain.handle("app:create-developer-preview", async () => withState(() => flow.createDeveloperPreview()));
   ipcMain.handle("app:create-review", async () => withState(() => flow.createReview()));
   ipcMain.handle("app:accept-pet", async () => withState(() => flow.acceptPet()));
   ipcMain.handle("app:launch-pet", async () => withState(() => flow.launchPet({ smoke: options.smoke })));
@@ -190,6 +192,7 @@ function serializeActionError(error: unknown): { code: string; message: string }
     error instanceof GuidedPetFlowError ||
     error instanceof SourceImageIntakeError ||
     error instanceof SourceImageNormalizationError ||
+    error instanceof StylizerPreviewComparisonError ||
     error instanceof CloudImageAdapterError ||
     error instanceof PetGenerationError ||
     error instanceof PetReviewError

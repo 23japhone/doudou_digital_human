@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, test } from "vitest";
 import { GuidedPetFlow } from "../../src/app/guided-flow.js";
@@ -75,6 +76,80 @@ describe("GuidedPetFlow", () => {
       status: "source_selected",
       accepted: null
     });
+  });
+
+  test("creates a local stylizer developer preview from derived artifacts only", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    const appDataDir = path.join(workspace, "app-data");
+    await writeFile(sourcePath, createPngSource());
+    const flow = new GuidedPetFlow({
+      workspaceDir: appDataDir,
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+
+    const result = await flow.createDeveloperPreview();
+    expect(result).toEqual({
+      presetIds: ["balanced", "soft_mask", "bold_edges"],
+      previewCount: 3
+    });
+
+    const publicState = flow.getPublicState();
+    expect(JSON.stringify(publicState)).not.toContain(sourcePath);
+    expect(publicState).toMatchObject({
+      developerPreview: {
+        contactSheetUrl: expect.stringContaining("contact-sheet.png"),
+        previews: [
+          expect.objectContaining({ presetId: "balanced", previewUrl: expect.stringContaining("balanced.png") }),
+          expect.objectContaining({ presetId: "soft_mask", previewUrl: expect.stringContaining("soft_mask.png") }),
+          expect.objectContaining({
+            presetId: "bold_edges",
+            currentDefault: true,
+            previewUrl: expect.stringContaining("bold_edges.png")
+          })
+        ]
+      }
+    });
+
+    const contactSheetPath = fileURLToPath(publicState.developerPreview!.contactSheetUrl);
+    await expect(stat(contactSheetPath)).resolves.toMatchObject({ isFile: expect.any(Function) });
+    for (const preview of publicState.developerPreview!.previews) {
+      await expect(stat(fileURLToPath(preview.previewUrl))).resolves.toMatchObject({ isFile: expect.any(Function) });
+    }
+
+    const previewOutputDir = path.dirname(contactSheetPath);
+    const reportText = await readFile(path.join(previewOutputDir, "stylizer-preview-comparison-report.json"), "utf8");
+    expect(reportText).not.toContain(sourcePath);
+    expect(reportText).not.toContain("source.png");
+    const artifactNames = await listRelativeFiles(path.join(appDataDir, "developer-previews"));
+    expect(artifactNames).toContain("run-20260630120000-1/comparison/contact-sheet.png");
+    expect(artifactNames).toContain("run-20260630120000-1/comparison/previews/bold_edges.png");
+    expect(artifactNames).not.toContain("run-20260630120000-1/comparison/source.png");
+    expect(artifactNames.some((name) => name.endsWith("normalized-source.png"))).toBe(false);
+
+    const deleted = await flow.deleteDraftAssets();
+    expect(deleted.deleted).toBe(true);
+    await expect(stat(contactSheetPath)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(flow.getPublicState().developerPreview).toBeNull();
+  });
+
+  test("cleans up developer preview output when local comparison fails", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "bad.png");
+    const appDataDir = path.join(workspace, "app-data");
+    await writeFile(sourcePath, "not a png");
+    const flow = new GuidedPetFlow({
+      workspaceDir: appDataDir,
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+
+    await expect(flow.createDeveloperPreview()).rejects.toMatchObject({ code: "UNSUPPORTED_SOURCE_IMAGE_TYPE" });
+    await expect(readdir(path.join(appDataDir, "developer-previews"))).resolves.toEqual([]);
+    expect(flow.getPublicState().developerPreview).toBeNull();
   });
 
   test("rejects actions before the required previous step", async () => {
@@ -345,4 +420,23 @@ function createPngSource(width = 32, height = 32): Buffer {
     }
   }
   return PNG.sync.write(png);
+}
+
+async function listRelativeFiles(rootDir: string): Promise<string[]> {
+  const entries: string[] = [];
+  await collect(rootDir, "");
+  return entries.sort();
+
+  async function collect(currentDir: string, relativeDir: string): Promise<void> {
+    const dirEntries = await readdir(currentDir, { withFileTypes: true });
+    for (const entry of dirEntries) {
+      const relativePath = path.join(relativeDir, entry.name);
+      const absolutePath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        await collect(absolutePath, relativePath);
+      } else {
+        entries.push(relativePath.split(path.sep).join("/"));
+      }
+    }
+  }
 }

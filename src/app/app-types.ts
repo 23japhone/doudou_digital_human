@@ -3,6 +3,7 @@ import type {
   PublicGuidedPetState,
   AcceptFlowResult,
   DeleteFlowResult,
+  DeveloperPreviewFlowResult,
   GenerateFlowResult,
   GuidedGenerationMode,
   GuidedGenerationSettings,
@@ -32,6 +33,9 @@ export interface GuidedAppSmokeResult {
   reviewed: boolean;
   previewLoaded: boolean;
   contactSheetLoaded: boolean;
+  developerPreviewed: boolean;
+  developerPreviewContactSheetLoaded: boolean;
+  developerPreviewPreviewsLoaded: boolean;
   accepted: boolean;
   launched: boolean;
   runtimeSmoke?: RuntimeSmokeResult;
@@ -51,6 +55,7 @@ export interface DoudouAppBridge {
   getState(): Promise<PublicGuidedPetState>;
   setGenerationSettings(settings: GuidedGenerationSettings): Promise<AppActionResult<PublicGuidedPetState>>;
   selectSourceImage(): Promise<AppActionResult<SelectSourceImageResult>>;
+  createDeveloperPreview(): Promise<AppActionResult<DeveloperPreviewFlowResult>>;
   generatePet(): Promise<AppActionResult<GenerateFlowResult>>;
   createReview(): Promise<AppActionResult<ReviewFlowResult>>;
   acceptPet(): Promise<AppActionResult<AcceptFlowResult>>;

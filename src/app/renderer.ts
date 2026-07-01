@@ -7,6 +7,8 @@ import type { GuidedGenerationMode, PublicGuidedPetState } from "./guided-flow.j
 const sourceName = query("#source-name");
 const statusLine = query("#status-line");
 const qaChecks = query("#qa-checks");
+const developerPreviewContactSheetImage = queryImage("#developer-preview-contact-sheet");
+const developerPreviewList = query("#developer-preview-list");
 const previewImage = queryImage("#preview-image");
 const contactSheetImage = queryImage("#contact-sheet-image");
 const generationMode = querySelect("#generation-mode");
@@ -14,6 +16,7 @@ const providerName = query("#provider-name");
 const providerStatus = query("#provider-status");
 const cloudConfirm = queryInput("#cloud-confirm");
 const selectButton = queryButton("#select-source");
+const developerPreviewButton = queryButton("#developer-preview");
 const generateButton = queryButton("#generate-pet");
 const qaButton = queryButton("#qa-pet");
 const acceptButton = queryButton("#accept-pet");
@@ -34,6 +37,7 @@ cloudConfirm.addEventListener("change", () => {
   void updateGenerationSettings();
 });
 selectButton.addEventListener("click", () => runAction(() => window.doudouApp.selectSourceImage()));
+developerPreviewButton.addEventListener("click", () => runAction(() => window.doudouApp.createDeveloperPreview()));
 generateButton.addEventListener("click", () => runAction(() => window.doudouApp.generatePet()));
 qaButton.addEventListener("click", () => runAction(() => window.doudouApp.createReview()));
 acceptButton.addEventListener("click", () => runAction(() => window.doudouApp.acceptPet()));
@@ -78,6 +82,7 @@ function render(state: PublicGuidedPetState, errorMessage?: string): void {
   renderGenerationSettings(state);
   renderActions(state);
   renderSteps(state);
+  renderDeveloperPreview(state);
   renderReview(state);
 }
 
@@ -96,12 +101,32 @@ function renderGenerationSettings(state: PublicGuidedPetState): void {
 
 function renderActions(state: PublicGuidedPetState): void {
   selectButton.disabled = busy;
+  developerPreviewButton.disabled = busy || !state.actions.canCreateDeveloperPreview;
   generateButton.disabled = busy || !state.actions.canGenerate;
   qaButton.disabled = busy || !state.actions.canReview;
   acceptButton.disabled = busy || !state.actions.canAccept;
   launchButton.disabled = busy || !state.actions.canLaunch;
   deleteDraftButton.disabled = busy || !state.actions.canDeleteDraft;
   deleteAcceptedButton.disabled = busy || !state.actions.canDeleteAccepted;
+}
+
+function renderDeveloperPreview(state: PublicGuidedPetState): void {
+  developerPreviewList.replaceChildren();
+  if (!state.developerPreview) {
+    developerPreviewContactSheetImage.removeAttribute("src");
+    return;
+  }
+  developerPreviewContactSheetImage.src = state.developerPreview.contactSheetUrl;
+  for (const preview of state.developerPreview.previews) {
+    const figure = document.createElement("figure");
+    const caption = document.createElement("figcaption");
+    caption.textContent = preview.currentDefault ? `${preview.title} (default)` : preview.title;
+    const image = document.createElement("img");
+    image.src = preview.previewUrl;
+    image.alt = `${preview.title} local stylizer preview`;
+    figure.append(caption, image);
+    developerPreviewList.append(figure);
+  }
 }
 
 function providerStatusText(state: PublicGuidedPetState): string {
@@ -180,6 +205,9 @@ async function runSmokeFlow(): Promise<void> {
     reviewed: false,
     previewLoaded: false,
     contactSheetLoaded: false,
+    developerPreviewed: false,
+    developerPreviewContactSheetLoaded: false,
+    developerPreviewPreviewsLoaded: false,
     accepted: false,
     launched: false,
     generationMode: null,
@@ -199,6 +227,16 @@ async function runSmokeFlow(): Promise<void> {
     const selected = await clickAndWait(selectButton, () => currentState.sourceImageName !== null);
     assertSmokeAction("select source", selected);
     smokeResult.sourceSelected = selected.ok && currentState.sourceImageName !== null;
+
+    const developerPreviewed = await clickAndWait(
+      developerPreviewButton,
+      () => currentState.developerPreview !== null
+    );
+    assertSmokeAction("developer preview", developerPreviewed);
+    smokeResult.developerPreviewed =
+      developerPreviewed.ok && currentState.developerPreview?.previews.length === 3;
+    smokeResult.developerPreviewContactSheetLoaded = await waitForImage(developerPreviewContactSheetImage, 768, 256);
+    smokeResult.developerPreviewPreviewsLoaded = await waitForDeveloperPreviewImages();
 
     const generated = await clickAndWait(generateButton, () => currentState.petId !== null);
     assertSmokeAction("generate", generated);
@@ -299,6 +337,20 @@ async function waitFor(predicate: () => boolean): Promise<AppActionResult<unknow
 async function waitForImage(image: HTMLImageElement, width: number, height: number): Promise<boolean> {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     if (image.complete && image.naturalWidth === width && image.naturalHeight === height) {
+      return true;
+    }
+    await delay(25);
+  }
+  return false;
+}
+
+async function waitForDeveloperPreviewImages(): Promise<boolean> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const images = [...developerPreviewList.querySelectorAll<HTMLImageElement>("img")];
+    if (
+      images.length === 3 &&
+      images.every((image) => image.complete && image.naturalWidth === 256 && image.naturalHeight === 256)
+    ) {
       return true;
     }
     await delay(25);
