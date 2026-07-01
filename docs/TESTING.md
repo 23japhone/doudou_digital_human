@@ -16,7 +16,7 @@
 - Review generated pet bundle: `npm run review:pet -- qa <bundle-dir> <review-dir>`
 - Accept generated pet bundle: `npm run review:pet -- accept <bundle-dir> <library-dir>`
 - Delete review or accepted assets: `npm run review:pet -- delete <target-dir> --root <allowed-root>`
-- Guided desktop app: `npm run dev:app` (full manager flow; launched pets can be stopped from the Stop button)
+- Guided desktop app: `npm run dev:app` (full manager flow; launched pets can be stopped from the Stop button). See [Guided App Quickstart](GUIDED_APP_QUICKSTART.md) for the shortest manual path and developer smoke checklist.
 - Guided desktop app smoke: `npm run smoke:app`
 - Guided desktop app live smoke: `npm run smoke:app:live` (skips unless `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set). Use `npm run smoke:app:live -- --source <image-path>` or `DOUDOU_APP_SMOKE_SOURCE_IMAGE=<image-path>` to run the live smoke against a specific local source image; explicit source-image smoke also requires `DOUDOU_CONFIRM_SOURCE_UPLOAD=1`.
 - OpenAI-compatible image provider probe: `npm run probe:openai-image` uploads only a synthetic PNG and verifies that the configured endpoint supports image edits before any user source image is used.
