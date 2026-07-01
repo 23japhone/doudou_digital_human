@@ -61,7 +61,7 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.runtimeSmoke.idleAdvanced ||
       !smokeResult.deletedDraft ||
       !smokeResult.deletedAccepted ||
-      smokeResult.finalStatus !== "source_selected"
+      smokeResult.finalStatus !== "idle"
     ) {
       throw new Error(`guided app smoke returned incomplete result\n${result.output}`);
     }

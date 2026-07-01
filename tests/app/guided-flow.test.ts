@@ -68,12 +68,14 @@ describe("GuidedPetFlow", () => {
     await expect(stat(generated.bundleDir)).rejects.toMatchObject({ code: "ENOENT" });
     await expect(stat(reviewed.reportPath)).rejects.toMatchObject({ code: "ENOENT" });
     expect(flow.getPublicState().accepted?.petId).toBe("generated_local_pet");
+    expect(flow.getPublicState().sourceImageName).toBeNull();
 
     const acceptedDeleted = await flow.deleteAcceptedPet();
     expect(acceptedDeleted.deleted).toBe(true);
     await expect(stat(accepted.installedBundleDir)).rejects.toMatchObject({ code: "ENOENT" });
     expect(flow.getPublicState()).toMatchObject({
-      status: "source_selected",
+      status: "idle",
+      sourceImageName: null,
       accepted: null
     });
   });
@@ -133,6 +135,53 @@ describe("GuidedPetFlow", () => {
     expect(deleted.deleted).toBe(true);
     await expect(stat(contactSheetPath)).rejects.toMatchObject({ code: "ENOENT" });
     expect(flow.getPublicState().developerPreview).toBeNull();
+    expect(flow.getPublicState().sourceImageName).toBeNull();
+  });
+
+  test("clears selected source image metadata when draft or accepted assets are deleted", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "1.jpg");
+    await writeFile(sourcePath, createPngSource());
+    const flow = new GuidedPetFlow({
+      workspaceDir: path.join(workspace, "app-data"),
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.generatePet();
+    await flow.acceptPet();
+
+    expect(flow.getPublicState()).toMatchObject({
+      sourceImageName: "1.jpg",
+      accepted: expect.objectContaining({ petId: "generated_local_pet" })
+    });
+
+    await expect(flow.deleteDraftAssets()).resolves.toEqual({ deleted: true });
+    await expect(stat(sourcePath)).resolves.toMatchObject({ isFile: expect.any(Function) });
+    expect(flow.getPublicState()).toMatchObject({
+      status: "accepted",
+      sourceImageName: null,
+      accepted: expect.objectContaining({ petId: "generated_local_pet" }),
+      actions: expect.objectContaining({
+        canGenerate: false,
+        canLaunch: true
+      })
+    });
+
+    await flow.setSourceImagePath(sourcePath);
+    expect(flow.getPublicState().sourceImageName).toBe("1.jpg");
+
+    await expect(flow.deleteAcceptedPet()).resolves.toEqual({ deleted: true });
+    await expect(stat(sourcePath)).resolves.toMatchObject({ isFile: expect.any(Function) });
+    expect(flow.getPublicState()).toMatchObject({
+      status: "idle",
+      sourceImageName: null,
+      accepted: null,
+      actions: expect.objectContaining({
+        canGenerate: false,
+        canLaunch: false
+      })
+    });
   });
 
   test("cleans up developer preview output when local comparison fails", async () => {

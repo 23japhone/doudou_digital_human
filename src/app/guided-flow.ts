@@ -274,7 +274,7 @@ export class GuidedPetFlow {
     const adapter = this.createGenerationAdapter();
     adapter?.preflight?.();
     if (this.draft) {
-      await this.deleteDraftAssets();
+      await this.deleteDraftAssets({ clearSourceImage: false });
     }
 
     const runId = this.createRunId();
@@ -456,7 +456,7 @@ export class GuidedPetFlow {
     return { stopped };
   }
 
-  async deleteDraftAssets(): Promise<DeleteFlowResult> {
+  async deleteDraftAssets(options: { clearSourceImage?: boolean } = {}): Promise<DeleteFlowResult> {
     let deleted = false;
     if (await this.deleteDeveloperPreviewAssets()) {
       deleted = true;
@@ -480,6 +480,9 @@ export class GuidedPetFlow {
     if (!this.runtimeProcess) {
       this.launch = null;
     }
+    if (deleted && options.clearSourceImage !== false) {
+      this.clearSourceImageSelection();
+    }
     this.status = this.runtimeProcess ? "launched" : this.statusAfterRuntimeStops();
     this.lastError = null;
     return { deleted };
@@ -496,6 +499,7 @@ export class GuidedPetFlow {
     });
     this.accepted = null;
     this.launch = null;
+    this.clearSourceImageSelection();
     this.status = this.draft ? "generated" : this.sourceImagePath ? "source_selected" : "idle";
     this.lastError = null;
     return { deleted: true };
@@ -563,6 +567,15 @@ export class GuidedPetFlow {
 
   private statusAfterRuntimeStops(): GuidedPetFlowStatus {
     return this.accepted ? "accepted" : this.sourceImagePath ? "source_selected" : "idle";
+  }
+
+  private clearSourceImageSelection(): void {
+    this.sourceImagePath = null;
+    this.sourceImageName = null;
+    this.generationSettings = {
+      ...this.generationSettings,
+      confirmCloudUpload: false
+    };
   }
 
   private async deleteDeveloperPreviewAssets(): Promise<boolean> {

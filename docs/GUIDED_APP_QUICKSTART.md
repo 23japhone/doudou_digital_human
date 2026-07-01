@@ -50,6 +50,8 @@ Use `npm run dev:app` for the full product flow. Use `npm run dev` only when you
 
 10. Optional cleanup: click `Delete Draft` and `Delete Accepted`.
 
+    Expected result: derived app assets are removed and the selected source filename returns to `No image selected`. The original local image file is not deleted from disk.
+
 ## Mock Cloud Path
 
 Mock cloud mode exercises the same upload-confirmation product path without making live network calls.
@@ -123,6 +125,7 @@ Manual smoke checklist:
 - Click `Launch` again to confirm relaunch still works.
 - Click `Stop` again.
 - Click `Delete Draft` and `Delete Accepted` if you want to clean the local app workspace.
+- Confirm the selected source filename is cleared after cleanup, while the original local image file remains on disk.
 
 Optional process check after stopping:
 
