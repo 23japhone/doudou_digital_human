@@ -30,6 +30,7 @@ This file is the short Codex entrypoint. Keep durable project details in `docs/`
 - Do not add production dependencies without explaining why.
 - Do not put secrets in code, docs, tests, logs, or fixtures.
 - 前端可见文案默认使用中文；除品牌名、模型名、协议字段、日志和开发者内部标识外，不要在用户界面展示英文。
+- `doudou` 的中文品牌名固定写作“兜兜”，不要写作“豆豆”；用户可见标题、按钮、文档说明和 QA 文案都遵守这个写法，代码内部稳定标识可继续使用 `doudou`。
 - Plan broad structural migrations first, then move mechanically in small verified phases.
 - When requirements are unclear, ask or record explicit assumptions before implementing.
 

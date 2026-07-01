@@ -102,7 +102,7 @@ function createWindow(): void {
     height: options.visualQa ? 640 : 740,
     minWidth: 900,
     minHeight: 640,
-    title: "豆豆桌宠工作台",
+    title: "兜兜桌宠工作台",
     backgroundColor: "#f7f8fa",
     webPreferences: {
       preload: join(currentDir, "preload.cjs"),

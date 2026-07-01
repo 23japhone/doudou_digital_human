@@ -6,6 +6,7 @@ const repoRoot = process.cwd();
 
 const disallowedUiTextByFile: Record<string, string[]> = {
   "src/app/index.html": [
+    "豆豆",
     "Doudou Pet Studio",
     "No image selected",
     "Select Image",
@@ -58,6 +59,7 @@ const disallowedUiTextByFile: Record<string, string[]> = {
     "local stylizer preview"
   ],
   "src/app/main.ts": [
+    "豆豆",
     "title: \"Doudou Pet Studio\"",
     "title: \"Select source image\"",
     "name: \"Images\"",
@@ -65,6 +67,7 @@ const disallowedUiTextByFile: Record<string, string[]> = {
     "\"Unknown app error.\""
   ],
   "src/runtime/index.html": [
+    "豆豆",
     "<html lang=\"en\">",
     "Doudou Pet Runtime",
     "desktop pet"
@@ -89,5 +92,23 @@ describe("frontend localization", () => {
 
     expect(agents).toContain("前端");
     expect(agents).toContain("中文");
+  });
+
+  test("uses 兜兜 in visible app and runtime titles", async () => {
+    const appHtml = await readFile(path.join(repoRoot, "src/app/index.html"), "utf8");
+    const appMain = await readFile(path.join(repoRoot, "src/app/main.ts"), "utf8");
+    const runtimeHtml = await readFile(path.join(repoRoot, "src/runtime/index.html"), "utf8");
+
+    expect(appHtml).toContain("兜兜桌宠工作台");
+    expect(appMain).toContain("title: \"兜兜桌宠工作台\"");
+    expect(runtimeHtml).toContain("兜兜桌宠运行时");
+  });
+
+  test("records the Doudou brand spelling as 兜兜", async () => {
+    const agents = await readFile(path.join(repoRoot, "AGENTS.md"), "utf8");
+
+    expect(agents).toContain("doudou");
+    expect(agents).toContain("兜兜");
+    expect(agents).toContain("豆豆");
   });
 });
