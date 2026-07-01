@@ -26,6 +26,7 @@
     "smoke:runtime": "npm run build && NODE_OPTIONS= node dist/src/scripts/runtime-smoke.js",
     "smoke:app": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-smoke.js",
     "smoke:app:live": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-live-smoke.js",
+    "qa:app:visual": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-visual-qa.js",
     "probe:openai-image": "npm run build:main && NODE_OPTIONS= node dist/src/scripts/openai-image-probe.js"
   },
   "dependencies": {

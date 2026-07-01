@@ -25,6 +25,8 @@ interface AppOptions {
   smoke: boolean;
   smokeGenerationMode: GuidedGenerationMode;
   smokeSourceImagePath?: string;
+  visualQa: boolean;
+  visualQaOutputDir?: string;
   workspaceDir?: string;
 }
 
@@ -57,11 +59,16 @@ async function main(): Promise<void> {
 }
 
 function parseArgs(args: string[]): AppOptions {
-  const parsed: AppOptions = { smoke: false, smokeGenerationMode: "mock_cloud" };
+  const parsed: AppOptions = { smoke: false, smokeGenerationMode: "mock_cloud", visualQa: false };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--smoke") {
       parsed.smoke = true;
+    } else if (arg === "--visual-qa") {
+      parsed.visualQa = true;
+    } else if (arg === "--visual-qa-output") {
+      parsed.visualQaOutputDir = args[index + 1];
+      index += 1;
     } else if (arg === "--provider" || arg === "--generation-mode") {
       parsed.smokeGenerationMode = parseGenerationMode(args[index + 1]);
       index += 1;
@@ -91,8 +98,8 @@ function parseGenerationMode(value: string | undefined): GuidedGenerationMode {
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1040,
-    height: 740,
+    width: options.visualQa ? 900 : 1040,
+    height: options.visualQa ? 640 : 740,
     minWidth: 900,
     minHeight: 640,
     title: "豆豆桌宠工作台",
@@ -104,10 +111,14 @@ function createWindow(): void {
     }
   });
 
-  void mainWindow.loadFile(join(currentDir, "index.html"));
-  if (options.smoke) {
+  void mainWindow.loadFile(join(currentDir, "index.html")).then(() => {
+    if (options.visualQa) {
+      void runVisualQa();
+    }
+  });
+  if (options.smoke || options.visualQa) {
     smokeTimeout = setTimeout(() => {
-      console.error("app smoke: renderer did not finish within 30s");
+      console.error("app automation: renderer did not finish within 30s");
       app.exit(1);
     }, 30000);
   }
@@ -154,6 +165,29 @@ function registerIpcHandlers(): void {
     console.log(`app smoke: ${JSON.stringify(result)}`);
     setTimeout(() => app.quit(), 250);
   });
+}
+
+async function runVisualQa(): Promise<void> {
+  try {
+    if (!mainWindow) {
+      throw new Error("Visual QA window is not available.");
+    }
+    const { runGuidedAppVisualQa } = await import("./visual-qa.js");
+    const report = await runGuidedAppVisualQa(mainWindow, options.visualQaOutputDir);
+    if (smokeTimeout) {
+      clearTimeout(smokeTimeout);
+      smokeTimeout = null;
+    }
+    console.log(`app visual qa: ${JSON.stringify(report)}`);
+    app.exit(report.issues.length === 0 ? 0 : 1);
+  } catch (error) {
+    if (smokeTimeout) {
+      clearTimeout(smokeTimeout);
+      smokeTimeout = null;
+    }
+    console.error("app visual qa failed:", error);
+    app.exit(1);
+  }
 }
 
 function registerQuitHandler(): void {

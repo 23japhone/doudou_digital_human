@@ -19,6 +19,7 @@
 - Guided desktop app: `npm run dev:app` (full manager flow; launched pets can be stopped from the Stop button). See [Guided App Quickstart](GUIDED_APP_QUICKSTART.md) for the shortest manual path and developer smoke checklist.
 - Guided desktop app smoke: `npm run smoke:app`
 - Guided desktop app live smoke: `npm run smoke:app:live` (skips unless `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set). Use `npm run smoke:app:live -- --source <image-path>` or `DOUDOU_APP_SMOKE_SOURCE_IMAGE=<image-path>` to run the live smoke against a specific local source image; explicit source-image smoke also requires `DOUDOU_CONFIRM_SOURCE_UPLOAD=1`.
+- Guided app Chinese visual QA: `npm run qa:app:visual` launches the built Electron manager at the minimum supported window size, injects representative Chinese source filename, status/error, provider, action, and QA text, saves a screenshot under `output/playwright/`, and fails on text overflow or overlapping controls.
 - OpenAI-compatible image provider probe: `npm run probe:openai-image` uploads only a synthetic PNG and verifies that the configured endpoint supports image edits before any user source image is used.
 - Fixture validation: `npm run validate:fixture`
 - Runtime smoke: `npm run smoke:runtime`
@@ -37,6 +38,7 @@
 - Review workflow tests cover QA report creation, accepted bundle validation, deletion safety, and privacy-safe review/install metadata.
 - Runtime smoke covers missing manifest, missing asset, unsupported schema, then launches the fixture and a generated bundle. Both require structured renderer evidence: bundle loaded, atlas loaded, nontransparent canvas pixel, and idle animation advance.
 - Guided app smoke launches the Electron manager UI, selects mock-cloud generation, confirms upload, clicks through source selection, local Style Compare developer preview, generation, QA, accept, runtime launch, draft deletion, and accepted deletion, then verifies the developer preview images and runtime smoke evidence returned through the UI flow. Flow-level unit tests cover managed runtime launch/stop behavior, including keeping Stop available after draft cleanup while a pet is running. The live smoke reuses this flow with `openai_live` only when the required env vars are present, and can use either its synthetic source image or an explicit `--source` / `DOUDOU_APP_SMOKE_SOURCE_IMAGE` path.
+- Guided app visual QA covers the Chinese layout surface rather than workflow behavior. It should be run after visible Chinese copy, button labels, status text, or sidebar layout changes. Generated screenshots are local QA artifacts and must stay out of git.
 
 ## Test Layout
 
@@ -64,3 +66,4 @@ Fixtures must be small, rights-safe, and documented.
 - Real adapter changes must cover cloud confirmation gating, provider config failures, source normalization cleanup, provider error mapping, live-provider env gating, `privacy.cloudGenerated`, and no leakage of raw prompts, raw responses, tokens, or source paths.
 - Review/deletion changes must cover invalid bundle rejection before artifact creation, accepted bundle validation, refusal to overwrite installs, refusal to delete outside the allowed root, and no absolute path or secret leakage in review/install records.
 - Guided UI changes must include a flow-level unit test plus an Electron smoke that proves renderer buttons can drive local developer preview, local or mock-cloud generate, QA, accept/delete, and launch without leaking source paths or provider secrets in smoke output.
+- Guided UI visible-copy or layout changes should also run `npm run qa:app:visual` to prove Chinese buttons, status/error text, and QA labels do not overflow or overlap at the minimum supported window size.

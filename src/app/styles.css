@@ -9,13 +9,16 @@ body {
 }
 
 button {
-  min-height: 36px;
+  min-height: 40px;
   border: 1px solid #aeb7c2;
   border-radius: 6px;
-  padding: 0 12px;
+  padding: 8px 12px;
   color: #1f2933;
   background: #ffffff;
   font: inherit;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 button:hover:not(:disabled) {
@@ -65,6 +68,8 @@ select {
   min-height: 20px;
   color: #52606d;
   font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .workspace {
@@ -75,9 +80,12 @@ select {
 
 .controls {
   display: grid;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: repeat(5, auto);
+  align-content: start;
   gap: 18px;
   border-right: 1px solid #d8dee6;
+  min-height: 0;
+  overflow-y: auto;
   padding: 20px;
   background: #ffffff;
 }
@@ -140,6 +148,9 @@ select {
   background: #eef1f4;
   color: #3e4c59;
   font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 #provider-status.ready {
@@ -163,9 +174,14 @@ select {
   margin-top: 2px;
 }
 
+.confirm-row span {
+  overflow-wrap: anywhere;
+}
+
 .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-auto-rows: minmax(40px, auto);
   gap: 8px;
 }
 
@@ -185,6 +201,7 @@ select {
   background: #f7f8fa;
   font-size: 13px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .steps li.active {
@@ -213,6 +230,7 @@ select {
   background: #ffffff;
   color: #3e4c59;
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .preview-area {
@@ -259,9 +277,9 @@ figcaption {
 }
 
 .style-preview-list figcaption {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 #preview-image,
