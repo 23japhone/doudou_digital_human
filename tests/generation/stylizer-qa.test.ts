@@ -4,7 +4,11 @@ import path from "node:path";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, test } from "vitest";
 import { runStylizerQaCli } from "../../src/scripts/stylizer-qa.js";
-import { runStylizerQaCorpus } from "../../src/generation/stylizer-qa.js";
+import {
+  evaluateDefaultParameterChangeEvidence,
+  runStylizerQaCorpus,
+  type StylizerManualScoringTemplate
+} from "../../src/generation/stylizer-qa.js";
 import { validatePetBundle } from "../../src/pet_bundle/validate.js";
 
 const tempDirs: string[] = [];
@@ -48,6 +52,16 @@ describe("runStylizerQaCorpus", () => {
     expect(contactSheet.width).toBe(1024);
     expect(contactSheet.height).toBe(1024);
     expect(hasNonTransparentPixel(contactSheet)).toBe(true);
+    expect(result.report.artifacts).toMatchObject({
+      manualScoringChecklist: "manual-scoring-checklist.md",
+      manualScoringTemplate: "manual-scoring-template.json"
+    });
+    await expect(stat(path.join(outputDir, "manual-scoring-checklist.md"))).resolves.toMatchObject({
+      isFile: expect.any(Function)
+    });
+    await expect(stat(path.join(outputDir, "manual-scoring-template.json"))).resolves.toMatchObject({
+      isFile: expect.any(Function)
+    });
 
     for (const corpusCase of result.report.cases) {
       await expect(stat(path.join(outputDir, corpusCase.source.path))).resolves.toMatchObject({ isFile: expect.any(Function) });
@@ -76,6 +90,51 @@ describe("runStylizerQaCorpus", () => {
     expect(reportText).not.toContain("rawResponse");
     expect(reportText).not.toContain("token");
     expect(reportText).not.toContain("secret");
+
+    const scoringTemplateText = await readFile(path.join(outputDir, "manual-scoring-template.json"), "utf8");
+    const scoringTemplate = JSON.parse(scoringTemplateText) as StylizerManualScoringTemplate;
+    expect(scoringTemplate).toMatchObject({
+      schemaVersion: "stylizer-manual-score.v0.1",
+      status: "needs_scoring",
+      defaultParameterChangeGate: {
+        candidateDefaultPresetId: null,
+        approved: false,
+        minimumAverageScore: 4,
+        minimumDimensionScore: 3
+      }
+    });
+    expect(scoringTemplate.dimensions.map((dimension) => dimension.id)).toEqual([
+      "crop_fit",
+      "mask_silhouette",
+      "color_preservation",
+      "edge_clarity",
+      "pet_cuteness"
+    ]);
+    expect(scoringTemplate.entries).toHaveLength(result.report.cases.length * result.report.presets.length);
+    for (const entry of scoringTemplate.entries) {
+      expect(entry.scores).toEqual({
+        crop_fit: null,
+        mask_silhouette: null,
+        color_preservation: null,
+        edge_clarity: null,
+        pet_cuteness: null
+      });
+      expect(entry.notes).toBe("");
+      expect(entry.previewPath).toMatch(/^previews\//);
+    }
+    expect(scoringTemplateText).not.toContain(outputDir);
+    expect(scoringTemplateText).not.toContain("prompt");
+    expect(scoringTemplateText).not.toContain("rawResponse");
+    expect(scoringTemplateText).not.toContain("token");
+    expect(scoringTemplateText).not.toContain("secret");
+    const checklistText = await readFile(path.join(outputDir, "manual-scoring-checklist.md"), "utf8");
+    expect(checklistText).toContain("crop fit");
+    expect(checklistText).toContain("mask silhouette");
+    expect(checklistText).toContain("color preservation");
+    expect(checklistText).toContain("edge clarity");
+    expect(checklistText).toContain("pet cuteness");
+    expect(checklistText).toContain("split_palette_square");
+    expect(checklistText).toContain("bold_edges");
   });
 
   test("preset variants produce different previews for batch tuning", async () => {
@@ -88,6 +147,32 @@ describe("runStylizerQaCorpus", () => {
     const boldEdges = await readFile(path.join(outputDir, firstCase.runs.find((run) => run.presetId === "bold_edges")!.previewPath));
 
     expect(boldEdges.equals(balanced)).toBe(false);
+  });
+
+  test("requires completed manual scoring evidence before a preset can become the default", async () => {
+    const workspace = await createTempDir();
+    const outputDir = path.join(workspace, "stylizer-qa");
+    const result = await runStylizerQaCorpus({ outputDir, now: fixedNow });
+    const template = JSON.parse(
+      await readFile(path.join(outputDir, "manual-scoring-template.json"), "utf8")
+    ) as StylizerManualScoringTemplate;
+
+    expect(evaluateDefaultParameterChangeEvidence(template, "bold_edges")).toMatchObject({
+      ok: false,
+      code: "SCORING_NOT_COMPLETE"
+    });
+
+    const completed = completeScores(template, "bold_edges", 4);
+    expect(evaluateDefaultParameterChangeEvidence(completed, "bold_edges")).toMatchObject({
+      ok: true,
+      candidateDefaultPresetId: "bold_edges"
+    });
+
+    const weakEvidence = completeScores(template, "bold_edges", 2);
+    expect(evaluateDefaultParameterChangeEvidence(weakEvidence, "bold_edges")).toMatchObject({
+      ok: false,
+      code: "SCORE_BELOW_THRESHOLD"
+    });
   });
 });
 
@@ -124,4 +209,32 @@ function hasNonTransparentPixel(png: PNG): boolean {
     }
   }
   return false;
+}
+
+function completeScores(
+  template: StylizerManualScoringTemplate,
+  candidateDefaultPresetId: string,
+  score: number
+): StylizerManualScoringTemplate {
+  return {
+    ...template,
+    status: "scored",
+    reviewer: "QA Reviewer",
+    reviewedAt: "2026-07-01T12:30:00.000Z",
+    defaultParameterChangeGate: {
+      ...template.defaultParameterChangeGate,
+      candidateDefaultPresetId,
+      approved: true
+    },
+    entries: template.entries.map((entry) => ({
+      ...entry,
+      scores: {
+        crop_fit: score,
+        mask_silhouette: score,
+        color_preservation: score,
+        edge_clarity: score,
+        pet_cuteness: score
+      }
+    }))
+  };
 }

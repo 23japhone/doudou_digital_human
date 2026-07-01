@@ -36,6 +36,8 @@ export interface StylizerQaReport {
   };
   artifacts: {
     contactSheet: string;
+    manualScoringChecklist: string;
+    manualScoringTemplate: string;
     columns: string[];
   };
   presets: Array<{
@@ -77,6 +79,69 @@ export interface StylizerQaMetrics {
   };
 }
 
+export type StylizerScoreDimensionId =
+  | "crop_fit"
+  | "mask_silhouette"
+  | "color_preservation"
+  | "edge_clarity"
+  | "pet_cuteness";
+
+export interface StylizerScoreDimension {
+  id: StylizerScoreDimensionId;
+  label: string;
+  rubric: string;
+}
+
+export interface StylizerManualScoringTemplate {
+  schemaVersion: "stylizer-manual-score.v0.1";
+  status: "needs_scoring" | "scored";
+  createdAt: string;
+  reviewer: string;
+  reviewedAt: string | null;
+  dimensions: StylizerScoreDimension[];
+  defaultParameterChangeGate: {
+    candidateDefaultPresetId: string | null;
+    approved: boolean;
+    minimumAverageScore: 4;
+    minimumDimensionScore: 3;
+  };
+  presets: Array<{
+    id: string;
+    title: string;
+  }>;
+  cases: Array<{
+    id: string;
+    title: string;
+  }>;
+  entries: StylizerManualScoringEntry[];
+}
+
+export interface StylizerManualScoringEntry {
+  caseId: string;
+  presetId: string;
+  previewPath: string;
+  scores: Record<StylizerScoreDimensionId, number | null>;
+  notes: string;
+}
+
+export type DefaultParameterChangeGateResult =
+  | {
+      ok: true;
+      candidateDefaultPresetId: string;
+      averageScore: number;
+    }
+  | {
+      ok: false;
+      code:
+        | "SCORING_NOT_COMPLETE"
+        | "DEFAULT_CHANGE_NOT_APPROVED"
+        | "CANDIDATE_PRESET_MISMATCH"
+        | "CANDIDATE_PRESET_MISSING"
+        | "SCORE_MISSING"
+        | "SCORE_BELOW_THRESHOLD";
+      message: string;
+    };
+
 export interface RunStylizerQaCorpusOptions {
   outputDir: string;
   now?: Date;
@@ -90,6 +155,36 @@ export interface RunStylizerQaCorpusResult {
 }
 
 const CONTACT_SHEET_CELL_SIZE = 256;
+const MANUAL_SCORING_CHECKLIST_PATH = "manual-scoring-checklist.md";
+const MANUAL_SCORING_TEMPLATE_PATH = "manual-scoring-template.json";
+
+export const STYLIZER_SCORE_DIMENSIONS: StylizerScoreDimension[] = [
+  {
+    id: "crop_fit",
+    label: "crop fit",
+    rubric: "The generated pet keeps the useful source content visible without awkward clipping or empty padding."
+  },
+  {
+    id: "mask_silhouette",
+    label: "mask silhouette",
+    rubric: "The body/head silhouette reads as a coherent desktop pet shape."
+  },
+  {
+    id: "color_preservation",
+    label: "color preservation",
+    rubric: "The preset preserves the source palette enough to compare source identity across outputs."
+  },
+  {
+    id: "edge_clarity",
+    label: "edge clarity",
+    rubric: "Edges and outlines improve readability without muddying the sprite."
+  },
+  {
+    id: "pet_cuteness",
+    label: "pet cuteness",
+    rubric: "The output feels pleasant, cute, and usable as a desktop pet."
+  }
+];
 
 export const STYLIZER_QA_PRESETS: StylizerQaPreset[] = [
   {
@@ -189,6 +284,8 @@ export async function runStylizerQaCorpus(options: RunStylizerQaCorpusOptions): 
     },
     artifacts: {
       contactSheet: "contact-sheet.png",
+      manualScoringChecklist: MANUAL_SCORING_CHECKLIST_PATH,
+      manualScoringTemplate: MANUAL_SCORING_TEMPLATE_PATH,
       columns: ["source", ...STYLIZER_QA_PRESETS.map((preset) => preset.id)]
     },
     presets: STYLIZER_QA_PRESETS.map((preset) => ({
@@ -247,6 +344,12 @@ export async function runStylizerQaCorpus(options: RunStylizerQaCorpusOptions): 
 
   const contactSheetPath = path.join(outputDir, "contact-sheet.png");
   await writeFile(contactSheetPath, await createContactSheet(outputDir, report));
+  const scoringTemplate = createManualScoringTemplate(report);
+  await writeFile(
+    path.join(outputDir, MANUAL_SCORING_TEMPLATE_PATH),
+    `${JSON.stringify(scoringTemplate, null, 2)}\n`
+  );
+  await writeFile(path.join(outputDir, MANUAL_SCORING_CHECKLIST_PATH), createManualScoringChecklist(scoringTemplate));
   const reportPath = path.join(outputDir, "stylizer-qa-report.json");
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   await rm(path.join(outputDir, ".normalization"), { force: true, recursive: true });
@@ -256,6 +359,162 @@ export async function runStylizerQaCorpus(options: RunStylizerQaCorpusOptions): 
     reportPath,
     contactSheetPath,
     report
+  };
+}
+
+export function evaluateDefaultParameterChangeEvidence(
+  scoring: StylizerManualScoringTemplate,
+  candidateDefaultPresetId: string
+): DefaultParameterChangeGateResult {
+  if (scoring.status !== "scored" || !scoring.reviewer || !scoring.reviewedAt) {
+    return {
+      ok: false,
+      code: "SCORING_NOT_COMPLETE",
+      message: "Manual scoring must be completed by a reviewer before changing default stylizer parameters."
+    };
+  }
+  if (!scoring.defaultParameterChangeGate.approved) {
+    return {
+      ok: false,
+      code: "DEFAULT_CHANGE_NOT_APPROVED",
+      message: "Manual scoring evidence does not approve a default parameter change."
+    };
+  }
+  if (scoring.defaultParameterChangeGate.candidateDefaultPresetId !== candidateDefaultPresetId) {
+    return {
+      ok: false,
+      code: "CANDIDATE_PRESET_MISMATCH",
+      message: "Manual scoring evidence is for a different candidate preset."
+    };
+  }
+  if (!scoring.presets.some((preset) => preset.id === candidateDefaultPresetId)) {
+    return {
+      ok: false,
+      code: "CANDIDATE_PRESET_MISSING",
+      message: "Manual scoring evidence references an unknown preset."
+    };
+  }
+
+  const candidateEntries = scoring.entries.filter((entry) => entry.presetId === candidateDefaultPresetId);
+  if (candidateEntries.length !== scoring.cases.length) {
+    return {
+      ok: false,
+      code: "SCORE_MISSING",
+      message: "Candidate preset must be scored for every QA corpus case."
+    };
+  }
+
+  let totalScore = 0;
+  let totalScores = 0;
+  for (const entry of candidateEntries) {
+    for (const dimension of STYLIZER_SCORE_DIMENSIONS) {
+      const score = entry.scores[dimension.id];
+      if (typeof score !== "number" || !Number.isInteger(score)) {
+        return {
+          ok: false,
+          code: "SCORE_MISSING",
+          message: `Missing score for ${entry.caseId}/${entry.presetId}/${dimension.id}.`
+        };
+      }
+      if (score < scoring.defaultParameterChangeGate.minimumDimensionScore) {
+        return {
+          ok: false,
+          code: "SCORE_BELOW_THRESHOLD",
+          message: `Score for ${entry.caseId}/${entry.presetId}/${dimension.id} is below the minimum dimension score.`
+        };
+      }
+      totalScore += score;
+      totalScores += 1;
+    }
+  }
+
+  const averageScore = totalScore / totalScores;
+  if (averageScore < scoring.defaultParameterChangeGate.minimumAverageScore) {
+    return {
+      ok: false,
+      code: "SCORE_BELOW_THRESHOLD",
+      message: "Candidate preset average score is below the default parameter change threshold."
+    };
+  }
+
+  return {
+    ok: true,
+    candidateDefaultPresetId,
+    averageScore
+  };
+}
+
+function createManualScoringTemplate(report: StylizerQaReport): StylizerManualScoringTemplate {
+  return {
+    schemaVersion: "stylizer-manual-score.v0.1",
+    status: "needs_scoring",
+    createdAt: report.createdAt,
+    reviewer: "",
+    reviewedAt: null,
+    dimensions: STYLIZER_SCORE_DIMENSIONS,
+    defaultParameterChangeGate: {
+      candidateDefaultPresetId: null,
+      approved: false,
+      minimumAverageScore: 4,
+      minimumDimensionScore: 3
+    },
+    presets: report.presets.map((preset) => ({
+      id: preset.id,
+      title: preset.title
+    })),
+    cases: report.cases.map((corpusCase) => ({
+      id: corpusCase.id,
+      title: corpusCase.title
+    })),
+    entries: report.cases.flatMap((corpusCase) => corpusCase.runs.map((run) => ({
+      caseId: corpusCase.id,
+      presetId: run.presetId,
+      previewPath: run.previewPath,
+      scores: createEmptyScores(),
+      notes: ""
+    })))
+  };
+}
+
+function createManualScoringChecklist(scoring: StylizerManualScoringTemplate): string {
+  const lines = [
+    "# Stylizer Manual Visual Scoring Checklist",
+    "",
+    "Score each generated preview from 1 (poor) to 5 (excellent). Complete every row before proposing a default stylizer parameter change.",
+    "",
+    "## Dimensions",
+    "",
+    ...scoring.dimensions.map((dimension) => `- ${dimension.label}: ${dimension.rubric}`),
+    "",
+    "## Default Parameter Change Gate",
+    "",
+    `- Minimum dimension score: ${scoring.defaultParameterChangeGate.minimumDimensionScore}`,
+    `- Minimum average score: ${scoring.defaultParameterChangeGate.minimumAverageScore}`,
+    "- A candidate default preset must be explicitly approved in the JSON template.",
+    "",
+    "## Scores",
+    "",
+    "| Case | Preset | Preview | crop fit | mask silhouette | color preservation | edge clarity | pet cuteness | Notes |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"
+  ];
+
+  for (const entry of scoring.entries) {
+    lines.push(
+      `| ${entry.caseId} | ${entry.presetId} | ${entry.previewPath} |  |  |  |  |  |  |`
+    );
+  }
+
+  lines.push("");
+  return `${lines.join("\n")}`;
+}
+
+function createEmptyScores(): Record<StylizerScoreDimensionId, null> {
+  return {
+    crop_fit: null,
+    mask_silhouette: null,
+    color_preservation: null,
+    edge_clarity: null,
+    pet_cuteness: null
   };
 }
 
