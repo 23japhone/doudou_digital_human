@@ -10,6 +10,7 @@
 - Build: `npm run build`
 - Generate local pet bundle: `npm run generate:pet -- <source-image-path> <output-bundle-dir>`
 - Generate stylizer visual QA corpus: `npm run qa:stylizer -- <output-dir>`
+- Generate local-image stylizer preview comparison: `npm run qa:stylizer:compare -- <source-image-path> <output-dir>`
 - Check stylizer default-preset scoring gate: `npm run qa:stylizer:check -- <manual-scoring-template.json> <candidate-preset>`
 - Run change-aware stylizer default gate: `npm run qa:stylizer:default-gate -- [--changed-file <path>...] [--staged] [--base <ref> [--head <ref>]] [manual-scoring-template.json candidate-preset]`. CI or hooks may pass evidence with `STYLIZER_SCORING_FILE=<manual-scoring-template.json>` and `STYLIZER_CANDIDATE_PRESET=<candidate-preset>`.
 - Review generated pet bundle: `npm run review:pet -- qa <bundle-dir> <review-dir>`
@@ -27,6 +28,7 @@
 - Unit test image validation, manifest parsing, bundle validation, and behavior state transitions.
 - Use the deterministic stylized PNG adapter for local source-image-to-bundle tests, including source-palette evidence in generated previews. Use fake/scripted model adapters for contract tests and verify adapter outputs before bundle packaging.
 - Use `npm run qa:stylizer -- <output-dir>` for rights-safe visual tuning of deterministic crop, mask, color, and edge parameters. The generated report, contact sheet, manual scoring checklist, and scoring JSON template are local QA artifacts; commit only the code-defined synthetic corpus and tests unless a fixture has an explicit rights-safe reason.
+- Use `npm run qa:stylizer:compare -- <source-image-path> <output-dir>` for one-off local source image comparison across `balanced`, `soft_mask`, and `bold_edges`. The command writes derived previews and a relative-path report only; do not commit personal source images or generated likenesses from this output.
 - Default deterministic stylizer parameter changes require completed manual visual scoring evidence. The scoring dimensions are crop fit, mask silhouette, color preservation, edge clarity, and pet cuteness; a candidate default preset must meet the documented minimum per-dimension and average score thresholds before defaults are changed. The current default is the QA-approved `bold_edges` preset. Use `npm run qa:stylizer:check -- <manual-scoring-template.json> <candidate-preset>` as the scoring proof and `npm run qa:stylizer:default-gate -- ...` as the change-aware repository check. The first implementation chooses an npm script check over a committed pre-commit hook or GitHub Actions job because it has no new dependencies, works locally through `npm run lint`, and can be reused by either hook/CI surface later.
 - Real cloud adapter scaffold tests use mocked provider calls only. OpenAI live-provider smoke requires explicit environment opt-in and is skipped by default. Run `npm run probe:openai-image` against a new custom endpoint before using `smoke:app:live -- --source <image-path>`.
 - Keep a tiny rights-safe golden fixture bundle for regression tests.

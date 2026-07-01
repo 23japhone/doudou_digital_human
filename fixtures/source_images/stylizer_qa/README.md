@@ -21,3 +21,9 @@ Use the change-aware repository gate when checking a diff:
 ```sh
 npm run qa:stylizer:default-gate -- --staged <manual-scoring-template.json> <candidate-preset>
 ```
+
+For a one-off local source image comparison without creating a pet bundle, run:
+
+```sh
+npm run qa:stylizer:compare -- <source-image-path> <output-dir>
+```
