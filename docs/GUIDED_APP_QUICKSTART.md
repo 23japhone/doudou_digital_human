@@ -20,37 +20,37 @@ Use `npm run dev:app` for the full product flow. Use `npm run dev` only when you
    npm run dev:app
    ```
 
-2. Click `Select Image` and choose a local `.png`, `.jpg`, or `.jpeg`.
+2. Click `选择图片` and choose a local `.png`, `.jpg`, or `.jpeg`.
 
-3. Keep `Generation` set to `Local`.
+3. Keep `生成设置` set to `本地`.
 
-4. Optional: click `Style Compare`.
+4. Optional: click `风格对比`.
 
    Expected result: the app shows a style comparison contact sheet and three local preview images.
 
-5. Click `Generate`.
+5. Click `生成`.
 
-   Expected result: the workflow reaches `Generated`, and the preview area can later show generated derived assets. The original source image is not copied into the pet bundle.
+   Expected result: the workflow reaches `已生成`, and the preview area can later show generated derived assets. The original source image is not copied into the pet bundle.
 
-6. Click `QA Preview`.
+6. Click `预览检查`.
 
-   Expected result: the app shows `Preview`, `Sprite Sheet`, and QA check ids.
+   Expected result: the app shows `预览图`, `精灵图集`, and QA check ids.
 
-7. Click `Accept`.
+7. Click `接受`.
 
-   Expected result: the generated bundle is installed into the local app library and `Launch` becomes available.
+   Expected result: the generated bundle is installed into the local app library and `启动` becomes available.
 
-8. Click `Launch`.
+8. Click `启动`.
 
-   Expected result: a transparent always-on-top desktop pet appears and animates. `Stop` becomes available.
+   Expected result: a transparent always-on-top desktop pet appears and animates. `停止` becomes available.
 
-9. Click `Stop`.
+9. Click `停止`.
 
-   Expected result: the desktop pet process exits, the workflow returns to the accepted state, and `Launch` becomes available again.
+   Expected result: the desktop pet process exits, the workflow returns to the accepted state, and `启动` becomes available again.
 
-10. Optional cleanup: click `Delete Draft` and `Delete Accepted`.
+10. Optional cleanup: click `删除草稿` and `删除已接受`.
 
-    Expected result: derived app assets are removed and the selected source filename returns to `No image selected`. The original local image file is not deleted from disk.
+    Expected result: derived app assets are removed and the selected source filename returns to `未选择图片`. The original local image file is not deleted from disk.
 
 ## Mock Cloud Path
 
@@ -64,11 +64,11 @@ Mock cloud mode exercises the same upload-confirmation product path without maki
 
 2. Select a local source image.
 
-3. Set `Generation` to `Mock Cloud`.
+3. Set `生成设置` to `模拟云`.
 
-4. Check `I confirm this source image may be sent to the selected provider.`
+4. Check `我确认可以将这张源图片发送给所选提供方。`
 
-5. Continue with `Generate -> QA Preview -> Accept -> Launch -> Stop`.
+5. Continue with `生成 -> 预览检查 -> 接受 -> 启动 -> 停止`.
 
 Expected result: generation succeeds with `privacy.cloudGenerated:true` in the produced bundle, but the mock provider still performs no live upload.
 
@@ -80,7 +80,7 @@ Use this only for runtime fixture debugging:
 npm run dev
 ```
 
-This bypasses the guided manager and launches `fixtures/pet_bundles/valid_minimal_atlas_pet` directly. Because the guided manager does not own this process, the in-app `Stop` button is not involved. Stop it with `Ctrl+C` in the terminal.
+This bypasses the guided manager and launches `fixtures/pet_bundles/valid_minimal_atlas_pet` directly. Because the guided manager does not own this process, the in-app `停止` button is not involved. Stop it with `Ctrl+C` in the terminal.
 
 ## Developer Smoke Checklist
 
@@ -115,16 +115,16 @@ Manual smoke checklist:
 - Start `npm run dev:app`.
 - Select a rights-safe local PNG/JPEG source image.
 - Confirm the source filename appears, but no absolute source path is shown in the UI.
-- Click `Style Compare` and confirm the contact sheet plus three preview images load.
-- Use `Local` generation for the fastest manual check.
-- Click `Generate`, then `QA Preview`.
-- Confirm `Preview`, `Sprite Sheet`, and QA check ids render.
-- Click `Accept`.
-- Click `Launch` and confirm a desktop pet appears above the desktop.
-- Click `Stop` and confirm the pet disappears.
-- Click `Launch` again to confirm relaunch still works.
-- Click `Stop` again.
-- Click `Delete Draft` and `Delete Accepted` if you want to clean the local app workspace.
+- Click `风格对比` and confirm the contact sheet plus three preview images load.
+- Use `本地` generation for the fastest manual check.
+- Click `生成`, then `预览检查`.
+- Confirm `预览图`, `精灵图集`, and QA check ids render.
+- Click `接受`.
+- Click `启动` and confirm a desktop pet appears above the desktop.
+- Click `停止` and confirm the pet disappears.
+- Click `启动` again to confirm relaunch still works.
+- Click `停止` again.
+- Click `删除草稿` and `删除已接受` if you want to clean the local app workspace.
 - Confirm the selected source filename is cleared after cleanup, while the original local image file remains on disk.
 
 Optional process check after stopping:
@@ -158,27 +158,27 @@ npm run lint
 
 `npm run lint` includes the change-aware stylizer default gate.
 
-### `Select Image` does not let you continue
+### `选择图片` does not let you continue
 
 Use a local PNG/JPEG file. Directories, remote URLs, unsupported formats, and unreadable files are rejected by source intake.
 
-### `Generate` is disabled
+### `生成` is disabled
 
 Check these conditions:
 
 - A source image is selected.
-- `Local` mode is selected, or cloud mode has explicit upload confirmation.
-- `Mock Cloud` mode has `DOUDOU_MOCK_CLOUD_API_KEY` in the app process environment.
-- `OpenAI Live` mode is intentionally gated and needs `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and explicit upload confirmation.
-- A desktop pet is not currently running. Click `Stop` before generating another pet.
+- `本地` mode is selected, or cloud mode has explicit upload confirmation.
+- `模拟云` mode has `DOUDOU_MOCK_CLOUD_API_KEY` in the app process environment.
+- `OpenAI 实时` mode is intentionally gated and needs `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and explicit upload confirmation.
+- A desktop pet is not currently running. Click `停止` before generating another pet.
 
-### `QA Preview`, `Accept`, or `Launch` is disabled
+### `预览检查`, `接受`, or `启动` is disabled
 
 The flow is sequential:
 
-- `QA Preview` requires a generated draft bundle.
-- `Accept` requires a generated draft bundle.
-- `Launch` requires an accepted bundle and no currently running managed desktop pet.
+- `预览检查` requires a generated draft bundle.
+- `接受` requires a generated draft bundle.
+- `启动` requires an accepted bundle and no currently running managed desktop pet.
 
 ### The desktop pet launches but is hard to see
 
@@ -190,11 +190,11 @@ npm run smoke:runtime
 
 The expected evidence includes `bundleLoaded:true`, `atlasLoaded:true`, `nonTransparentPixel:true`, and `idleAdvanced:true`.
 
-### `Stop` is disabled
+### `停止` is disabled
 
-`Stop` is only enabled for a runtime process launched from `npm run dev:app`. If you launched the fixture with `npm run dev`, stop it with `Ctrl+C` in that terminal.
+`停止` is only enabled for a runtime process launched from `npm run dev:app`. If you launched the fixture with `npm run dev`, stop it with `Ctrl+C` in that terminal.
 
-### `Stop` does not appear to end the pet during development
+### `停止` does not appear to end the pet during development
 
 First close the guided app; it also attempts to stop the managed runtime during app quit. Then check for a remaining process:
 

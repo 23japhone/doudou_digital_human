@@ -141,7 +141,7 @@ ipcMain.on("pet:show-context-menu", () => {
   }
   Menu.buildFromTemplate([
     {
-      label: "Quit",
+      label: "退出",
       click: () => app.quit()
     }
   ]).popup({ window: mainWindow });

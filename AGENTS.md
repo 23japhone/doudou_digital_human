@@ -29,6 +29,7 @@ This file is the short Codex entrypoint. Keep durable project details in `docs/`
 - Do not default new modules into a flat package root; keep root files for stable entrypoints or compatibility wrappers.
 - Do not add production dependencies without explaining why.
 - Do not put secrets in code, docs, tests, logs, or fixtures.
+- 前端可见文案默认使用中文；除品牌名、模型名、协议字段、日志和开发者内部标识外，不要在用户界面展示英文。
 - Plan broad structural migrations first, then move mechanically in small verified phases.
 - When requirements are unclear, ask or record explicit assumptions before implementing.
 

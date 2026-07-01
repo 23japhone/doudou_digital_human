@@ -1,85 +1,85 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Doudou Pet Studio</title>
+    <title>豆豆桌宠工作台</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="studio-shell">
       <header class="app-header">
         <div>
-          <h1>Doudou Pet Studio</h1>
-          <p id="status-line">Idle</p>
+          <h1>豆豆桌宠工作台</h1>
+          <p id="status-line">空闲</p>
         </div>
       </header>
 
       <section class="workspace">
-        <aside class="controls" aria-label="Pet workflow">
+        <aside class="controls" aria-label="桌宠工作流">
           <div class="source-row">
-            <span id="source-name">No image selected</span>
-            <button id="select-source" type="button">Select Image</button>
+            <span id="source-name">未选择图片</span>
+            <button id="select-source" type="button">选择图片</button>
           </div>
 
           <fieldset class="generation-panel">
-            <legend>Generation</legend>
-            <label for="generation-mode">Mode</label>
+            <legend>生成设置</legend>
+            <label for="generation-mode">模式</label>
             <select id="generation-mode">
-              <option value="local">Local</option>
-              <option value="mock_cloud">Mock Cloud</option>
-              <option value="openai_live">OpenAI Live</option>
+              <option value="local">本地</option>
+              <option value="mock_cloud">模拟云</option>
+              <option value="openai_live">OpenAI 实时</option>
             </select>
             <div class="provider-row">
-              <span id="provider-name">mock-provider</span>
-              <span id="provider-status">Not used</span>
+              <span id="provider-name">无</span>
+              <span id="provider-status">未使用</span>
             </div>
             <label class="confirm-row">
               <input id="cloud-confirm" type="checkbox" />
-              <span>I confirm this source image may be sent to the selected provider.</span>
+              <span>我确认可以将这张源图片发送给所选提供方。</span>
             </label>
           </fieldset>
 
           <div class="actions">
-            <button id="developer-preview" type="button">Style Compare</button>
-            <button id="generate-pet" type="button">Generate</button>
-            <button id="qa-pet" type="button">QA Preview</button>
-            <button id="accept-pet" type="button">Accept</button>
-            <button id="launch-pet" type="button">Launch</button>
-            <button id="stop-pet" type="button">Stop</button>
-            <button id="delete-draft" type="button">Delete Draft</button>
-            <button id="delete-accepted" type="button">Delete Accepted</button>
+            <button id="developer-preview" type="button">风格对比</button>
+            <button id="generate-pet" type="button">生成</button>
+            <button id="qa-pet" type="button">预览检查</button>
+            <button id="accept-pet" type="button">接受</button>
+            <button id="launch-pet" type="button">启动</button>
+            <button id="stop-pet" type="button">停止</button>
+            <button id="delete-draft" type="button">删除草稿</button>
+            <button id="delete-accepted" type="button">删除已接受</button>
           </div>
 
-          <ol class="steps" aria-label="Workflow status">
-            <li data-step="source">Source</li>
-            <li data-step="generated">Generated</li>
-            <li data-step="review">Reviewed</li>
-            <li data-step="accepted">Accepted</li>
-            <li data-step="launched">Launched</li>
+          <ol class="steps" aria-label="工作流状态">
+            <li data-step="source">源图</li>
+            <li data-step="generated">已生成</li>
+            <li data-step="review">已检查</li>
+            <li data-step="accepted">已接受</li>
+            <li data-step="launched">已启动</li>
           </ol>
 
           <div class="qa-panel">
-            <h2>QA Checks</h2>
+            <h2>质量检查</h2>
             <ul id="qa-checks"></ul>
           </div>
         </aside>
 
-        <section class="preview-area" aria-label="Pet preview">
-          <section class="developer-preview-panel" aria-label="Developer style comparison">
+        <section class="preview-area" aria-label="桌宠预览">
+          <section class="developer-preview-panel" aria-label="开发者风格对比">
             <figure>
-              <figcaption>Style Comparison</figcaption>
-              <img id="developer-preview-contact-sheet" alt="Local stylizer comparison contact sheet" />
+              <figcaption>风格对比</figcaption>
+              <img id="developer-preview-contact-sheet" alt="本地风格化对比图" />
             </figure>
             <div id="developer-preview-list" class="style-preview-list"></div>
           </section>
           <figure>
-            <figcaption>Preview</figcaption>
-            <img id="preview-image" alt="Generated pet preview" />
+            <figcaption>预览图</figcaption>
+            <img id="preview-image" alt="生成的桌宠预览图" />
           </figure>
           <figure>
-            <figcaption>Sprite Sheet</figcaption>
-            <img id="contact-sheet-image" alt="Generated pet sprite sheet" />
+            <figcaption>精灵图集</figcaption>
+            <img id="contact-sheet-image" alt="生成的桌宠精灵图集" />
           </figure>
         </section>
       </section>

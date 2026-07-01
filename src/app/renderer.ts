@@ -79,7 +79,7 @@ async function updateGenerationSettings(): Promise<void> {
 }
 
 function render(state: PublicGuidedPetState, errorMessage?: string): void {
-  sourceName.textContent = state.sourceImageName ?? "No image selected";
+  sourceName.textContent = state.sourceImageName ?? "未选择图片";
   statusLine.textContent = errorMessage ?? statusText(state);
   renderGenerationSettings(state);
   renderActions(state);
@@ -90,7 +90,7 @@ function render(state: PublicGuidedPetState, errorMessage?: string): void {
 
 function renderGenerationSettings(state: PublicGuidedPetState): void {
   generationMode.value = state.generation.mode;
-  providerName.textContent = state.generation.providerId ?? "none";
+  providerName.textContent = providerDisplayName(state.generation.providerId);
   cloudConfirm.checked = state.generation.cloudUploadConfirmed;
   cloudConfirm.disabled = busy || !isCloudGenerationMode(state.generation.mode);
   providerStatus.textContent = providerStatusText(state);
@@ -123,23 +123,47 @@ function renderDeveloperPreview(state: PublicGuidedPetState): void {
   for (const preview of state.developerPreview.previews) {
     const figure = document.createElement("figure");
     const caption = document.createElement("figcaption");
-    caption.textContent = preview.currentDefault ? `${preview.title} (default)` : preview.title;
+    const previewTitle = previewTitleText(preview.presetId, preview.title);
+    caption.textContent = preview.currentDefault ? `${previewTitle}（默认）` : previewTitle;
     const image = document.createElement("img");
     image.src = preview.previewUrl;
-    image.alt = `${preview.title} local stylizer preview`;
+    image.alt = `${previewTitle}本地风格预览`;
     figure.append(caption, image);
     developerPreviewList.append(figure);
   }
 }
 
+function providerDisplayName(providerId: string | null): string {
+  if (providerId === "mock-provider") {
+    return "模拟云提供方";
+  }
+  if (providerId === "openai-image") {
+    return "OpenAI 图像提供方";
+  }
+  return "无";
+}
+
 function providerStatusText(state: PublicGuidedPetState): string {
   if (state.generation.mode === "local") {
-    return "Not used";
+    return "未使用";
   }
   if (state.generation.mode === "openai_live" && !state.generation.liveProviderEnabled) {
-    return "Live disabled";
+    return "实时模式未启用";
   }
-  return state.generation.cloudProviderConfigured ? "Configured" : "Missing config";
+  return state.generation.cloudProviderConfigured ? "已配置" : "缺少配置";
+}
+
+function previewTitleText(presetId: string, fallbackTitle: string): string {
+  switch (presetId) {
+    case "balanced":
+      return "平衡风格";
+    case "soft_mask":
+      return "柔和蒙版";
+    case "bold_edges":
+      return "粗边线";
+    default:
+      return fallbackTitle ? "自定义风格" : "未命名风格";
+  }
 }
 
 function renderSteps(state: PublicGuidedPetState): void {
@@ -175,33 +199,95 @@ function renderReview(state: PublicGuidedPetState): void {
   contactSheetImage.src = state.review.contactSheetUrl;
   for (const check of state.review.checks) {
     const item = document.createElement("li");
-    item.textContent = check;
+    item.textContent = qaCheckText(check);
     qaChecks.append(item);
   }
 }
 
 function statusText(state: PublicGuidedPetState): string {
   if (state.lastError) {
-    return state.lastError.message;
+    return localizedActionErrorMessage(state.lastError.code, state.lastError.message);
   }
   if (state.launch?.running) {
-    return "Launched";
+    return "已启动";
   }
   if (state.launch?.launched) {
-    return "Launched";
+    return "已启动";
   }
   switch (state.status) {
     case "source_selected":
-      return "Source selected";
+      return "已选择源图";
     case "generated":
-      return "Generated";
+      return "已生成";
     case "needs_review":
-      return "Needs review";
+      return "待检查";
     case "accepted":
-      return "Accepted";
+      return "已接受";
     default:
-      return "Idle";
+      return "空闲";
   }
+}
+
+function qaCheckText(checkId: string): string {
+  switch (checkId) {
+    case "bundle-valid":
+      return "资源包校验通过";
+    case "preview-png":
+      return "预览图有效";
+    case "atlas-contact-sheet":
+      return "精灵图集已生成";
+    case "privacy-source-not-stored":
+      return "未保存源图";
+    case "source-metadata-sanitized":
+      return "源图元数据已脱敏";
+    default:
+      return "质量检查通过";
+  }
+}
+
+function localizedActionErrorMessage(code: string, fallbackMessage: string): string {
+  const messages: Record<string, string> = {
+    SOURCE_IMAGE_REQUIRED: "请先选择一张源图片。",
+    DRAFT_BUNDLE_REQUIRED: "请先生成桌宠草稿。",
+    ACCEPTED_BUNDLE_REQUIRED: "请先接受一个桌宠资源包。",
+    LIVE_PROVIDER_NOT_ENABLED: "OpenAI 实时生成尚未启用，请先配置环境变量并勾选上传确认。",
+    RUNTIME_LAUNCH_FAILED: "桌宠启动失败。",
+    RUNTIME_STOP_FAILED: "桌宠停止失败。",
+    MISSING_SOURCE_IMAGE: "请选择一张源图片。",
+    SOURCE_URI_UNSUPPORTED: "请选择本地文件，不支持 file URI。",
+    REMOTE_SOURCE_UNSUPPORTED: "请选择本地文件，不支持远程图片地址。",
+    UNSAFE_SOURCE_PATH: "源图片路径不安全。",
+    SOURCE_IMAGE_NOT_FOUND: "源图片不存在。",
+    SOURCE_IMAGE_NOT_FILE: "源图片路径必须指向文件。",
+    UNSUPPORTED_SOURCE_IMAGE_TYPE: "源图片必须是 PNG 或 JPEG。",
+    INVALID_SOURCE_IMAGE: "源图片无法解码。",
+    SOURCE_IMAGE_TOO_SMALL: "源图片尺寸太小，无法生成。",
+    SOURCE_IMAGE_TOO_LARGE: "源图片尺寸太大，无法生成。",
+    CLOUD_OPT_IN_REQUIRED: "云端生成需要先勾选上传确认。",
+    PROVIDER_NOT_CONFIGURED: "所选提供方尚未配置。",
+    SOURCE_IMAGE_NORMALIZATION_FAILED: "源图片归一化失败。",
+    MODEL_REFUSED: "模型拒绝了这次生成请求。",
+    MODEL_RATE_LIMITED: "模型调用频率受限，请稍后重试。",
+    MODEL_TIMEOUT: "模型请求超时，请稍后重试。",
+    MODEL_PROVIDER_ERROR: "模型提供方调用失败。",
+    MODEL_OUTPUT_INVALID: "模型输出无效。",
+    POSTPROCESSING_FAILED: "生成结果后处理失败。",
+    MISSING_OUTPUT_DIR: "缺少输出目录。",
+    OUTPUT_PATH_NOT_DIRECTORY: "输出路径必须是目录。",
+    OUTPUT_DIR_NOT_EMPTY: "输出目录必须为空。",
+    ADAPTER_OUTPUT_INVALID: "生成适配器输出无效。",
+    REVIEW_DIR_UNSAFE: "检查输出目录不安全。",
+    REVIEW_DIR_NOT_EMPTY: "检查输出目录必须为空。",
+    INSTALLATION_ALREADY_EXISTS: "已接受的桌宠资源包已存在。",
+    INSTALLATION_ROOT_UNSAFE: "安装目录不安全。",
+    INSTALLATION_ROOT_INVALID: "安装目录必须是有效目录。",
+    DELETE_TARGET_UNSAFE: "删除目标不安全。",
+    DELETE_TARGET_MISSING: "删除目标不存在。",
+    DELETE_TARGET_NOT_DIRECTORY: "删除目标必须是目录。",
+    PET_BUNDLE_INVALID: "桌宠资源包校验失败。",
+    UNKNOWN_ERROR: "未知错误。"
+  };
+  return messages[code] ?? (fallbackMessage ? "操作失败，请查看日志。" : "未知错误。");
 }
 
 async function runSmokeFlow(): Promise<void> {

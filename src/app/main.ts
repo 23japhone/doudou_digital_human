@@ -95,7 +95,7 @@ function createWindow(): void {
     height: 740,
     minWidth: 900,
     minHeight: 640,
-    title: "Doudou Pet Studio",
+    title: "豆豆桌宠工作台",
     backgroundColor: "#f7f8fa",
     webPreferences: {
       preload: join(currentDir, "preload.cjs"),
@@ -179,10 +179,10 @@ async function selectSourceImagePath(): Promise<string | null> {
     return options.smokeSourceImagePath ?? null;
   }
   const dialogOptions: OpenDialogOptions = {
-    title: "Select source image",
+    title: "选择源图片",
     properties: ["openFile"],
     filters: [
-      { name: "Images", extensions: ["png", "jpg", "jpeg"] }
+      { name: "图片", extensions: ["png", "jpg", "jpeg"] }
     ]
   };
   const result = mainWindow
@@ -218,18 +218,61 @@ function serializeActionError(error: unknown): { code: string; message: string }
     error instanceof PetGenerationError ||
     error instanceof PetReviewError
   ) {
-    return { code: error.code, message: error.message };
+    return { code: error.code, message: localizedActionErrorMessage(error.code) };
   }
   if (error instanceof PetBundleValidationError) {
     return {
       code: error.issues[0]?.code ?? "PET_BUNDLE_INVALID",
-      message: "Pet bundle validation failed."
+      message: "桌宠资源包校验失败。"
     };
   }
   return {
     code: "UNKNOWN_ERROR",
-    message: error instanceof Error ? error.message : "Unknown app error."
+    message: "未知错误。"
   };
+}
+
+function localizedActionErrorMessage(code: string): string {
+  const messages: Record<string, string> = {
+    SOURCE_IMAGE_REQUIRED: "请先选择一张源图片。",
+    DRAFT_BUNDLE_REQUIRED: "请先生成桌宠草稿。",
+    ACCEPTED_BUNDLE_REQUIRED: "请先接受一个桌宠资源包。",
+    LIVE_PROVIDER_NOT_ENABLED: "OpenAI 实时生成尚未启用，请先配置环境变量并勾选上传确认。",
+    RUNTIME_LAUNCH_FAILED: "桌宠启动失败。",
+    RUNTIME_STOP_FAILED: "桌宠停止失败。",
+    MISSING_SOURCE_IMAGE: "请选择一张源图片。",
+    SOURCE_URI_UNSUPPORTED: "请选择本地文件，不支持 file URI。",
+    REMOTE_SOURCE_UNSUPPORTED: "请选择本地文件，不支持远程图片地址。",
+    UNSAFE_SOURCE_PATH: "源图片路径不安全。",
+    SOURCE_IMAGE_NOT_FOUND: "源图片不存在。",
+    SOURCE_IMAGE_NOT_FILE: "源图片路径必须指向文件。",
+    UNSUPPORTED_SOURCE_IMAGE_TYPE: "源图片必须是 PNG 或 JPEG。",
+    INVALID_SOURCE_IMAGE: "源图片无法解码。",
+    SOURCE_IMAGE_TOO_SMALL: "源图片尺寸太小，无法生成。",
+    SOURCE_IMAGE_TOO_LARGE: "源图片尺寸太大，无法生成。",
+    CLOUD_OPT_IN_REQUIRED: "云端生成需要先勾选上传确认。",
+    PROVIDER_NOT_CONFIGURED: "所选提供方尚未配置。",
+    SOURCE_IMAGE_NORMALIZATION_FAILED: "源图片归一化失败。",
+    MODEL_REFUSED: "模型拒绝了这次生成请求。",
+    MODEL_RATE_LIMITED: "模型调用频率受限，请稍后重试。",
+    MODEL_TIMEOUT: "模型请求超时，请稍后重试。",
+    MODEL_PROVIDER_ERROR: "模型提供方调用失败。",
+    MODEL_OUTPUT_INVALID: "模型输出无效。",
+    POSTPROCESSING_FAILED: "生成结果后处理失败。",
+    MISSING_OUTPUT_DIR: "缺少输出目录。",
+    OUTPUT_PATH_NOT_DIRECTORY: "输出路径必须是目录。",
+    OUTPUT_DIR_NOT_EMPTY: "输出目录必须为空。",
+    ADAPTER_OUTPUT_INVALID: "生成适配器输出无效。",
+    REVIEW_DIR_UNSAFE: "检查输出目录不安全。",
+    REVIEW_DIR_NOT_EMPTY: "检查输出目录必须为空。",
+    INSTALLATION_ALREADY_EXISTS: "已接受的桌宠资源包已存在。",
+    INSTALLATION_ROOT_UNSAFE: "安装目录不安全。",
+    INSTALLATION_ROOT_INVALID: "安装目录必须是有效目录。",
+    DELETE_TARGET_UNSAFE: "删除目标不安全。",
+    DELETE_TARGET_MISSING: "删除目标不存在。",
+    DELETE_TARGET_NOT_DIRECTORY: "删除目标必须是目录。"
+  };
+  return messages[code] ?? "操作失败，请查看日志。";
 }
 
 app.on("window-all-closed", () => {
