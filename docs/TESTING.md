@@ -10,6 +10,7 @@
 - Build: `npm run build`
 - Generate local pet bundle: `npm run generate:pet -- <source-image-path> <output-bundle-dir>`
 - Generate stylizer visual QA corpus: `npm run qa:stylizer -- <output-dir>`
+- Check stylizer default-preset scoring gate: `npm run qa:stylizer:check -- <manual-scoring-template.json> <candidate-preset>`
 - Review generated pet bundle: `npm run review:pet -- qa <bundle-dir> <review-dir>`
 - Accept generated pet bundle: `npm run review:pet -- accept <bundle-dir> <library-dir>`
 - Delete review or accepted assets: `npm run review:pet -- delete <target-dir> --root <allowed-root>`
@@ -25,7 +26,7 @@
 - Unit test image validation, manifest parsing, bundle validation, and behavior state transitions.
 - Use the deterministic stylized PNG adapter for local source-image-to-bundle tests, including source-palette evidence in generated previews. Use fake/scripted model adapters for contract tests and verify adapter outputs before bundle packaging.
 - Use `npm run qa:stylizer -- <output-dir>` for rights-safe visual tuning of deterministic crop, mask, color, and edge parameters. The generated report, contact sheet, manual scoring checklist, and scoring JSON template are local QA artifacts; commit only the code-defined synthetic corpus and tests unless a fixture has an explicit rights-safe reason.
-- Default deterministic stylizer parameter changes require completed manual visual scoring evidence. The scoring dimensions are crop fit, mask silhouette, color preservation, edge clarity, and pet cuteness; a candidate default preset must meet the documented minimum per-dimension and average score thresholds before defaults are changed.
+- Default deterministic stylizer parameter changes require completed manual visual scoring evidence. The scoring dimensions are crop fit, mask silhouette, color preservation, edge clarity, and pet cuteness; a candidate default preset must meet the documented minimum per-dimension and average score thresholds before defaults are changed. Use `npm run qa:stylizer:check -- <manual-scoring-template.json> <candidate-preset>` as the CI/pre-commit proof that the candidate scoring evidence passes.
 - Real cloud adapter scaffold tests use mocked provider calls only. OpenAI live-provider smoke requires explicit environment opt-in and is skipped by default. Run `npm run probe:openai-image` against a new custom endpoint before using `smoke:app:live -- --source <image-path>`.
 - Keep a tiny rights-safe golden fixture bundle for regression tests.
 - Add smoke tests for preview rendering and desktop runtime launch once a runtime stack exists.
@@ -56,7 +57,7 @@ Fixtures must be small, rights-safe, and documented.
 - Fixture assets must be synthetic or explicitly licensed. The current fixture is generated from simple project-owned geometric shapes.
 - Bundle validation changes must keep negative coverage for unreferenced files, source-like payloads, bad preview images, missing assets, and unsupported schema versions.
 - Generation adapter changes must cover valid frame output, source-derived local stylization where applicable, missing frames, out-of-range frame indexes, bad preview assets, and sanitized provenance metadata.
-- Deterministic stylizer default-parameter changes must include generated stylizer QA artifacts and completed manual scoring evidence before changing the default adapter constants.
+- Deterministic stylizer default-parameter changes must include generated stylizer QA artifacts and completed manual scoring evidence before changing the default adapter constants. The scoring JSON must pass `npm run qa:stylizer:check -- <manual-scoring-template.json> <candidate-preset>`.
 - Real adapter changes must cover cloud confirmation gating, provider config failures, source normalization cleanup, provider error mapping, live-provider env gating, `privacy.cloudGenerated`, and no leakage of raw prompts, raw responses, tokens, or source paths.
 - Review/deletion changes must cover invalid bundle rejection before artifact creation, accepted bundle validation, refusal to overwrite installs, refusal to delete outside the allowed root, and no absolute path or secret leakage in review/install records.
 - Guided UI changes must include a flow-level unit test plus an Electron smoke that proves renderer buttons can drive local or mock-cloud generate, QA, accept/delete, and launch without leaking source paths or provider secrets in smoke output.

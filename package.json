@@ -16,6 +16,7 @@
     "generate:pet": "npm run build:main && node dist/src/cli/generate-pet.js",
     "generate:pet:cloud": "npm run build:main && node dist/src/cli/generate-pet-cloud.js",
     "qa:stylizer": "npm run build:main && node dist/src/scripts/stylizer-qa.js",
+    "qa:stylizer:check": "npm run build:main && node dist/src/scripts/stylizer-qa-check.js",
     "review:pet": "npm run build:main && node dist/src/cli/review-pet.js",
     "validate:fixture": "npm run build:main && node dist/src/cli/validate-pet.js fixtures/pet_bundles/valid_minimal_atlas_pet",
     "dev": "npm run build && NODE_OPTIONS= electron dist/src/runtime/main.js --bundle fixtures/pet_bundles/valid_minimal_atlas_pet",
