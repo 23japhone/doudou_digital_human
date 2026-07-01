@@ -8,6 +8,42 @@ import type {
 
 type Rgb = [number, number, number];
 
+export interface DeterministicStylizerParams {
+  crop: {
+    visibleBoundsPaddingPx: number;
+  };
+  mask: {
+    headRadiusX: number;
+    headRadiusY: number;
+    bodyRadiusX: number;
+    bodyRadiusY: number;
+    edgeFeather: number;
+    outlineRadiusPx: number;
+  };
+  color: {
+    saturation: number;
+    contrast: number;
+    brightness: number;
+    posterizeStep: number;
+  };
+  edge: {
+    weakThreshold: number;
+    strongThreshold: number;
+    weakMix: number;
+    strongMix: number;
+    weakColor: Rgb;
+    strongColor: Rgb;
+  };
+}
+
+export type DeterministicStylizerParamsInput = {
+  [Section in keyof DeterministicStylizerParams]?: Partial<DeterministicStylizerParams[Section]>;
+};
+
+export interface CreateDeterministicStylizedPngAdapterOptions {
+  params?: DeterministicStylizerParamsInput;
+}
+
 interface SourceSampler {
   source: PNG;
   bounds: {
@@ -20,9 +56,40 @@ interface SourceSampler {
 
 const CANVAS_SIZE = 256;
 
-export function createDeterministicStylizedPngAdapter(): PetGenerationAdapter {
+export const DEFAULT_DETERMINISTIC_STYLIZER_PARAMS: DeterministicStylizerParams = {
+  crop: {
+    visibleBoundsPaddingPx: 0
+  },
+  mask: {
+    headRadiusX: 82,
+    headRadiusY: 88,
+    bodyRadiusX: 70,
+    bodyRadiusY: 52,
+    edgeFeather: 0.08,
+    outlineRadiusPx: 3
+  },
+  color: {
+    saturation: 1.28,
+    contrast: 1.08,
+    brightness: 4,
+    posterizeStep: 32
+  },
+  edge: {
+    weakThreshold: 32,
+    strongThreshold: 52,
+    weakMix: 0.34,
+    strongMix: 0.72,
+    weakColor: [42, 51, 72],
+    strongColor: [25, 32, 48]
+  }
+};
+
+export function createDeterministicStylizedPngAdapter(
+  options: CreateDeterministicStylizedPngAdapterOptions = {}
+): PetGenerationAdapter {
   const adapterId = "deterministic-stylized-png-adapter";
   const adapterVersion = "0.1.0";
+  const params = resolveDeterministicStylizerParams(options.params);
   return {
     id: adapterId,
     version: adapterVersion,
@@ -33,7 +100,7 @@ export function createDeterministicStylizedPngAdapter(): PetGenerationAdapter {
       }
 
       const source = readNormalizedSource(request.normalizedSourceImage.bytes);
-      const sticker = createStylizedSticker(source);
+      const sticker = createStylizedSticker(source, params);
       const frames = createFrames(sticker);
       const previewFrame = frames.find((frame) => frame.index === 1) ?? frames[0];
       return {
@@ -45,6 +112,29 @@ export function createDeterministicStylizedPngAdapter(): PetGenerationAdapter {
         previewPng: previewFrame?.png ?? frames[0]!.png,
         frames
       };
+    }
+  };
+}
+
+export function resolveDeterministicStylizerParams(
+  input: DeterministicStylizerParamsInput = {}
+): DeterministicStylizerParams {
+  return {
+    crop: {
+      ...DEFAULT_DETERMINISTIC_STYLIZER_PARAMS.crop,
+      ...input.crop
+    },
+    mask: {
+      ...DEFAULT_DETERMINISTIC_STYLIZER_PARAMS.mask,
+      ...input.mask
+    },
+    color: {
+      ...DEFAULT_DETERMINISTIC_STYLIZER_PARAMS.color,
+      ...input.color
+    },
+    edge: {
+      ...DEFAULT_DETERMINISTIC_STYLIZER_PARAMS.edge,
+      ...input.edge
     }
   };
 }
@@ -65,22 +155,22 @@ function createFrames(sticker: PNG): GeneratedPetFrame[] {
   }));
 }
 
-function createStylizedSticker(source: PNG): PNG {
+function createStylizedSticker(source: PNG, params: DeterministicStylizerParams): PNG {
   const sticker = new PNG({ width: CANVAS_SIZE, height: CANVAS_SIZE });
-  const sampler = createSourceSampler(source);
+  const sampler = createSourceSampler(source, params.crop);
 
   for (let y = 0; y < sticker.height; y += 1) {
     for (let x = 0; x < sticker.width; x += 1) {
-      const mask = characterMaskCoverage(x, y);
+      const mask = characterMaskCoverage(x, y, params.mask);
       if (mask > 0) {
-        const color = stylizedColorAt(sampler, x, y);
+        const color = stylizedColorAt(sampler, x, y, params.color, params.edge);
         if (color.alpha > 0) {
           blendPixel(sticker, x, y, color.rgb, Math.round(color.alpha * mask));
         }
         continue;
       }
 
-      const outlineAlpha = outlineCoverage(x, y);
+      const outlineAlpha = outlineCoverage(x, y, params.mask);
       if (outlineAlpha > 0) {
         blendPixel(sticker, x, y, [28, 38, 60], outlineAlpha);
       }
@@ -109,19 +199,25 @@ function renderFrame(sticker: PNG, frameIndex: number): Buffer {
   return PNG.sync.write(frame);
 }
 
-function stylizedColorAt(sampler: SourceSampler, x: number, y: number): { rgb: Rgb; alpha: number } {
+function stylizedColorAt(
+  sampler: SourceSampler,
+  x: number,
+  y: number,
+  colorParams: DeterministicStylizerParams["color"],
+  edgeParams: DeterministicStylizerParams["edge"]
+): { rgb: Rgb; alpha: number } {
   const sourcePoint = mapCanvasToSource(sampler, x, y);
   const blurred = blurredRgbaAt(sampler.source, sourcePoint.x, sourcePoint.y);
   if (blurred.alpha <= 0) {
     return { rgb: [0, 0, 0], alpha: 0 };
   }
 
-  let rgb = posterize(boostSaturation(blurred.rgb));
+  let rgb = posterize(boostSaturation(blurred.rgb, colorParams), colorParams.posterizeStep);
   const edge = edgeStrength(sampler.source, sourcePoint.x, sourcePoint.y);
-  if (edge > 52) {
-    rgb = mixRgb(rgb, [25, 32, 48], 0.72);
-  } else if (edge > 32) {
-    rgb = mixRgb(rgb, [42, 51, 72], 0.34);
+  if (edge > edgeParams.strongThreshold) {
+    rgb = mixRgb(rgb, edgeParams.strongColor, edgeParams.strongMix);
+  } else if (edge > edgeParams.weakThreshold) {
+    rgb = mixRgb(rgb, edgeParams.weakColor, edgeParams.weakMix);
   }
 
   return {
@@ -130,10 +226,10 @@ function stylizedColorAt(sampler: SourceSampler, x: number, y: number): { rgb: R
   };
 }
 
-function createSourceSampler(source: PNG): SourceSampler {
+function createSourceSampler(source: PNG, cropParams: DeterministicStylizerParams["crop"]): SourceSampler {
   return {
     source,
-    bounds: findVisibleBounds(source)
+    bounds: expandBounds(findVisibleBounds(source), cropParams.visibleBoundsPaddingPx, source)
   };
 }
 
@@ -166,6 +262,20 @@ function findVisibleBounds(source: PNG): SourceSampler["bounds"] {
   }
 
   return { minX, minY, maxX, maxY };
+}
+
+function expandBounds(
+  bounds: SourceSampler["bounds"],
+  paddingPx: number,
+  source: PNG
+): SourceSampler["bounds"] {
+  const padding = Math.max(0, Math.round(paddingPx));
+  return {
+    minX: clampInt(bounds.minX - padding, 0, source.width - 1),
+    minY: clampInt(bounds.minY - padding, 0, source.height - 1),
+    maxX: clampInt(bounds.maxX + padding, 0, source.width - 1),
+    maxY: clampInt(bounds.maxY + padding, 0, source.height - 1)
+  };
 }
 
 function mapCanvasToSource(sampler: SourceSampler, x: number, y: number): { x: number; y: number } {
@@ -213,21 +323,22 @@ function blurredRgbaAt(source: PNG, x: number, y: number): { rgb: Rgb; alpha: nu
   };
 }
 
-function boostSaturation(rgb: Rgb): Rgb {
+function boostSaturation(rgb: Rgb, colorParams: DeterministicStylizerParams["color"]): Rgb {
   const gray = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114;
   return [
-    stylizeChannel(gray + (rgb[0] - gray) * 1.28),
-    stylizeChannel(gray + (rgb[1] - gray) * 1.28),
-    stylizeChannel(gray + (rgb[2] - gray) * 1.28)
+    stylizeChannel(gray + (rgb[0] - gray) * colorParams.saturation, colorParams),
+    stylizeChannel(gray + (rgb[1] - gray) * colorParams.saturation, colorParams),
+    stylizeChannel(gray + (rgb[2] - gray) * colorParams.saturation, colorParams)
   ];
 }
 
-function stylizeChannel(value: number): number {
-  return clampChannel(128 + (value - 128) * 1.08 + 4);
+function stylizeChannel(value: number, colorParams: DeterministicStylizerParams["color"]): number {
+  return clampChannel(128 + (value - 128) * colorParams.contrast + colorParams.brightness);
 }
 
-function posterize(rgb: Rgb): Rgb {
-  return rgb.map((channel) => clampChannel(Math.round(channel / 32) * 32)) as Rgb;
+function posterize(rgb: Rgb, step: number): Rgb {
+  const safeStep = Math.max(1, Math.round(step));
+  return rgb.map((channel) => clampChannel(Math.round(channel / safeStep) * safeStep)) as Rgb;
 }
 
 function edgeStrength(source: PNG, x: number, y: number): number {
@@ -249,30 +360,32 @@ function luminanceAt(source: PNG, x: number, y: number): number {
   );
 }
 
-function characterMaskCoverage(x: number, y: number): number {
-  const head = ellipseDistance(x, y, 128, 110, 82, 88);
-  const body = ellipseDistance(x, y, 128, 184, 70, 52);
+function characterMaskCoverage(x: number, y: number, maskParams: DeterministicStylizerParams["mask"]): number {
+  const head = ellipseDistance(x, y, 128, 110, maskParams.headRadiusX, maskParams.headRadiusY);
+  const body = ellipseDistance(x, y, 128, 184, maskParams.bodyRadiusX, maskParams.bodyRadiusY);
   const distance = Math.min(head, body);
   if (distance <= 0.96) {
     return 1;
   }
-  if (distance <= 1.04) {
-    return (1.04 - distance) / 0.08;
+  const outerDistance = 0.96 + Math.max(0.01, maskParams.edgeFeather);
+  if (distance <= outerDistance) {
+    return (outerDistance - distance) / Math.max(0.01, maskParams.edgeFeather);
   }
   return 0;
 }
 
-function outlineCoverage(x: number, y: number): number {
-  if (characterMaskCoverage(x, y) > 0) {
+function outlineCoverage(x: number, y: number, maskParams: DeterministicStylizerParams["mask"]): number {
+  if (characterMaskCoverage(x, y, maskParams) > 0) {
     return 0;
   }
-  for (let radius = 1; radius <= 3; radius += 1) {
+  const outlineRadius = Math.max(0, Math.round(maskParams.outlineRadiusPx));
+  for (let radius = 1; radius <= outlineRadius; radius += 1) {
     for (let dy = -radius; dy <= radius; dy += 1) {
       for (let dx = -radius; dx <= radius; dx += 1) {
         if (dx * dx + dy * dy > radius * radius) {
           continue;
         }
-        if (characterMaskCoverage(x + dx, y + dy) > 0.4) {
+        if (characterMaskCoverage(x + dx, y + dy, maskParams) > 0.4) {
           return 220 - radius * 44;
         }
       }

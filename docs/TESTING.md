@@ -9,6 +9,7 @@
 - Unit tests: `npm test`
 - Build: `npm run build`
 - Generate local pet bundle: `npm run generate:pet -- <source-image-path> <output-bundle-dir>`
+- Generate stylizer visual QA corpus: `npm run qa:stylizer -- <output-dir>`
 - Review generated pet bundle: `npm run review:pet -- qa <bundle-dir> <review-dir>`
 - Accept generated pet bundle: `npm run review:pet -- accept <bundle-dir> <library-dir>`
 - Delete review or accepted assets: `npm run review:pet -- delete <target-dir> --root <allowed-root>`
@@ -23,6 +24,7 @@
 
 - Unit test image validation, manifest parsing, bundle validation, and behavior state transitions.
 - Use the deterministic stylized PNG adapter for local source-image-to-bundle tests, including source-palette evidence in generated previews. Use fake/scripted model adapters for contract tests and verify adapter outputs before bundle packaging.
+- Use `npm run qa:stylizer -- <output-dir>` for rights-safe visual tuning of deterministic crop, mask, color, and edge parameters. The generated report and contact sheet are local QA artifacts; commit only the code-defined synthetic corpus and tests unless a fixture has an explicit rights-safe reason.
 - Real cloud adapter scaffold tests use mocked provider calls only. OpenAI live-provider smoke requires explicit environment opt-in and is skipped by default. Run `npm run probe:openai-image` against a new custom endpoint before using `smoke:app:live -- --source <image-path>`.
 - Keep a tiny rights-safe golden fixture bundle for regression tests.
 - Add smoke tests for preview rendering and desktop runtime launch once a runtime stack exists.

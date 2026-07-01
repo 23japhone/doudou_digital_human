@@ -10,7 +10,7 @@ Exit criteria: Electron loads a validated `pet bundle v0.1` fixture and generate
 
 ## Next Vertical Slices
 
-1. Add a small rights-safe visual QA corpus for deterministic local stylization and tune crop/mask/color parameters against it.
+1. Add a manual visual scoring checklist on top of the stylizer QA corpus so crop/mask/color/edge presets can be compared before changing defaults.
 2. Harden click-through behavior beyond fallbackRect/alpha hit area if macOS manual testing shows input interference.
 3. Manually run and evaluate the opt-in OpenAI live smoke with a non-sensitive source image, then compare model quality with the local deterministic fallback.
 4. Add local model adapter experiments after cache paths and deletion behavior are designed.

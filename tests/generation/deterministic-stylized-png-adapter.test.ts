@@ -58,6 +58,33 @@ describe("createDeterministicStylizedPngAdapter", () => {
     const preview = PNG.sync.read(output.previewPng);
     expect(countBluePixels(preview, { minY: 54, maxY: 88 })).toBeGreaterThan(200);
   });
+
+  test("lets QA presets tune crop, mask, color, and edge parameters", async () => {
+    const normalizedImage = createSplitNormalizedImage();
+    const sourceImage: SourceImageInfo = {
+      bytes: normalizedImage.bytes.length,
+      mime: "image/png",
+      width: 256,
+      height: 256
+    };
+    const defaultOutput = await createDeterministicStylizedPngAdapter().generate({
+      sourceImage,
+      normalizedSourceImage: normalizedImage
+    });
+    const tunedOutput = await createDeterministicStylizedPngAdapter({
+      params: {
+        crop: { visibleBoundsPaddingPx: 18 },
+        mask: { headRadiusX: 92, edgeFeather: 0.16, outlineRadiusPx: 8 },
+        color: { saturation: 1.55, posterizeStep: 24 },
+        edge: { weakThreshold: 0, strongThreshold: 1, weakMix: 0.9, strongMix: 1, weakColor: [0, 0, 0], strongColor: [0, 0, 0] }
+      }
+    }).generate({ sourceImage, normalizedSourceImage: normalizedImage });
+
+    expect(tunedOutput.previewPng.equals(defaultOutput.previewPng)).toBe(false);
+    expect(countDarkEdgePixels(PNG.sync.read(tunedOutput.previewPng))).toBeGreaterThan(
+      countDarkEdgePixels(PNG.sync.read(defaultOutput.previewPng))
+    );
+  });
 });
 
 function createSplitNormalizedImage(): NormalizedSourceImage {
@@ -136,6 +163,18 @@ function countBluePixels(png: PNG, region: { minY: number; maxY: number }): numb
       if (png.data[index + 3] > 0 && png.data[index + 2] > 150 && png.data[index] < 100) {
         count += 1;
       }
+    }
+  }
+  return count;
+}
+
+function countDarkEdgePixels(png: PNG): number {
+  let count = 0;
+  for (let index = 0; index < png.data.length; index += 4) {
+    const alpha = png.data[index + 3];
+    const luminance = (png.data[index] * 0.299) + (png.data[index + 1] * 0.587) + (png.data[index + 2] * 0.114);
+    if (alpha > 0 && luminance < 80) {
+      count += 1;
     }
   }
   return count;

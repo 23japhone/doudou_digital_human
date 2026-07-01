@@ -18,6 +18,7 @@ Potential developer interfaces:
 - `npm run validate:fixture` validates the committed fixture bundle.
 - `node dist/src/cli/validate-pet.js <bundle-dir>` validates any local bundle after `npm run build:main`.
 - `npm run generate:pet -- <source-image-path> <output-bundle-dir>` validates and decodes a local PNG/JPEG source image, runs the default deterministic stylized PNG adapter, then writes a deterministic `pet bundle v0.1`.
+- `npm run qa:stylizer -- <output-dir>` creates a rights-safe synthetic visual QA corpus for the deterministic local adapter. It writes synthetic source images, one valid bundle per corpus case and tuning preset, copied previews/atlases, `contact-sheet.png`, and `stylizer-qa-report.json`.
 - Cloud scaffold entrypoint: `npm run generate:pet:cloud -- <source-image-path> <output-bundle-dir> --provider mock-provider --confirm-cloud-upload`. This uses a mocked provider and does not perform live network calls.
 - `npm run review:pet -- qa <bundle-dir> <review-dir>` validates a generated bundle and writes `review.json`, `preview.png`, and `contact-sheet.png` for user inspection.
 - `npm run review:pet -- accept <bundle-dir> <library-dir>` validates and copies the bundle into `<library-dir>/<pet-id>` without adding files to the bundle.
@@ -49,7 +50,17 @@ Generation adapters receive validated local source-image metadata and return gen
 - one transparent 256x256 `previewPng`
 - no source image paths, prompts, raw model responses, tokens, secrets, or provider payloads
 
-The default local adapter is `deterministic-stylized-png-adapter@0.1.0`. It is non-model and local-only: it posterizes normalized source pixels, adds deterministic edge/outline styling, and emits the same eight-frame contract as cloud or scripted adapters. The bundle generator validates adapter output, packs frames into `atlases/main.png`, writes `preview.png`, and then validates the final bundle. Runtime consumes only the final bundle.
+The default local adapter is `deterministic-stylized-png-adapter@0.1.0`. It is non-model and local-only: it posterizes normalized source pixels, adds deterministic edge/outline styling, and emits the same eight-frame contract as cloud or scripted adapters. The adapter accepts optional tuning parameters grouped under `crop`, `mask`, `color`, and `edge`; those parameters are generation-only and are not written into `pet bundle v0.1`. The bundle generator validates adapter output, packs frames into `atlases/main.png`, writes `preview.png`, and then validates the final bundle. Runtime consumes only the final bundle.
+
+## Stylizer QA Corpus
+
+`npm run qa:stylizer -- <output-dir>` is a developer QA interface, not part of the runtime. It uses only project-owned synthetic geometric source images and runs the default local stylizer across preset parameter sets:
+
+- `balanced`
+- `soft_mask`
+- `bold_edges`
+
+The output report uses relative paths only and records non-sensitive metrics such as visible bounds and non-transparent pixel counts. Generated QA outputs are local artifacts for inspection and should not include personal source images, secrets, prompts, or raw provider responses.
 
 Real cloud adapters must fail with `CLOUD_OPT_IN_REQUIRED` unless the user explicitly confirms upload. Provider-specific failures map to project-owned codes such as `PROVIDER_NOT_CONFIGURED`, `MODEL_REFUSED`, `MODEL_RATE_LIMITED`, `MODEL_TIMEOUT`, `MODEL_PROVIDER_ERROR`, `MODEL_OUTPUT_INVALID`, and `POSTPROCESSING_FAILED`. The guided app supports `mock-provider` with `DOUDOU_MOCK_CLOUD_API_KEY` and `openai-image` with `DOUDOU_ENABLE_OPENAI_LIVE=1` plus `OPENAI_API_KEY`. `openai-image` uses an OpenAI-compatible image edits endpoint with a normalized PNG input and expects a base64 PNG image response. Configure it with either `DOUDOU_OPENAI_IMAGE_ENDPOINT` or `DOUDOU_OPENAI_BASE_URL` / `OPENAI_BASE_URL`; configure the model with `DOUDOU_OPENAI_IMAGE_MODEL` or `OPENAI_MODEL`. Text-only chat/completions models are not sufficient for this adapter. Raw provider responses, prompts, source paths, and secrets must not be returned from the adapter or written into the bundle.
 
