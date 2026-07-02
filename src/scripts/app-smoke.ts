@@ -66,6 +66,9 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.runtimeSmoke.motionTuningApplied ||
       !smokeResult.runtimeSmoke.motionTuningPanelVisible ||
       !smokeResult.runtimeSmoke.motionTuningPresetButtonVisible ||
+      !smokeResult.runtimeSmoke.motionTuningPresetSaved ||
+      !smokeResult.runtimeSmoke.motionTuningPresetApplied ||
+      !smokeResult.runtimeSmoke.motionTuningPresetNames.includes("烟测节奏") ||
       !smokeResult.runtimeSmoke.motionTuningPresetCopied ||
       !hasSmokeMotionTuningPreset(smokeResult.runtimeSmoke.motionTuningPresetText) ||
       !hasSmokeMotionTuning(smokeResult.runtimeSmoke.motionTuningSnapshot) ||

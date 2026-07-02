@@ -691,7 +691,11 @@ export class GuidedPetFlow {
       args.push("--smoke", "--tuning");
       return new Promise((resolvePromise, reject) => {
         const child = spawn(this.runtimeElectronPath, args, {
-          env: { ...process.env, NODE_OPTIONS: "" },
+          env: {
+            ...process.env,
+            DOUDOU_RUNTIME_USER_DATA_DIR: join(this.workspaceDir, "runtime-smoke-user-data"),
+            NODE_OPTIONS: ""
+          },
           stdio: ["ignore", "pipe", "pipe"]
         });
         let output = "";

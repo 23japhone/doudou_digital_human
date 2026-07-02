@@ -71,6 +71,9 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.motionTuningApplied ||
     !smokeResult.motionTuningPanelVisible ||
     !smokeResult.motionTuningPresetButtonVisible ||
+    !smokeResult.motionTuningPresetSaved ||
+    !smokeResult.motionTuningPresetApplied ||
+    !smokeResult.motionTuningPresetNames.includes("烟测节奏") ||
     !smokeResult.motionTuningPresetCopied ||
     !hasSmokeMotionTuningPreset(smokeResult.motionTuningPresetText) ||
     !hasSmokeMotionTuning(smokeResult.motionTuningSnapshot) ||
@@ -163,9 +166,10 @@ function createSmokeSourcePng(): Buffer {
 
 function runRuntime(bundleDir: string): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
+    const runtimeUserDataDir = path.join(tmpdir(), `runtime-smoke-user-data-${process.pid}-${Date.now()}`);
     const child = spawn(electronBin, [runtimeMain, "--bundle", bundleDir, "--smoke", "--tuning"], {
       cwd: repoRoot,
-      env: { ...process.env, NODE_OPTIONS: "" },
+      env: { ...process.env, DOUDOU_RUNTIME_USER_DATA_DIR: runtimeUserDataDir, NODE_OPTIONS: "" },
       stdio: ["ignore", "pipe", "pipe"]
     });
     let output = "";
@@ -183,6 +187,7 @@ function runRuntime(bundleDir: string): Promise<SpawnResult> {
     child.on("error", reject);
     child.on("close", (code) => {
       clearTimeout(timeout);
+      void rm(runtimeUserDataDir, { force: true, recursive: true });
       resolve({ code, output });
     });
   });
@@ -211,7 +216,10 @@ function parseSmokeResult(output: string) {
     motionTuningApplied: boolean;
     motionTuningPanelVisible: boolean;
     motionTuningPresetButtonVisible: boolean;
+    motionTuningPresetApplied: boolean;
     motionTuningPresetCopied: boolean;
+    motionTuningPresetNames: string[];
+    motionTuningPresetSaved: boolean;
     motionTuningPresetText: string;
     motionTuningSnapshot: {
       recoverySpeedPixelsPerSecond: number;

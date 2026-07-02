@@ -47,8 +47,14 @@ import {
   createRuntimeRecoveryFollowConfig,
   resolveRuntimeMotionTuning,
   runtimeRetreatDistanceForTuning,
-  type RuntimeMotionTuning
+  type RuntimeMotionTuning,
+  type RuntimeMotionTuningPreset
 } from "./tuning.js";
+import {
+  loadRuntimeMotionTuningPresets,
+  saveRuntimeMotionTuningPresets,
+  upsertRuntimeMotionTuningPreset
+} from "./tuning-presets.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
@@ -81,6 +87,7 @@ let smokeEmotionMotionPhasesObserved = new Set<RuntimeEmotionMotionPhase>();
 let smokeMaxEmotionWariness = 0;
 let runtimeMotionTuning = RUNTIME_MOTION_TUNING_DEFAULTS;
 let runtimeMotionTuningEnabled = false;
+let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = [];
 let smokeTimeout: NodeJS.Timeout | null = null;
 let cursorFollowTimer: NodeJS.Timeout | null = null;
 let cursorFollowPausedUntil = 0;
@@ -105,6 +112,7 @@ async function main(): Promise<void> {
   readySignalMode = options.readySignal ?? false;
   runtimeMotionTuningEnabled = Boolean(options.tuning || process.env.DOUDOU_RUNTIME_TUNING === "1");
   runtimeMotionTuning = runtimeMotionTuningFromEnv(process.env);
+  applyRuntimeUserDataDirFromEnv(process.env);
 
   try {
     currentBundle = await validatePetBundle(options.bundleDir);
@@ -114,6 +122,9 @@ async function main(): Promise<void> {
   }
 
   await app.whenReady();
+  runtimeMotionTuningPresets = runtimeMotionTuningEnabled
+    ? await loadRuntimeMotionTuningPresets(runtimeMotionTuningPresetsPath())
+    : [];
   createWindow(currentBundle);
 
   app.on("activate", () => {
@@ -225,7 +236,8 @@ ipcMain.handle("pet:get-bundle", () => {
     scaleLimits: RUNTIME_SCALE_LIMITS,
     smoke: smokeMode,
     motionTuning: runtimeMotionTuning,
-    motionTuningEnabled: runtimeMotionTuningEnabled
+    motionTuningEnabled: runtimeMotionTuningEnabled,
+    motionTuningPresets: runtimeMotionTuningPresets
   };
   return runtimeBundle;
 });
@@ -248,6 +260,26 @@ ipcMain.handle("pet:set-motion-tuning", (_event, patch: Partial<RuntimeMotionTun
   }
   runtimeMotionTuning = resolveRuntimeMotionTuning(patch, runtimeMotionTuning);
   return runtimeMotionTuning;
+});
+
+ipcMain.handle("pet:list-motion-tuning-presets", () => {
+  return runtimeMotionTuningEnabled ? runtimeMotionTuningPresets : [];
+});
+
+ipcMain.handle("pet:save-motion-tuning-preset", async (_event, input: unknown) => {
+  if (!runtimeMotionTuningEnabled) {
+    return runtimeMotionTuningPresets;
+  }
+  const candidate = input && typeof input === "object"
+    ? input as { name?: unknown; tuning?: Partial<RuntimeMotionTuning> }
+    : {};
+  const tuning = resolveRuntimeMotionTuning(candidate.tuning ?? {}, runtimeMotionTuning);
+  runtimeMotionTuningPresets = upsertRuntimeMotionTuningPreset(runtimeMotionTuningPresets, {
+    name: typeof candidate.name === "string" ? candidate.name : "",
+    tuning
+  });
+  await saveRuntimeMotionTuningPresets(runtimeMotionTuningPresetsPath(), runtimeMotionTuningPresets);
+  return runtimeMotionTuningPresets;
 });
 
 ipcMain.handle("pet:copy-motion-tuning-preset", (_event, text: unknown) => {
@@ -707,6 +739,17 @@ function numberFromEnv(value: string | undefined): number | undefined {
     return undefined;
   }
   return Number(value);
+}
+
+function applyRuntimeUserDataDirFromEnv(env: NodeJS.ProcessEnv): void {
+  if (!env.DOUDOU_RUNTIME_USER_DATA_DIR) {
+    return;
+  }
+  app.setPath("userData", resolve(env.DOUDOU_RUNTIME_USER_DATA_DIR));
+}
+
+function runtimeMotionTuningPresetsPath(): string {
+  return join(app.getPath("userData"), "motion-tuning-presets.json");
 }
 
 function sanitizeClipboardText(value: unknown): string {

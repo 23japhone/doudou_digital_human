@@ -2,7 +2,7 @@ import type { PetManifest } from "../pet_bundle/manifest.js";
 import type { ScreenPoint } from "./drag.js";
 import type { RuntimeScaleLimits } from "./scale.js";
 import type { RuntimePetMotionCue, RuntimePetState } from "./state.js";
-import type { RuntimeMotionTuning } from "./tuning.js";
+import type { RuntimeMotionTuning, RuntimeMotionTuningPreset } from "./tuning.js";
 
 export interface RuntimeAtlas {
   id: string;
@@ -32,6 +32,7 @@ export interface RuntimeBundle {
   smoke: boolean;
   motionTuning: RuntimeMotionTuning;
   motionTuningEnabled: boolean;
+  motionTuningPresets: RuntimeMotionTuningPreset[];
 }
 
 export interface PetRuntimeBridge {
@@ -39,11 +40,13 @@ export interface PetRuntimeBridge {
   dragWindowTo(pointer: ScreenPoint): void;
   endWindowDrag(): void;
   getBundle(): Promise<RuntimeBundle>;
+  listMotionTuningPresets(): Promise<RuntimeMotionTuningPreset[]>;
   onCursorHitTest(callback: (screenPoint: ScreenPoint) => RuntimeCursorHitTestResult): () => void;
   onMotionState(callback: (cue: RuntimePetMotionCue) => void): () => void;
   quit(): void;
   recordPoke(point?: ScreenPoint): void;
   reportSmokeResult(result: RuntimeSmokeResult): void;
+  saveMotionTuningPreset(name: string, tuning: Partial<RuntimeMotionTuning>): Promise<RuntimeMotionTuningPreset[]>;
   setMotionTuning(patch: Partial<RuntimeMotionTuning>): Promise<RuntimeMotionTuning>;
   setIgnoreMouseEvents(ignore: boolean): void;
   setWindowScale(scale: number, source?: RuntimeScaleSource): Promise<number>;
@@ -69,7 +72,10 @@ export interface RuntimeSmokeResult {
   motionTuningApplied: boolean;
   motionTuningPanelVisible: boolean;
   motionTuningPresetButtonVisible: boolean;
+  motionTuningPresetApplied: boolean;
   motionTuningPresetCopied: boolean;
+  motionTuningPresetNames: string[];
+  motionTuningPresetSaved: boolean;
   motionTuningPresetText: string;
   motionTuningSnapshot: RuntimeMotionTuning;
   maxEmotionWariness: number;

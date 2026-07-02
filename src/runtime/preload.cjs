@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("petRuntime", {
   dragWindowTo: (point) => ipcRenderer.send("pet:drag-window-to", sanitizePoint(point)),
   endWindowDrag: () => ipcRenderer.send("pet:end-window-drag"),
   getBundle: () => ipcRenderer.invoke("pet:get-bundle"),
+  listMotionTuningPresets: () => ipcRenderer.invoke("pet:list-motion-tuning-presets"),
   onCursorHitTest: (callback) => {
     const listener = (_event, request) => {
       const requestId = Number(request?.requestId);
@@ -35,6 +36,10 @@ contextBridge.exposeInMainWorld("petRuntime", {
   quit: () => ipcRenderer.send("pet:quit"),
   recordPoke: (point) => ipcRenderer.send("pet:record-poke", sanitizeOptionalPoint(point)),
   reportSmokeResult: (result) => ipcRenderer.send("pet:smoke-result", result),
+  saveMotionTuningPreset: (name, tuning) => ipcRenderer.invoke("pet:save-motion-tuning-preset", {
+    name: sanitizePresetName(name),
+    tuning: sanitizeMotionTuningPatch(tuning)
+  }),
   setMotionTuning: (patch) => ipcRenderer.invoke("pet:set-motion-tuning", sanitizeMotionTuningPatch(patch)),
   setIgnoreMouseEvents: (ignore) => ipcRenderer.send("pet:set-ignore-mouse-events", Boolean(ignore)),
   setWindowScale: (scale, source) => ipcRenderer.invoke("pet:set-window-scale", Number(scale), sanitizeScaleSource(source)),
@@ -76,6 +81,13 @@ function sanitizeClipboardText(text) {
     return "";
   }
   return text.slice(0, 512);
+}
+
+function sanitizePresetName(name) {
+  if (typeof name !== "string") {
+    return "";
+  }
+  return name.trim().replace(/\s+/g, " ").slice(0, 32);
 }
 
 function sanitizeMotionTuningPatch(patch) {

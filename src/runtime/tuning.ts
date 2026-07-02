@@ -18,6 +18,12 @@ export interface RuntimeMotionTuning {
   watchingPauseMs: number;
 }
 
+export interface RuntimeMotionTuningPreset {
+  name: string;
+  tuning: RuntimeMotionTuning;
+  updatedAt: string;
+}
+
 interface RuntimeMotionTuningLimits {
   recoverySpeedPixelsPerSecond: { max: number; min: number };
   retreatDistancePixels: { max: number; min: number };

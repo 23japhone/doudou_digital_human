@@ -30,7 +30,8 @@ import {
   createRuntimeStateTiming,
   formatRuntimeMotionTuningPreset,
   resolveRuntimeMotionTuning,
-  type RuntimeMotionTuning
+  type RuntimeMotionTuning,
+  type RuntimeMotionTuningPreset
 } from "./tuning.js";
 import "./styles.css";
 
@@ -92,8 +93,12 @@ let maxStopRebound = 0;
 let smokeMotionTuningApplied = false;
 let smokeMotionTuningPanelVisible = false;
 let smokeMotionTuningPresetButtonVisible = false;
+let smokeMotionTuningPresetApplied = false;
 let smokeMotionTuningPresetCopied = false;
+let smokeMotionTuningPresetNames: string[] = [];
+let smokeMotionTuningPresetSaved = false;
 let smokeMotionTuningPresetText = "";
+let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = bundle.motionTuningPresets;
 const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
 type RuntimeMotionTuningKey = keyof RuntimeMotionTuning;
@@ -111,6 +116,8 @@ const runtimeTuningControls: readonly RuntimeTuningControl[] = [
 ];
 const tuningPanelOutputs = new Map<RuntimeMotionTuningKey, HTMLOutputElement>();
 const tuningPanelInputs = new Map<RuntimeMotionTuningKey, HTMLInputElement>();
+let tuningPresetNameInput: HTMLInputElement | null = null;
+let tuningPresetSelect: HTMLSelectElement | null = null;
 let tuningPresetStatus: HTMLElement | null = null;
 
 petCanvas.width = bundle.manifest.canvas.width;
@@ -530,7 +537,10 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     motionTuningApplied: smokeMotionTuningApplied,
     motionTuningPanelVisible: smokeMotionTuningPanelVisible,
     motionTuningPresetButtonVisible: smokeMotionTuningPresetButtonVisible,
+    motionTuningPresetApplied: smokeMotionTuningPresetApplied,
     motionTuningPresetCopied: smokeMotionTuningPresetCopied,
+    motionTuningPresetNames: smokeMotionTuningPresetNames,
+    motionTuningPresetSaved: smokeMotionTuningPresetSaved,
     motionTuningPresetText: smokeMotionTuningPresetText,
     motionTuningSnapshot: runtimeMotionTuning,
     maxEmotionWariness: 0,
@@ -569,6 +579,12 @@ async function exerciseRuntimeMotionTuningForSmoke(): Promise<void> {
   smokeMotionTuningPresetButtonVisible = Boolean(document.querySelector("#runtime-copy-tuning-preset"));
   smokeMotionTuningPresetText = currentRuntimeMotionTuningPresetText();
   smokeMotionTuningPresetCopied = await copyRuntimeMotionTuningPreset();
+  const smokePresetName = "烟测节奏";
+  runtimeMotionTuningPresets = await window.petRuntime.saveMotionTuningPreset(smokePresetName, runtimeMotionTuning);
+  updateRuntimePresetList();
+  smokeMotionTuningPresetNames = runtimeMotionTuningPresets.map((preset) => preset.name);
+  smokeMotionTuningPresetSaved = smokeMotionTuningPresetNames.includes(smokePresetName);
+  smokeMotionTuningPresetApplied = await applyRuntimeMotionTuningPreset(smokePresetName);
 }
 
 function setupRuntimeTuningPanel(): void {
@@ -588,6 +604,8 @@ function setupRuntimeTuningPanel(): void {
   for (const control of runtimeTuningControls) {
     panel.append(createRuntimeTuningControl(control));
   }
+
+  panel.append(createRuntimePresetControls());
 
   const actionRow = document.createElement("div");
   actionRow.className = "runtime-tuning-actions";
@@ -620,6 +638,42 @@ function setupRuntimeTuningPanel(): void {
   petFrame.append(panel);
   smokeMotionTuningPanelVisible = true;
   updateRuntimeTuningPanelValues();
+  updateRuntimePresetList();
+}
+
+function createRuntimePresetControls(): HTMLElement {
+  const wrapper = document.createElement("div");
+  wrapper.className = "runtime-tuning-presets";
+
+  tuningPresetNameInput = document.createElement("input");
+  tuningPresetNameInput.id = "runtime-tuning-preset-name";
+  tuningPresetNameInput.type = "text";
+  tuningPresetNameInput.maxLength = 32;
+  tuningPresetNameInput.placeholder = "预设名称";
+  tuningPresetNameInput.setAttribute("aria-label", "预设名称");
+
+  const saveButton = document.createElement("button");
+  saveButton.id = "runtime-save-tuning-preset";
+  saveButton.type = "button";
+  saveButton.textContent = "保存预设";
+  saveButton.addEventListener("click", () => {
+    void saveRuntimeMotionTuningPresetFromPanel();
+  });
+
+  tuningPresetSelect = document.createElement("select");
+  tuningPresetSelect.id = "runtime-tuning-preset-list";
+  tuningPresetSelect.setAttribute("aria-label", "已保存预设");
+
+  const applyButton = document.createElement("button");
+  applyButton.id = "runtime-apply-tuning-preset";
+  applyButton.type = "button";
+  applyButton.textContent = "套用";
+  applyButton.addEventListener("click", () => {
+    void applyRuntimeMotionTuningPreset(tuningPresetSelect?.value ?? "");
+  });
+
+  wrapper.append(tuningPresetNameInput, saveButton, tuningPresetSelect, applyButton);
+  return wrapper;
 }
 
 function createRuntimeTuningControl(control: RuntimeTuningControl): HTMLElement {
@@ -657,12 +711,43 @@ async function updateRuntimeMotionTuning(patch: Partial<RuntimeMotionTuning>): P
   applyRuntimeMotionTuning(appliedTuning);
 }
 
+async function saveRuntimeMotionTuningPresetFromPanel(): Promise<boolean> {
+  const name = tuningPresetNameInput?.value.trim() ?? "";
+  if (!name) {
+    setTuningPresetStatus("请输入预设名");
+    return false;
+  }
+  runtimeMotionTuningPresets = await window.petRuntime.saveMotionTuningPreset(name, runtimeMotionTuning);
+  updateRuntimePresetList();
+  if (tuningPresetSelect) {
+    tuningPresetSelect.value = normalizeRuntimePresetName(name);
+  }
+  setTuningPresetStatus("已保存预设");
+  return true;
+}
+
+async function applyRuntimeMotionTuningPreset(name: string): Promise<boolean> {
+  const preset = runtimeMotionTuningPresets.find((candidate) => candidate.name === name);
+  if (!preset) {
+    setTuningPresetStatus("请选择预设");
+    return false;
+  }
+  const appliedTuning = await window.petRuntime.setMotionTuning(preset.tuning);
+  applyRuntimeMotionTuning(appliedTuning);
+  if (tuningPresetNameInput) {
+    tuningPresetNameInput.value = preset.name;
+  }
+  if (tuningPresetSelect) {
+    tuningPresetSelect.value = preset.name;
+  }
+  setTuningPresetStatus("已套用预设");
+  return true;
+}
+
 async function copyRuntimeMotionTuningPreset(): Promise<boolean> {
   const presetText = currentRuntimeMotionTuningPresetText();
   const copied = await window.petRuntime.copyMotionTuningPreset(presetText);
-  if (tuningPresetStatus) {
-    tuningPresetStatus.textContent = copied ? "已复制预设" : "复制失败";
-  }
+  setTuningPresetStatus(copied ? "已复制预设" : "复制失败");
   return copied;
 }
 
@@ -673,10 +758,35 @@ function currentRuntimeMotionTuningPresetText(): string {
 function applyRuntimeMotionTuning(nextTuning: RuntimeMotionTuning): void {
   runtimeMotionTuning = resolveRuntimeMotionTuning(nextTuning);
   Object.assign(runtimeStateTiming, createRuntimeStateTiming(runtimeMotionTuning));
-  if (tuningPresetStatus) {
-    tuningPresetStatus.textContent = "";
-  }
+  setTuningPresetStatus("");
   updateRuntimeTuningPanelValues();
+}
+
+function updateRuntimePresetList(): void {
+  if (!tuningPresetSelect) {
+    return;
+  }
+  tuningPresetSelect.replaceChildren();
+  const emptyOption = document.createElement("option");
+  emptyOption.value = "";
+  emptyOption.textContent = runtimeMotionTuningPresets.length > 0 ? "选择预设" : "暂无预设";
+  tuningPresetSelect.append(emptyOption);
+  for (const preset of runtimeMotionTuningPresets) {
+    const option = document.createElement("option");
+    option.value = preset.name;
+    option.textContent = preset.name;
+    tuningPresetSelect.append(option);
+  }
+}
+
+function setTuningPresetStatus(text: string): void {
+  if (tuningPresetStatus) {
+    tuningPresetStatus.textContent = text;
+  }
+}
+
+function normalizeRuntimePresetName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").slice(0, 32);
 }
 
 function updateRuntimeTuningPanelValues(): void {

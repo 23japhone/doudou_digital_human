@@ -157,6 +157,25 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.runtime-tuning-presets {
+  display: grid;
+  grid-template-columns: 1fr 72px;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.runtime-tuning-presets input,
+.runtime-tuning-presets select {
+  min-width: 0;
+  height: 26px;
+  box-sizing: border-box;
+  border: 1px solid rgba(72, 128, 164, 0.28);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #1b3442;
+  font: inherit;
+}
+
 .runtime-tuning-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
