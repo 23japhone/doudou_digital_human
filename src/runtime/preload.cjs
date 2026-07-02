@@ -71,7 +71,13 @@ function sanitizeScaleSource(source) {
 
 function sanitizeMotionCue(cue) {
   const state = cue?.state;
-  if (state !== "approaching" && state !== "dodging" && state !== "stopped") {
+  if (
+    state !== "approaching" &&
+    state !== "dodging" &&
+    state !== "retreating" &&
+    state !== "stopped" &&
+    state !== "watching"
+  ) {
     return undefined;
   }
   return {

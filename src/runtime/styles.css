@@ -20,9 +20,13 @@ body {
   --runtime-click-pop: 1.06;
   --runtime-dodge-rotate: 0deg;
   --runtime-dodge-x: 0px;
+  --runtime-retreat-rotate: 0deg;
+  --runtime-retreat-x: 0px;
   --runtime-stop-drop: 2px;
   --runtime-stop-scale-x: 1;
   --runtime-stop-scale-y: 0.99;
+  --runtime-watch-rotate: 0deg;
+  --runtime-watch-scale: 1.01;
 
   width: 100vw;
   height: 100vh;
@@ -88,6 +92,16 @@ body {
 #pet-frame.runtime-state-dodging #pet-canvas {
   filter: drop-shadow(0 9px 10px rgba(28, 72, 92, 0.22));
   transform: translateX(var(--runtime-dodge-x)) translateY(-7px) rotate(var(--runtime-dodge-rotate)) scale(1.04);
+}
+
+#pet-frame.runtime-state-retreating #pet-canvas {
+  filter: drop-shadow(0 11px 12px rgba(28, 72, 92, 0.26));
+  transform: translateX(var(--runtime-retreat-x)) translateY(-11px) rotate(var(--runtime-retreat-rotate)) scale(1.055);
+}
+
+#pet-frame.runtime-state-watching #pet-canvas {
+  filter: drop-shadow(0 8px 9px rgba(28, 72, 92, 0.2));
+  transform: translateY(-4px) rotate(var(--runtime-watch-rotate)) scale(var(--runtime-watch-scale));
 }
 
 #pet-frame.runtime-state-poked #pet-canvas {

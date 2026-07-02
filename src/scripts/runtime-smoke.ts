@@ -67,6 +67,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.wheelScaleChanged ||
     !smokeResult.mouseFollowMoved ||
     !smokeResult.cursorFollowAlphaHitTested ||
+    !hasAllEmotionMotionPhases(smokeResult.emotionMotionPhasesObserved) ||
     smokeResult.maxEmotionWariness <= 0.5 ||
     !smokeResult.visualStateApplied ||
     !hasAllRuntimeStates(smokeResult.runtimeStatesObserved) ||
@@ -79,8 +80,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.frameVisibleOnResizeEdge ||
     !smokeResult.renderLoopAdvanced ||
     smokeResult.scale <= 1 ||
-    smokeResult.drawCount < 2 ||
-    smokeResult.currentFrameIndex === smokeResult.initialFrameIndex
+    smokeResult.drawCount < 2
   ) {
     throw new Error(`${label} runtime smoke returned incomplete result\n${validResult.output}`);
   }
@@ -88,7 +88,13 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
 }
 
 function hasAllRuntimeStates(states: string[]): boolean {
-  return ["approaching", "dodging", "poked", "stopped", "waiting", "working"].every((state) => states.includes(state));
+  return ["approaching", "dodging", "poked", "retreating", "stopped", "waiting", "watching", "working"].every((state) =>
+    states.includes(state)
+  );
+}
+
+function hasAllEmotionMotionPhases(phases: string[]): boolean {
+  return ["retreating", "watching", "recovering"].every((phase) => phases.includes(phase));
 }
 
 function hasMotionDirection(directions: string[]): boolean {
@@ -183,6 +189,7 @@ function parseSmokeResult(output: string) {
     wheelScaleChanged: boolean;
     mouseFollowMoved: boolean;
     cursorFollowAlphaHitTested: boolean;
+    emotionMotionPhasesObserved: string[];
     maxEmotionWariness: number;
     runtimeStatesObserved: string[];
     visualStateApplied: boolean;

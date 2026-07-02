@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   classifyRuntimeAlphaReaction,
+  classifyRuntimeEmotionMotionPhase,
   createRuntimeEmotionMemory,
   decayRuntimeEmotionMemory,
   recordRuntimePokeEmotion,
@@ -76,6 +77,17 @@ describe("runtime alpha reaction strategy", () => {
 
     expect(runtimeDodgeDistanceForEmotion(createRuntimeEmotionMemory(), 128)).toBe(128);
     expect(runtimeDodgeDistanceForEmotion(memory, 128)).toBeGreaterThan(128);
+  });
+
+  test("maps high wariness into retreat, watch, and slow-approach phases", () => {
+    let memory = createRuntimeEmotionMemory();
+    memory = recordRuntimePokeEmotion(memory, 1000);
+    memory = recordRuntimePokeEmotion(memory, 1300);
+
+    expect(classifyRuntimeEmotionMotionPhase(memory, 1450)).toBe("retreating");
+    expect(classifyRuntimeEmotionMotionPhase(memory, 1850)).toBe("watching");
+    expect(classifyRuntimeEmotionMotionPhase(memory, 2450)).toBe("recovering");
+    expect(classifyRuntimeEmotionMotionPhase(decayRuntimeEmotionMemory(memory, 4400), 4400)).toBe("settled");
   });
 });
 

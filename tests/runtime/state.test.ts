@@ -83,6 +83,37 @@ describe("runtime pet state machine", () => {
     expect(machine.pose().motionIntensity).toBe(0);
   });
 
+  test("retreats briefly, watches the cursor, then settles when no fresh cue arrives", () => {
+    const machine = createRuntimePetStateMachine();
+
+    machine.motion(motionCue("retreating", 0.88), 2000);
+    expect(machine.current()).toBe("retreating");
+    expect(machine.pose()).toMatchObject({
+      direction: "right",
+      motionIntensity: 0.88
+    });
+
+    machine.advance(
+      RUNTIME_PET_STATE_TIMING.retreatingToWatchingMs - 1,
+      2000 + RUNTIME_PET_STATE_TIMING.retreatingToWatchingMs - 1
+    );
+    expect(machine.current()).toBe("retreating");
+
+    machine.advance(1, 2000 + RUNTIME_PET_STATE_TIMING.retreatingToWatchingMs);
+    expect(machine.current()).toBe("watching");
+    expect(machine.pose()).toMatchObject({
+      direction: "right",
+      motionIntensity: 0.88
+    });
+
+    machine.advance(
+      RUNTIME_PET_STATE_TIMING.watchingToWaitingMs,
+      2000 + RUNTIME_PET_STATE_TIMING.retreatingToWatchingMs + RUNTIME_PET_STATE_TIMING.watchingToWaitingMs
+    );
+    expect(machine.current()).toBe("waiting");
+    expect(machine.pose().motionIntensity).toBe(0);
+  });
+
   test("keeps poked visual state briefly before returning to waiting", () => {
     const machine = createRuntimePetStateMachine();
 
@@ -115,6 +146,8 @@ describe("runtime pet state machine", () => {
 
     machine.motion(motionCue("approaching", 0.5), 1000);
     machine.motion(motionCue("dodging", 0.75), 1050);
+    machine.motion(motionCue("retreating", 0.85), 1075);
+    machine.motion(motionCue("watching", 0.6), 1085);
     machine.motion(motionCue("stopped", 0.5), 1100);
     machine.tap(1200);
     machine.working(1300);
@@ -124,6 +157,8 @@ describe("runtime pet state machine", () => {
       "waiting",
       "approaching",
       "dodging",
+      "retreating",
+      "watching",
       "stopped",
       "poked",
       "working"

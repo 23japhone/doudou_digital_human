@@ -60,6 +60,7 @@ export interface RuntimeSmokeResult {
   wheelScaleChanged: boolean;
   mouseFollowMoved: boolean;
   cursorFollowAlphaHitTested: boolean;
+  emotionMotionPhasesObserved: string[];
   maxEmotionWariness: number;
   runtimeStatesObserved: RuntimePetState[];
   visualStateApplied: boolean;

@@ -1,15 +1,28 @@
 import type { RuntimeMotionDirection } from "./motion.js";
 
-export type RuntimePetState = "approaching" | "dodging" | "poked" | "stopped" | "waiting" | "working";
+export type RuntimePetState =
+  | "approaching"
+  | "dodging"
+  | "poked"
+  | "retreating"
+  | "stopped"
+  | "waiting"
+  | "watching"
+  | "working";
 
-export type RuntimeMotionPetState = Extract<RuntimePetState, "approaching" | "dodging" | "stopped">;
+export type RuntimeMotionPetState = Extract<
+  RuntimePetState,
+  "approaching" | "dodging" | "retreating" | "stopped" | "watching"
+>;
 
 export const RUNTIME_PET_STATES: readonly RuntimePetState[] = [
   "approaching",
   "dodging",
+  "retreating",
   "stopped",
   "poked",
   "waiting",
+  "watching",
   "working"
 ];
 
@@ -17,7 +30,9 @@ export interface RuntimePetStateTiming {
   approachingToWaitingMs: number;
   dodgingToWaitingMs: number;
   pokedMs: number;
+  retreatingToWatchingMs: number;
   stoppedToWaitingMs: number;
+  watchingToWaitingMs: number;
   workingHoldMs: number;
 }
 
@@ -48,7 +63,9 @@ export const RUNTIME_PET_STATE_TIMING: RuntimePetStateTiming = {
   approachingToWaitingMs: 520,
   dodgingToWaitingMs: 460,
   pokedMs: 420,
+  retreatingToWatchingMs: 360,
   stoppedToWaitingMs: 900,
+  watchingToWaitingMs: 620,
   workingHoldMs: 520
 };
 
@@ -85,10 +102,16 @@ export function createRuntimePetStateMachine(
     if (state === "dodging" && elapsedMs >= timing.dodgingToWaitingMs) {
       return setState("waiting", nowMs, createNeutralPose());
     }
+    if (state === "retreating" && elapsedMs >= timing.retreatingToWatchingMs) {
+      return setState("watching", nowMs, pose);
+    }
     if (state === "poked" && elapsedMs >= timing.pokedMs) {
       return setState("waiting", nowMs, createNeutralPose());
     }
     if (state === "stopped" && elapsedMs >= timing.stoppedToWaitingMs) {
+      return setState("waiting", nowMs, createNeutralPose());
+    }
+    if (state === "watching" && elapsedMs >= timing.watchingToWaitingMs) {
       return setState("waiting", nowMs, createNeutralPose());
     }
     if (state === "working" && elapsedMs >= timing.workingHoldMs) {

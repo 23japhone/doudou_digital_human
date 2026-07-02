@@ -442,6 +442,16 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
     state: "dodging"
   });
   applyRuntimeMotionCue({
+    direction: "left",
+    motionIntensity: 0.88,
+    state: "retreating"
+  });
+  applyRuntimeMotionCue({
+    direction: "right",
+    motionIntensity: 0.64,
+    state: "watching"
+  });
+  applyRuntimeMotionCue({
     direction: "right",
     motionIntensity: 0.82,
     state: "stopped"
@@ -449,6 +459,7 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
   const smokePokePoint = frameCenterScreenPoint();
   window.petRuntime.recordPoke(smokePokePoint);
   window.petRuntime.recordPoke(smokePokePoint);
+  await waitForSmokeMotion(1100);
   markRuntimePoked();
   player.tap();
   drawTapExpressionFramesForSmoke();
@@ -482,6 +493,7 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     wheelScaleChanged: false,
     mouseFollowMoved: false,
     cursorFollowAlphaHitTested: false,
+    emotionMotionPhasesObserved: [],
     maxEmotionWariness: 0,
     runtimeStatesObserved: stateMachine.observed(),
     visualStateApplied: isRuntimeVisualStateApplied(),
@@ -537,6 +549,10 @@ function applyRuntimeVisualPose(): void {
   petFrame.style.setProperty("--runtime-approach-lift", `${-(3 + motionIntensity * 5).toFixed(2)}px`);
   petFrame.style.setProperty("--runtime-approach-rotate", `${(directionX * (2 + motionIntensity * 5)).toFixed(2)}deg`);
   petFrame.style.setProperty("--runtime-approach-scale", (1 + motionIntensity * 0.028).toFixed(3));
+  petFrame.style.setProperty("--runtime-retreat-x", `${(-directionX * (14 + motionIntensity * 18)).toFixed(2)}px`);
+  petFrame.style.setProperty("--runtime-retreat-rotate", `${(-directionX * (8 + motionIntensity * 6)).toFixed(2)}deg`);
+  petFrame.style.setProperty("--runtime-watch-rotate", `${(directionX * (3 + motionIntensity * 4)).toFixed(2)}deg`);
+  petFrame.style.setProperty("--runtime-watch-scale", (1 + motionIntensity * 0.018).toFixed(3));
   petFrame.style.setProperty("--runtime-stop-drop", `${(2 + stopRebound * 5).toFixed(2)}px`);
   petFrame.style.setProperty("--runtime-stop-scale-x", (1 + stopRebound * 0.03).toFixed(3));
   petFrame.style.setProperty("--runtime-stop-scale-y", (1 - stopRebound * 0.045).toFixed(3));
@@ -574,6 +590,12 @@ function drawTapExpressionFramesForSmoke(): void {
     drawCurrentFrame();
     player.advance(frame.durationMs);
   }
+}
+
+function waitForSmokeMotion(durationMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, durationMs);
+  });
 }
 
 function isRuntimeFrameHiddenByDefault(): boolean {

@@ -1,6 +1,7 @@
 import type { RuntimeCursorHitTestResult } from "./runtime-types.js";
 
 export type RuntimeAlphaReaction = "approach" | "dodge" | "none";
+export type RuntimeEmotionMotionPhase = "recovering" | "retreating" | "settled" | "watching";
 
 export interface RuntimeEmotionMemory {
   lastInteractionAtMs: number | null;
@@ -16,6 +17,12 @@ export interface RuntimeEmotionMemoryConfig {
   waryDodgeThreshold: number;
 }
 
+export interface RuntimeEmotionMotionPhaseConfig {
+  recoveringMs: number;
+  retreatingMs: number;
+  watchingMs: number;
+}
+
 export interface RuntimeAlphaReactionInput {
   emotionMemory?: RuntimeEmotionMemory;
   hitTest: RuntimeCursorHitTestResult;
@@ -29,6 +36,12 @@ export const RUNTIME_EMOTION_MEMORY_CONFIG: RuntimeEmotionMemoryConfig = {
   recoveryDelayMs: 1200,
   recoveryHalfLifeMs: 1800,
   waryDodgeThreshold: 0.58
+};
+
+export const RUNTIME_EMOTION_MOTION_PHASE_CONFIG: RuntimeEmotionMotionPhaseConfig = {
+  recoveringMs: 1400,
+  retreatingMs: 360,
+  watchingMs: 520
 };
 
 export function classifyRuntimeAlphaReaction(input: RuntimeAlphaReactionInput): RuntimeAlphaReaction {
@@ -47,6 +60,33 @@ export function classifyRuntimeAlphaReaction(input: RuntimeAlphaReactionInput): 
   const radiusBasis = Math.max(1, Math.min(hitTest.canvasSize.width, hitTest.canvasSize.height) / 2);
   const distanceRatio = Math.hypot(hitTest.canvasPoint.x - center.x, hitTest.canvasPoint.y - center.y) / radiusBasis;
   return distanceRatio <= RUNTIME_ALPHA_REACTION_DODGE_RADIUS_RATIO || wary ? "dodge" : "approach";
+}
+
+export function classifyRuntimeEmotionMotionPhase(
+  memory: RuntimeEmotionMemory,
+  nowMs: number,
+  config = RUNTIME_EMOTION_MOTION_PHASE_CONFIG
+): RuntimeEmotionMotionPhase {
+  if (
+    memory.lastInteractionAtMs === null ||
+    !Number.isFinite(nowMs) ||
+    nowMs < memory.lastInteractionAtMs ||
+    memory.wariness < RUNTIME_EMOTION_MEMORY_CONFIG.waryDodgeThreshold
+  ) {
+    return "settled";
+  }
+
+  const elapsedMs = nowMs - memory.lastInteractionAtMs;
+  if (elapsedMs < config.retreatingMs) {
+    return "retreating";
+  }
+  if (elapsedMs < config.retreatingMs + config.watchingMs) {
+    return "watching";
+  }
+  if (elapsedMs < config.retreatingMs + config.watchingMs + config.recoveringMs) {
+    return "recovering";
+  }
+  return "settled";
 }
 
 export function createRuntimeEmotionMemory(): RuntimeEmotionMemory {
