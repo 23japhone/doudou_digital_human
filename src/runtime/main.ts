@@ -23,7 +23,6 @@ import {
 } from "./scale.js";
 import {
   RUNTIME_CURSOR_DODGE_CONFIG,
-  RUNTIME_CURSOR_FOLLOW_CONFIG,
   calculateCursorDodgeStep,
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
@@ -37,29 +36,31 @@ import {
   createRuntimeEmotionMemory,
   decayRuntimeEmotionMemory,
   recordRuntimePokeEmotion,
-  runtimeDodgeDistanceForEmotion,
   runtimeMotionIntensityForEmotion,
   type RuntimeAlphaReaction,
   type RuntimeEmotionMotionPhase
 } from "./reaction.js";
 import type { RuntimeMotionPetState, RuntimePetMotionCue } from "./state.js";
+import {
+  RUNTIME_MOTION_TUNING_DEFAULTS,
+  createRuntimeEmotionPhaseConfig,
+  createRuntimeRecoveryFollowConfig,
+  resolveRuntimeMotionTuning,
+  runtimeRetreatDistanceForTuning,
+  type RuntimeMotionTuning
+} from "./tuning.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
 const RUNTIME_CURSOR_FOLLOW_MAX_DELTA_MS = 100;
 const RUNTIME_CURSOR_HIT_TEST_TIMEOUT_MS = 80;
 const RUNTIME_CURSOR_FOLLOW_RESUME_DELAY_MS = 220;
-const RUNTIME_EMOTION_RECOVERY_FOLLOW_CONFIG = {
-  ...RUNTIME_CURSOR_FOLLOW_CONFIG,
-  easingResponsiveness: 3.2,
-  maxSpeedPixelsPerSecond: 320,
-  settleDistance: 14
-};
 
 interface RuntimeOptions {
   bundleDir: string;
   readySignal: boolean;
   smoke: boolean;
+  tuning: boolean;
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -77,6 +78,8 @@ let smokeMouseFollowMoved = false;
 let smokeCursorFollowAlphaHitTested = false;
 let smokeEmotionMotionPhasesObserved = new Set<RuntimeEmotionMotionPhase>();
 let smokeMaxEmotionWariness = 0;
+let runtimeMotionTuning = RUNTIME_MOTION_TUNING_DEFAULTS;
+let runtimeMotionTuningEnabled = false;
 let smokeTimeout: NodeJS.Timeout | null = null;
 let cursorFollowTimer: NodeJS.Timeout | null = null;
 let cursorFollowPausedUntil = 0;
@@ -99,6 +102,8 @@ async function main(): Promise<void> {
 
   smokeMode = options.smoke ?? false;
   readySignalMode = options.readySignal ?? false;
+  runtimeMotionTuningEnabled = Boolean(options.tuning || process.env.DOUDOU_RUNTIME_TUNING === "1");
+  runtimeMotionTuning = runtimeMotionTuningFromEnv(process.env);
 
   try {
     currentBundle = await validatePetBundle(options.bundleDir);
@@ -118,7 +123,7 @@ async function main(): Promise<void> {
 }
 
 function parseArgs(args: string[]): Partial<RuntimeOptions> {
-  const options: Partial<RuntimeOptions> = { readySignal: false, smoke: false };
+  const options: Partial<RuntimeOptions> = { readySignal: false, smoke: false, tuning: false };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--bundle") {
@@ -128,6 +133,8 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
       options.smoke = true;
     } else if (arg === "--ready-signal") {
       options.readySignal = true;
+    } else if (arg === "--tuning") {
+      options.tuning = true;
     }
   }
   return options;
@@ -215,7 +222,9 @@ ipcMain.handle("pet:get-bundle", () => {
     previewUrl: pathToFileURL(join(currentBundle.rootDir, manifest.assets.preview)).href,
     scale: runtimeScale,
     scaleLimits: RUNTIME_SCALE_LIMITS,
-    smoke: smokeMode
+    smoke: smokeMode,
+    motionTuning: runtimeMotionTuning,
+    motionTuningEnabled: runtimeMotionTuningEnabled
   };
   return runtimeBundle;
 });
@@ -231,6 +240,14 @@ ipcMain.on("pet:set-ignore-mouse-events", (_event, ignore: boolean) => {
 ipcMain.handle("pet:set-window-scale", (_event, requestedScale: number, source?: unknown) =>
   applyWindowScale(requestedScale, sanitizeRuntimeScaleSource(source))
 );
+
+ipcMain.handle("pet:set-motion-tuning", (_event, patch: Partial<RuntimeMotionTuning>) => {
+  if (!runtimeMotionTuningEnabled) {
+    return runtimeMotionTuning;
+  }
+  runtimeMotionTuning = resolveRuntimeMotionTuning(patch, runtimeMotionTuning);
+  return runtimeMotionTuning;
+});
 
 ipcMain.on("pet:start-window-drag", (_event, pointer: ScreenPoint) => {
   if (!mainWindow || !isFiniteScreenPoint(pointer)) {
@@ -322,6 +339,9 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
         mouseFollowMoved: smokeMouseFollowMoved,
         cursorFollowAlphaHitTested: smokeCursorFollowAlphaHitTested,
         emotionMotionPhasesObserved: [...smokeEmotionMotionPhasesObserved],
+        motionTuningApplied: result.motionTuningApplied,
+        motionTuningPanelVisible: result.motionTuningPanelVisible,
+        motionTuningSnapshot: runtimeMotionTuning,
         maxEmotionWariness: smokeMaxEmotionWariness
       })}`
     );
@@ -414,7 +434,11 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
   const deltaMs = Math.min(RUNTIME_CURSOR_FOLLOW_MAX_DELTA_MS, Math.max(0, now - lastCursorFollowTimestamp));
   lastCursorFollowTimestamp = now;
   runtimeEmotionMemory = decayRuntimeEmotionMemory(runtimeEmotionMemory, now);
-  const emotionPhase = classifyRuntimeEmotionMotionPhase(runtimeEmotionMemory, now);
+  const emotionPhase = classifyRuntimeEmotionMotionPhase(
+    runtimeEmotionMemory,
+    now,
+    createRuntimeEmotionPhaseConfig(runtimeMotionTuning)
+  );
   if (smokeMode && emotionPhase !== "settled") {
     smokeEmotionMotionPhasesObserved.add(emotionPhase);
   }
@@ -470,9 +494,10 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
         deltaMs,
         config: {
           ...RUNTIME_CURSOR_DODGE_CONFIG,
-          dodgeDistance: runtimeDodgeDistanceForEmotion(
+          dodgeDistance: runtimeRetreatDistanceForTuning(
             runtimeEmotionMemory,
-            RUNTIME_CURSOR_DODGE_CONFIG.dodgeDistance
+            RUNTIME_CURSOR_DODGE_CONFIG.dodgeDistance,
+            runtimeMotionTuning
           )
         },
         windowBounds: currentBounds,
@@ -481,7 +506,7 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
       : calculateCursorFollowStep({
         cursor: cursorPoint,
         deltaMs,
-        config: emotionPhase === "recovering" ? RUNTIME_EMOTION_RECOVERY_FOLLOW_CONFIG : undefined,
+        config: emotionPhase === "recovering" ? createRuntimeRecoveryFollowConfig(runtimeMotionTuning) : undefined,
         windowBounds: currentBounds,
         workArea
       });
@@ -657,4 +682,19 @@ function motionDirectionTowardCursor(cursorPoint: RuntimeMotionPoint, windowBoun
     return dx >= 0 ? "right" : "left";
   }
   return dy >= 0 ? "down" : "up";
+}
+
+function runtimeMotionTuningFromEnv(env: NodeJS.ProcessEnv): RuntimeMotionTuning {
+  return resolveRuntimeMotionTuning({
+    recoverySpeedPixelsPerSecond: numberFromEnv(env.DOUDOU_RUNTIME_RECOVERY_SPEED),
+    retreatDistancePixels: numberFromEnv(env.DOUDOU_RUNTIME_RETREAT_DISTANCE),
+    watchingPauseMs: numberFromEnv(env.DOUDOU_RUNTIME_WATCH_MS)
+  });
+}
+
+function numberFromEnv(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") {
+    return undefined;
+  }
+  return Number(value);
 }

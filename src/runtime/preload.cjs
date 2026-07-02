@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld("petRuntime", {
   quit: () => ipcRenderer.send("pet:quit"),
   recordPoke: (point) => ipcRenderer.send("pet:record-poke", sanitizeOptionalPoint(point)),
   reportSmokeResult: (result) => ipcRenderer.send("pet:smoke-result", result),
+  setMotionTuning: (patch) => ipcRenderer.invoke("pet:set-motion-tuning", sanitizeMotionTuningPatch(patch)),
   setIgnoreMouseEvents: (ignore) => ipcRenderer.send("pet:set-ignore-mouse-events", Boolean(ignore)),
   setWindowScale: (scale, source) => ipcRenderer.invoke("pet:set-window-scale", Number(scale), sanitizeScaleSource(source)),
   showContextMenu: () => ipcRenderer.send("pet:show-context-menu"),
@@ -67,6 +68,22 @@ function sanitizeOptionalSize(size) {
 
 function sanitizeScaleSource(source) {
   return source === "pointer" || source === "wheel" ? source : undefined;
+}
+
+function sanitizeMotionTuningPatch(patch) {
+  if (!patch || typeof patch !== "object") {
+    return {};
+  }
+  return {
+    recoverySpeedPixelsPerSecond: optionalNumber(patch?.recoverySpeedPixelsPerSecond),
+    retreatDistancePixels: optionalNumber(patch?.retreatDistancePixels),
+    watchingPauseMs: optionalNumber(patch?.watchingPauseMs)
+  };
+}
+
+function optionalNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
 }
 
 function sanitizeMotionCue(cue) {

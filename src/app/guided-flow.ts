@@ -688,7 +688,7 @@ export class GuidedPetFlow {
     }
     const args = [this.runtimeMainPath, "--bundle", bundleDir];
     if (smoke) {
-      args.push("--smoke");
+      args.push("--smoke", "--tuning");
       return new Promise((resolvePromise, reject) => {
         const child = spawn(this.runtimeElectronPath, args, {
           env: { ...process.env, NODE_OPTIONS: "" },

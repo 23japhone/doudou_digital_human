@@ -2,6 +2,7 @@ import type { PetManifest } from "../pet_bundle/manifest.js";
 import type { ScreenPoint } from "./drag.js";
 import type { RuntimeScaleLimits } from "./scale.js";
 import type { RuntimePetMotionCue, RuntimePetState } from "./state.js";
+import type { RuntimeMotionTuning } from "./tuning.js";
 
 export interface RuntimeAtlas {
   id: string;
@@ -29,6 +30,8 @@ export interface RuntimeBundle {
   scale: number;
   scaleLimits: RuntimeScaleLimits;
   smoke: boolean;
+  motionTuning: RuntimeMotionTuning;
+  motionTuningEnabled: boolean;
 }
 
 export interface PetRuntimeBridge {
@@ -40,6 +43,7 @@ export interface PetRuntimeBridge {
   quit(): void;
   recordPoke(point?: ScreenPoint): void;
   reportSmokeResult(result: RuntimeSmokeResult): void;
+  setMotionTuning(patch: Partial<RuntimeMotionTuning>): Promise<RuntimeMotionTuning>;
   setIgnoreMouseEvents(ignore: boolean): void;
   setWindowScale(scale: number, source?: RuntimeScaleSource): Promise<number>;
   showContextMenu(): void;
@@ -61,6 +65,9 @@ export interface RuntimeSmokeResult {
   mouseFollowMoved: boolean;
   cursorFollowAlphaHitTested: boolean;
   emotionMotionPhasesObserved: string[];
+  motionTuningApplied: boolean;
+  motionTuningPanelVisible: boolean;
+  motionTuningSnapshot: RuntimeMotionTuning;
   maxEmotionWariness: number;
   runtimeStatesObserved: RuntimePetState[];
   visualStateApplied: boolean;

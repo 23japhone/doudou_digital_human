@@ -24,6 +24,13 @@ import {
   type RuntimePetMotionCue,
   type RuntimePetState
 } from "./state.js";
+import {
+  RUNTIME_MOTION_TUNING_DEFAULTS,
+  RUNTIME_MOTION_TUNING_LIMITS,
+  createRuntimeStateTiming,
+  resolveRuntimeMotionTuning,
+  type RuntimeMotionTuning
+} from "./tuning.js";
 import "./styles.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
@@ -47,7 +54,9 @@ const RESIZE_AFFORDANCE_CLASS = "is-resize-affordance-visible";
 const bundle = await window.petRuntime.getBundle();
 console.log(`pet renderer: loaded bundle ${bundle.manifest.id}`);
 const player = createAnimationPlayer(bundle.manifest);
-const stateMachine = createRuntimePetStateMachine();
+let runtimeMotionTuning = resolveRuntimeMotionTuning(bundle.motionTuning);
+const runtimeStateTiming = createRuntimeStateTiming(runtimeMotionTuning);
+const stateMachine = createRuntimePetStateMachine(runtimeStateTiming);
 const atlasImages = await loadAtlases(bundle);
 console.log(`pet renderer: loaded ${atlasImages.size} atlas image(s)`);
 const canvasAlphaSampler: CanvasAlphaSampler = {
@@ -79,13 +88,31 @@ let scaleDragSession: RuntimeScaleDragSession | null = null;
 let scaleRequestSerial = 0;
 let visualState: RuntimePetState = stateMachine.current();
 let maxStopRebound = 0;
+let smokeMotionTuningApplied = false;
+let smokeMotionTuningPanelVisible = false;
 const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
+type RuntimeMotionTuningKey = keyof RuntimeMotionTuning;
+interface RuntimeTuningControl {
+  key: RuntimeMotionTuningKey;
+  label: string;
+  step: number;
+  unit: string;
+}
+
+const runtimeTuningControls: readonly RuntimeTuningControl[] = [
+  { key: "retreatDistancePixels", label: "后退距离", step: 4, unit: "px" },
+  { key: "watchingPauseMs", label: "观察停顿", step: 20, unit: "ms" },
+  { key: "recoverySpeedPixelsPerSecond", label: "恢复速度", step: 20, unit: "px/s" }
+];
+const tuningPanelOutputs = new Map<RuntimeMotionTuningKey, HTMLOutputElement>();
+const tuningPanelInputs = new Map<RuntimeMotionTuningKey, HTMLInputElement>();
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
 petFrame.style.setProperty("--runtime-frame-padding", `${RUNTIME_FRAME_PADDING}px`);
 applyRuntimePetState(visualState);
+setupRuntimeTuningPanel();
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
@@ -431,6 +458,7 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
     return;
   }
   smokeInteractionsExercised = true;
+  await exerciseRuntimeMotionTuningForSmoke();
   applyRuntimeMotionCue({
     direction: "right",
     motionIntensity: 0.82,
@@ -494,6 +522,9 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     mouseFollowMoved: false,
     cursorFollowAlphaHitTested: false,
     emotionMotionPhasesObserved: [],
+    motionTuningApplied: smokeMotionTuningApplied,
+    motionTuningPanelVisible: smokeMotionTuningPanelVisible,
+    motionTuningSnapshot: runtimeMotionTuning,
     maxEmotionWariness: 0,
     runtimeStatesObserved: stateMachine.observed(),
     visualStateApplied: isRuntimeVisualStateApplied(),
@@ -510,6 +541,112 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
 
 function applyRuntimeMotionCue(cue: RuntimePetMotionCue): void {
   applyRuntimePetState(stateMachine.motion(cue, performance.now()));
+}
+
+async function exerciseRuntimeMotionTuningForSmoke(): Promise<void> {
+  smokeMotionTuningPanelVisible = Boolean(document.querySelector("#runtime-tuning-panel"));
+  if (!bundle.motionTuningEnabled) {
+    return;
+  }
+  const appliedTuning = await window.petRuntime.setMotionTuning({
+    recoverySpeedPixelsPerSecond: 240,
+    retreatDistancePixels: 260,
+    watchingPauseMs: 560
+  });
+  applyRuntimeMotionTuning(appliedTuning);
+  smokeMotionTuningApplied =
+    runtimeMotionTuning.recoverySpeedPixelsPerSecond === 240 &&
+    runtimeMotionTuning.retreatDistancePixels === 260 &&
+    runtimeMotionTuning.watchingPauseMs === 560;
+}
+
+function setupRuntimeTuningPanel(): void {
+  if (!bundle.motionTuningEnabled) {
+    return;
+  }
+
+  const panel = document.createElement("section");
+  panel.id = "runtime-tuning-panel";
+  panel.setAttribute("aria-label", "动作调参");
+  panel.className = "runtime-tuning-panel";
+
+  const title = document.createElement("h2");
+  title.textContent = "动作调参";
+  panel.append(title);
+
+  for (const control of runtimeTuningControls) {
+    panel.append(createRuntimeTuningControl(control));
+  }
+
+  const resetButton = document.createElement("button");
+  resetButton.type = "button";
+  resetButton.textContent = "重置";
+  resetButton.addEventListener("click", () => {
+    void updateRuntimeMotionTuning(RUNTIME_MOTION_TUNING_DEFAULTS);
+  });
+  panel.append(resetButton);
+
+  panel.addEventListener("pointerdown", (event) => event.stopPropagation());
+  panel.addEventListener("pointermove", (event) => event.stopPropagation());
+  panel.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
+  petFrame.append(panel);
+  smokeMotionTuningPanelVisible = true;
+  updateRuntimeTuningPanelValues();
+}
+
+function createRuntimeTuningControl(control: RuntimeTuningControl): HTMLElement {
+  const wrapper = document.createElement("label");
+  wrapper.className = "runtime-tuning-control";
+
+  const caption = document.createElement("span");
+  caption.textContent = control.label;
+
+  const value = document.createElement("output");
+  value.setAttribute("for", `runtime-tuning-${control.key}`);
+
+  const input = document.createElement("input");
+  input.id = `runtime-tuning-${control.key}`;
+  input.type = "range";
+  input.min = String(RUNTIME_MOTION_TUNING_LIMITS[control.key].min);
+  input.max = String(RUNTIME_MOTION_TUNING_LIMITS[control.key].max);
+  input.step = String(control.step);
+  input.value = String(runtimeMotionTuning[control.key]);
+  input.addEventListener("input", () => {
+    void updateRuntimeMotionTuning({
+      [control.key]: Number(input.value)
+    });
+  });
+
+  tuningPanelOutputs.set(control.key, value);
+  tuningPanelInputs.set(control.key, input);
+
+  wrapper.append(caption, input, value);
+  return wrapper;
+}
+
+async function updateRuntimeMotionTuning(patch: Partial<RuntimeMotionTuning>): Promise<void> {
+  const appliedTuning = await window.petRuntime.setMotionTuning(patch);
+  applyRuntimeMotionTuning(appliedTuning);
+}
+
+function applyRuntimeMotionTuning(nextTuning: RuntimeMotionTuning): void {
+  runtimeMotionTuning = resolveRuntimeMotionTuning(nextTuning);
+  Object.assign(runtimeStateTiming, createRuntimeStateTiming(runtimeMotionTuning));
+  updateRuntimeTuningPanelValues();
+}
+
+function updateRuntimeTuningPanelValues(): void {
+  for (const control of runtimeTuningControls) {
+    const value = runtimeMotionTuning[control.key];
+    const input = tuningPanelInputs.get(control.key);
+    const output = tuningPanelOutputs.get(control.key);
+    if (input) {
+      input.value = String(value);
+    }
+    if (output) {
+      output.value = `${value}${control.unit}`;
+    }
+  }
 }
 
 function markRuntimePoked(): void {

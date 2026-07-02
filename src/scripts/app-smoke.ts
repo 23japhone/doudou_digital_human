@@ -63,6 +63,9 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.runtimeSmoke.mouseFollowMoved ||
       !smokeResult.runtimeSmoke.cursorFollowAlphaHitTested ||
       !hasAllEmotionMotionPhases(smokeResult.runtimeSmoke.emotionMotionPhasesObserved) ||
+      !smokeResult.runtimeSmoke.motionTuningApplied ||
+      !smokeResult.runtimeSmoke.motionTuningPanelVisible ||
+      !hasSmokeMotionTuning(smokeResult.runtimeSmoke.motionTuningSnapshot) ||
       smokeResult.runtimeSmoke.maxEmotionWariness <= 0.5 ||
       !smokeResult.runtimeSmoke.visualStateApplied ||
       !hasAllRuntimeStates(smokeResult.runtimeSmoke.runtimeStatesObserved) ||
@@ -93,6 +96,14 @@ function hasAllRuntimeStates(states: string[]): boolean {
 
 function hasAllEmotionMotionPhases(phases: string[]): boolean {
   return ["retreating", "watching", "recovering"].every((phase) => phases.includes(phase));
+}
+
+function hasSmokeMotionTuning(tuning: { recoverySpeedPixelsPerSecond: number; retreatDistancePixels: number; watchingPauseMs: number }): boolean {
+  return (
+    tuning.recoverySpeedPixelsPerSecond === 240 &&
+    tuning.retreatDistancePixels === 260 &&
+    tuning.watchingPauseMs === 560
+  );
 }
 
 function hasMotionDirection(directions: string[]): boolean {

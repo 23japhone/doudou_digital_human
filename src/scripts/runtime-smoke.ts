@@ -68,6 +68,9 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.mouseFollowMoved ||
     !smokeResult.cursorFollowAlphaHitTested ||
     !hasAllEmotionMotionPhases(smokeResult.emotionMotionPhasesObserved) ||
+    !smokeResult.motionTuningApplied ||
+    !smokeResult.motionTuningPanelVisible ||
+    !hasSmokeMotionTuning(smokeResult.motionTuningSnapshot) ||
     smokeResult.maxEmotionWariness <= 0.5 ||
     !smokeResult.visualStateApplied ||
     !hasAllRuntimeStates(smokeResult.runtimeStatesObserved) ||
@@ -95,6 +98,14 @@ function hasAllRuntimeStates(states: string[]): boolean {
 
 function hasAllEmotionMotionPhases(phases: string[]): boolean {
   return ["retreating", "watching", "recovering"].every((phase) => phases.includes(phase));
+}
+
+function hasSmokeMotionTuning(tuning: { recoverySpeedPixelsPerSecond: number; retreatDistancePixels: number; watchingPauseMs: number }): boolean {
+  return (
+    tuning.recoverySpeedPixelsPerSecond === 240 &&
+    tuning.retreatDistancePixels === 260 &&
+    tuning.watchingPauseMs === 560
+  );
 }
 
 function hasMotionDirection(directions: string[]): boolean {
@@ -145,7 +156,7 @@ function createSmokeSourcePng(): Buffer {
 
 function runRuntime(bundleDir: string): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(electronBin, [runtimeMain, "--bundle", bundleDir, "--smoke"], {
+    const child = spawn(electronBin, [runtimeMain, "--bundle", bundleDir, "--smoke", "--tuning"], {
       cwd: repoRoot,
       env: { ...process.env, NODE_OPTIONS: "" },
       stdio: ["ignore", "pipe", "pipe"]
@@ -190,6 +201,13 @@ function parseSmokeResult(output: string) {
     mouseFollowMoved: boolean;
     cursorFollowAlphaHitTested: boolean;
     emotionMotionPhasesObserved: string[];
+    motionTuningApplied: boolean;
+    motionTuningPanelVisible: boolean;
+    motionTuningSnapshot: {
+      recoverySpeedPixelsPerSecond: number;
+      retreatDistancePixels: number;
+      watchingPauseMs: number;
+    };
     maxEmotionWariness: number;
     runtimeStatesObserved: string[];
     visualStateApplied: boolean;
