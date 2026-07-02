@@ -22,6 +22,7 @@ Initial components:
 
 - Generation code must not depend on desktop-window APIs.
 - Runtime code must consume versioned pet bundles and should not know model-specific generation details.
+- Default 兜兜 Live2D emotion mapping is a runtime research contract: emotion ids map to Cubism expression specs and model suggestions map only through a safe arbitration layer. It must not couple runtime to raw LLM/VLM provider payloads.
 - Privacy and storage code must be the only layer that decides retention, cache, and deletion behavior.
 - UI code should orchestrate flows and render state, not embed model prompts or asset-schema rules.
 - Tests and fixtures should mirror these domains instead of accumulating in flat root folders.

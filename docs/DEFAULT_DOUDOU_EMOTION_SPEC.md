@@ -63,6 +63,8 @@ Stage A 不接真实模型，但后续研究可沿三个边界推进：
 
 任何模型输出都必须先通过 safety 和 privacy 边界，再映射到本文件的稳定情绪 ID。
 
+Stage B 已将本文件的 12 个 emotion ids 映射为 Live2D Cubism expression 参数表，并定义 LLM/VLM 只输出安全意图和情绪建议的仲裁规格。详见 `docs/DEFAULT_DOUDOU_LIVE2D_AND_MODEL_ARBITRATION.md`。
+
 ## Verification
 
 Stage A 的自动证据来自：

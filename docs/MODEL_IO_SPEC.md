@@ -31,6 +31,8 @@ The adapter boundary must expose sanitized assets and compact provenance only. R
 
 Refusal/error fields should cover unsupported file types, unsafe/unauthorized likeness requests, missing cloud consent, provider configuration failure, provider refusal, rate limits, timeouts, generation failure, adapter-output validation failure, and post-processing failure.
 
+Runtime emotion models are a separate future path from generation adapters. For the default 兜兜 desktop pet, LLM/VLM outputs must use the Stage B arbitration schema in `src/runtime/default-doudou-live2d.ts`: the model may output only `source`, `intent`, `suggestedEmotionId`, `confidence`, `reasonCode`, and `ttlMs`. It must not output Live2D parameters, expression file names, freeform pet dialogue, source paths, raw prompts, raw provider responses, screen text, or provider payloads. VLM input is allowed only for user-selected source or QA assets with explicit consent, never default desktop, camera, or private window capture.
+
 ## Golden Cases
 
 Add rights-safe fixtures before implementation:
