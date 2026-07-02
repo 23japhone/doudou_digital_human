@@ -4,6 +4,21 @@ contextBridge.exposeInMainWorld("petRuntime", {
   dragWindowTo: (point) => ipcRenderer.send("pet:drag-window-to", sanitizePoint(point)),
   endWindowDrag: () => ipcRenderer.send("pet:end-window-drag"),
   getBundle: () => ipcRenderer.invoke("pet:get-bundle"),
+  onCursorHitTest: (callback) => {
+    const listener = (_event, request) => {
+      const requestId = Number(request?.requestId);
+      if (!Number.isFinite(requestId)) {
+        return;
+      }
+      const result = callback(sanitizePoint(request?.screenPoint));
+      ipcRenderer.send("pet:cursor-hit-test-response", {
+        requestId,
+        visible: Boolean(result?.visible)
+      });
+    };
+    ipcRenderer.on("pet:cursor-hit-test-request", listener);
+    return () => ipcRenderer.off("pet:cursor-hit-test-request", listener);
+  },
   onMotionState: (callback) => {
     const listener = (_event, cue) => {
       const sanitizedCue = sanitizeMotionCue(cue);

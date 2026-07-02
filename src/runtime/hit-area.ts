@@ -9,6 +9,29 @@ export interface CanvasAlphaSampler {
 type RuntimeHitArea = PetManifest["hitArea"];
 type RuntimeFallbackRect = RuntimeHitArea["fallbackRect"];
 
+export interface RuntimeScreenHitTestInput {
+  canvasClientRect: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  canvasSize: {
+    width: number;
+    height: number;
+  };
+  hitArea: RuntimeHitArea;
+  sampler?: CanvasAlphaSampler;
+  screenPoint: {
+    x: number;
+    y: number;
+  };
+  windowOrigin: {
+    x: number;
+    y: number;
+  };
+}
+
 export function isPointInsideRuntimeHitArea(
   x: number,
   y: number,
@@ -20,6 +43,28 @@ export function isPointInsideRuntimeHitArea(
     return sampledAlpha > hitArea.alphaThreshold;
   }
   return isPointInsideFallbackRect(x, y, hitArea.fallbackRect);
+}
+
+export function isScreenPointInsideRuntimeHitArea(input: RuntimeScreenHitTestInput): boolean {
+  if (
+    !Number.isFinite(input.screenPoint.x) ||
+    !Number.isFinite(input.screenPoint.y) ||
+    !Number.isFinite(input.windowOrigin.x) ||
+    !Number.isFinite(input.windowOrigin.y) ||
+    !Number.isFinite(input.canvasClientRect.x) ||
+    !Number.isFinite(input.canvasClientRect.y) ||
+    !Number.isFinite(input.canvasClientRect.width) ||
+    !Number.isFinite(input.canvasClientRect.height) ||
+    input.canvasClientRect.width <= 0 ||
+    input.canvasClientRect.height <= 0
+  ) {
+    return false;
+  }
+  const cssX = input.screenPoint.x - input.windowOrigin.x - input.canvasClientRect.x;
+  const cssY = input.screenPoint.y - input.windowOrigin.y - input.canvasClientRect.y;
+  const canvasX = (cssX / input.canvasClientRect.width) * input.canvasSize.width;
+  const canvasY = (cssY / input.canvasClientRect.height) * input.canvasSize.height;
+  return isPointInsideRuntimeHitArea(canvasX, canvasY, input.hitArea, input.sampler);
 }
 
 export function isPointInsideFallbackRect(x: number, y: number, rect: RuntimeFallbackRect): boolean {

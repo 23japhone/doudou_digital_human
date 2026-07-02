@@ -1,7 +1,11 @@
 import { createAnimationPlayer } from "./animation.js";
 import type { PetAtlas } from "../pet_bundle/manifest.js";
 import type { RuntimeBundle, RuntimeScaleSource, RuntimeSmokeResult } from "./runtime-types.js";
-import { isPointInsideRuntimeHitArea, type CanvasAlphaSampler } from "./hit-area.js";
+import {
+  isPointInsideRuntimeHitArea,
+  isScreenPointInsideRuntimeHitArea,
+  type CanvasAlphaSampler
+} from "./hit-area.js";
 import {
   RUNTIME_FRAME_PADDING,
   calculateDraggedRuntimeScale,
@@ -116,6 +120,17 @@ window.addEventListener("mouseleave", () => {
 window.petRuntime.onMotionState((state) => {
   applyRuntimePetState(stateMachine.motion(state, performance.now()));
 });
+
+window.petRuntime.onCursorHitTest((screenPoint) => ({
+  visible: isScreenPointInsideRuntimeHitArea({
+    canvasClientRect: rectLikeFromDomRect(petCanvas.getBoundingClientRect()),
+    canvasSize: bundle.manifest.canvas,
+    hitArea: bundle.manifest.hitArea,
+    sampler: canvasAlphaSampler,
+    screenPoint,
+    windowOrigin: { x: window.screenX, y: window.screenY }
+  })
+}));
 
 petFrame.addEventListener("pointerdown", (event) => {
   const framePoint = framePointFromMouseEvent(event);
@@ -350,6 +365,15 @@ function isInsidePetHitArea(x: number, y: number, runtimeBundle: RuntimeBundle):
   return isPointInsideRuntimeHitArea(x, y, runtimeBundle.manifest.hitArea, canvasAlphaSampler);
 }
 
+function rectLikeFromDomRect(rect: DOMRect): { x: number; y: number; width: number; height: number } {
+  return {
+    x: rect.x,
+    y: rect.y,
+    width: rect.width,
+    height: rect.height
+  };
+}
+
 async function loadAtlases(runtimeBundle: RuntimeBundle): Promise<Map<string, HTMLImageElement>> {
   const images = new Map<string, HTMLImageElement>();
   await Promise.all(
@@ -447,6 +471,7 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     pointerScaleChanged: false,
     wheelScaleChanged: false,
     mouseFollowMoved: false,
+    cursorFollowAlphaHitTested: false,
     runtimeStatesObserved: stateMachine.observed(),
     visualStateApplied: isRuntimeVisualStateApplied(),
     motionDirectionsObserved: [...motionDirectionsObserved],

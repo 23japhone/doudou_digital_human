@@ -115,8 +115,8 @@ export function calculateCursorFollowStep(input: RuntimeCursorFollowInput): Runt
 export function createSmokeCursorFollowPoint(windowBounds: RuntimeMotionRect): RuntimeMotionPoint {
   const safeBounds = sanitizeRect(windowBounds);
   return {
-    x: safeBounds.x + safeBounds.width - 40,
-    y: safeBounds.y + safeBounds.height - 60
+    x: safeBounds.x + safeBounds.width / 2,
+    y: safeBounds.y + safeBounds.height / 2
   };
 }
 

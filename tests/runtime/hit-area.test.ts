@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { PetManifest } from "../../src/pet_bundle/manifest.js";
 import {
+  isScreenPointInsideRuntimeHitArea,
   isPointInsideFallbackRect,
   isPointInsideRuntimeHitArea,
   type CanvasAlphaSampler
@@ -34,6 +35,31 @@ describe("runtime hit area", () => {
 
     expect(isPointInsideRuntimeHitArea(4.9, 4.1, hitArea(), sampler)).toBe(false);
     expect(isPointInsideRuntimeHitArea(5, 5, hitArea(), sampler)).toBe(true);
+  });
+
+  test("maps a screen point into the rendered canvas before alpha hit testing", () => {
+    const sampler = samplerWithAlphaAt(128, 116, 255);
+
+    expect(
+      isScreenPointInsideRuntimeHitArea({
+        canvasClientRect: { x: 12, y: 12, width: 256, height: 256 },
+        canvasSize: { width: 256, height: 256 },
+        hitArea: hitArea(),
+        sampler,
+        screenPoint: { x: 240, y: 228 },
+        windowOrigin: { x: 100, y: 100 }
+      })
+    ).toBe(true);
+    expect(
+      isScreenPointInsideRuntimeHitArea({
+        canvasClientRect: { x: 12, y: 12, width: 256, height: 256 },
+        canvasSize: { width: 256, height: 256 },
+        hitArea: hitArea(),
+        sampler,
+        screenPoint: { x: 124, y: 136 },
+        windowOrigin: { x: 100, y: 100 }
+      })
+    ).toBe(false);
   });
 
   test("keeps fallback rectangle edge behavior compatible with the previous runtime", () => {

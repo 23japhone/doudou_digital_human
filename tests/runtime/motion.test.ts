@@ -137,8 +137,12 @@ describe("runtime cursor-follow motion", () => {
     expect(step.nextBounds.y).toBeGreaterThanOrEqual(workArea.y);
   });
 
-  test("creates a deterministic smoke cursor away from the current window center", () => {
+  test("creates a deterministic smoke cursor near the current window center", () => {
     const smokeCursor = createSmokeCursorFollowPoint(windowBounds);
+    expect(smokeCursor).toEqual({
+      x: windowBounds.x + windowBounds.width / 2,
+      y: windowBounds.y + windowBounds.height / 2
+    });
     expect(isCursorInsideRuntimeMotionActivationArea(smokeCursor, windowBounds)).toBe(true);
     const step = calculateCursorFollowStep({
       cursor: smokeCursor,

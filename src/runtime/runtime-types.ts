@@ -10,6 +10,10 @@ export interface RuntimeAtlas {
 
 export type RuntimeScaleSource = "pointer" | "wheel";
 
+export interface RuntimeCursorHitTestResult {
+  visible: boolean;
+}
+
 export interface RuntimeBundle {
   manifest: PetManifest;
   atlases: RuntimeAtlas[];
@@ -23,6 +27,7 @@ export interface PetRuntimeBridge {
   dragWindowTo(pointer: ScreenPoint): void;
   endWindowDrag(): void;
   getBundle(): Promise<RuntimeBundle>;
+  onCursorHitTest(callback: (screenPoint: ScreenPoint) => RuntimeCursorHitTestResult): () => void;
   onMotionState(callback: (cue: RuntimePetMotionCue) => void): () => void;
   quit(): void;
   reportSmokeResult(result: RuntimeSmokeResult): void;
@@ -45,6 +50,7 @@ export interface RuntimeSmokeResult {
   pointerScaleChanged: boolean;
   wheelScaleChanged: boolean;
   mouseFollowMoved: boolean;
+  cursorFollowAlphaHitTested: boolean;
   runtimeStatesObserved: RuntimePetState[];
   visualStateApplied: boolean;
   motionDirectionsObserved: string[];

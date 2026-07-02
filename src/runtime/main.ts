@@ -28,6 +28,7 @@ import type { RuntimePetMotionCue } from "./state.js";
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
 const RUNTIME_CURSOR_FOLLOW_MAX_DELTA_MS = 100;
+const RUNTIME_CURSOR_HIT_TEST_TIMEOUT_MS = 80;
 const RUNTIME_CURSOR_FOLLOW_RESUME_DELAY_MS = 220;
 
 interface RuntimeOptions {
@@ -48,9 +49,12 @@ let smokeScaleChanged = false;
 let smokePointerScaleChanged = false;
 let smokeWheelScaleChanged = false;
 let smokeMouseFollowMoved = false;
+let smokeCursorFollowAlphaHitTested = false;
 let smokeTimeout: NodeJS.Timeout | null = null;
 let cursorFollowTimer: NodeJS.Timeout | null = null;
 let cursorFollowPausedUntil = 0;
+let cursorFollowHitTestPending = false;
+let cursorHitTestSerial = 0;
 let lastCursorFollowTimestamp = 0;
 let smokeCursorFollowPoint: RuntimeMotionPoint | null = null;
 let lastApproachCue: Pick<RuntimePetMotionCue, "direction" | "motionIntensity"> = {
@@ -161,6 +165,8 @@ function createWindow(bundle: ValidatedPetBundle): void {
     mainWindow = null;
     dragSession = null;
     stopCursorFollowMotion();
+    cursorFollowHitTestPending = false;
+    clearPendingCursorHitTests();
   });
 }
 
@@ -271,11 +277,16 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
         scaleChanged: smokeScaleChanged,
         pointerScaleChanged: smokePointerScaleChanged,
         wheelScaleChanged: smokeWheelScaleChanged,
-        mouseFollowMoved: smokeMouseFollowMoved
+        mouseFollowMoved: smokeMouseFollowMoved,
+        cursorFollowAlphaHitTested: smokeCursorFollowAlphaHitTested
       })}`
     );
     setTimeout(() => app.quit(), 250);
   }
+});
+
+ipcMain.on("pet:cursor-hit-test-response", (_event, response: unknown) => {
+  resolveCursorHitTestResponse(response);
 });
 
 app.on("window-all-closed", () => {
@@ -343,7 +354,16 @@ function pauseCursorFollowMotion(durationMs = RUNTIME_CURSOR_FOLLOW_RESUME_DELAY
 }
 
 function tickCursorFollowMotion(): void {
+  void tickCursorFollowMotionAsync().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error));
+  });
+}
+
+async function tickCursorFollowMotionAsync(): Promise<void> {
   if (!mainWindow || !currentBundle) {
+    return;
+  }
+  if (cursorFollowHitTestPending) {
     return;
   }
   const now = Date.now();
@@ -360,6 +380,18 @@ function tickCursorFollowMotion(): void {
     : screen.getCursorScreenPoint();
   if (!isCursorInsideRuntimeMotionActivationArea(cursorPoint, currentBounds)) {
     return;
+  }
+  cursorFollowHitTestPending = true;
+  try {
+    const hitTestResult = await requestCursorHitTest(cursorPoint);
+    if (smokeMode) {
+      smokeCursorFollowAlphaHitTested = true;
+    }
+    if (!hitTestResult.visible) {
+      return;
+    }
+  } finally {
+    cursorFollowHitTestPending = false;
   }
   const workArea = screen.getDisplayNearestPoint(cursorPoint).workArea;
   const motionStep = calculateCursorFollowStep({
@@ -379,6 +411,60 @@ function tickCursorFollowMotion(): void {
     const appliedBounds = mainWindow.getBounds();
     smokeMouseFollowMoved ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
   }
+}
+
+interface PendingCursorHitTest {
+  resolve(result: { visible: boolean }): void;
+  timeout: NodeJS.Timeout;
+}
+
+const pendingCursorHitTests = new Map<number, PendingCursorHitTest>();
+
+function requestCursorHitTest(screenPoint: RuntimeMotionPoint): Promise<{ visible: boolean }> {
+  if (!mainWindow || mainWindow.webContents.isDestroyed()) {
+    return Promise.resolve({ visible: false });
+  }
+  const requestId = (cursorHitTestSerial += 1);
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingCursorHitTests.delete(requestId);
+      resolve({ visible: false });
+    }, RUNTIME_CURSOR_HIT_TEST_TIMEOUT_MS);
+    pendingCursorHitTests.set(requestId, { resolve, timeout });
+    mainWindow?.webContents.send("pet:cursor-hit-test-request", {
+      requestId,
+      screenPoint
+    });
+  });
+}
+
+function resolveCursorHitTestResponse(response: unknown): void {
+  if (!isCursorHitTestResponse(response)) {
+    return;
+  }
+  const pending = pendingCursorHitTests.get(response.requestId);
+  if (!pending) {
+    return;
+  }
+  clearTimeout(pending.timeout);
+  pendingCursorHitTests.delete(response.requestId);
+  pending.resolve({ visible: response.visible });
+}
+
+function clearPendingCursorHitTests(): void {
+  for (const pending of pendingCursorHitTests.values()) {
+    clearTimeout(pending.timeout);
+    pending.resolve({ visible: false });
+  }
+  pendingCursorHitTests.clear();
+}
+
+function isCursorHitTestResponse(response: unknown): response is { requestId: number; visible: boolean } {
+  if (!response || typeof response !== "object") {
+    return false;
+  }
+  const candidate = response as { requestId?: unknown; visible?: unknown };
+  return Number.isFinite(candidate.requestId) && typeof candidate.visible === "boolean";
 }
 
 function publishCursorMotionCue(cue: RuntimePetMotionCue): void {
