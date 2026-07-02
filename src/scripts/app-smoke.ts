@@ -60,7 +60,7 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.runtimeSmoke.scaleChanged ||
       !smokeResult.runtimeSmoke.pointerScaleChanged ||
       !smokeResult.runtimeSmoke.wheelScaleChanged ||
-      !smokeResult.runtimeSmoke.mouseFollowMoved ||
+      smokeResult.runtimeSmoke.passiveCursorMovedWindow ||
       !smokeResult.runtimeSmoke.cursorFollowAlphaHitTested ||
       !hasAllEmotionMotionPhases(smokeResult.runtimeSmoke.emotionMotionPhasesObserved) ||
       !smokeResult.runtimeSmoke.motionTuningApplied ||

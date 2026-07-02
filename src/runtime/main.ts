@@ -81,7 +81,7 @@ let smokeDragMoved = false;
 let smokeScaleChanged = false;
 let smokePointerScaleChanged = false;
 let smokeWheelScaleChanged = false;
-let smokeMouseFollowMoved = false;
+let smokePassiveCursorMovedWindow = false;
 let smokeCursorFollowAlphaHitTested = false;
 let smokeEmotionMotionPhasesObserved = new Set<RuntimeEmotionMotionPhase>();
 let smokeMaxEmotionWariness = 0;
@@ -378,7 +378,7 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
         scaleChanged: smokeScaleChanged,
         pointerScaleChanged: smokePointerScaleChanged,
         wheelScaleChanged: smokeWheelScaleChanged,
-        mouseFollowMoved: smokeMouseFollowMoved,
+        passiveCursorMovedWindow: smokePassiveCursorMovedWindow,
         cursorFollowAlphaHitTested: smokeCursorFollowAlphaHitTested,
         emotionMotionPhasesObserved: [...smokeEmotionMotionPhasesObserved],
         motionTuningApplied: result.motionTuningApplied,
@@ -561,17 +561,12 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
         emotionPhase
       )
     );
-
-    if (!motionStep.moved) {
-      return;
-    }
-
-    mainWindow.setPosition(motionStep.nextBounds.x, motionStep.nextBounds.y, false);
+  } finally {
+    // Passive cursor cues must not move the window; smoke records actual bounds.
     if (smokeMode) {
       const appliedBounds = mainWindow.getBounds();
-      smokeMouseFollowMoved ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
+      smokePassiveCursorMovedWindow ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
     }
-  } finally {
     cursorFollowHitTestPending = false;
   }
 }

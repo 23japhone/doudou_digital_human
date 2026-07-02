@@ -66,7 +66,7 @@ export interface RuntimeSmokeResult {
   scaleChanged: boolean;
   pointerScaleChanged: boolean;
   wheelScaleChanged: boolean;
-  mouseFollowMoved: boolean;
+  passiveCursorMovedWindow: boolean;
   cursorFollowAlphaHitTested: boolean;
   emotionMotionPhasesObserved: string[];
   motionTuningApplied: boolean;

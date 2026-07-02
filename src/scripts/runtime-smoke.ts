@@ -65,7 +65,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.scaleChanged ||
     !smokeResult.pointerScaleChanged ||
     !smokeResult.wheelScaleChanged ||
-    !smokeResult.mouseFollowMoved ||
+    smokeResult.passiveCursorMovedWindow ||
     !smokeResult.cursorFollowAlphaHitTested ||
     !hasAllEmotionMotionPhases(smokeResult.emotionMotionPhasesObserved) ||
     !smokeResult.motionTuningApplied ||
@@ -210,7 +210,7 @@ function parseSmokeResult(output: string) {
     scaleChanged: boolean;
     pointerScaleChanged: boolean;
     wheelScaleChanged: boolean;
-    mouseFollowMoved: boolean;
+    passiveCursorMovedWindow: boolean;
     cursorFollowAlphaHitTested: boolean;
     emotionMotionPhasesObserved: string[];
     motionTuningApplied: boolean;

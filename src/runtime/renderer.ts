@@ -531,7 +531,7 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     scaleChanged: false,
     pointerScaleChanged: false,
     wheelScaleChanged: false,
-    mouseFollowMoved: false,
+    passiveCursorMovedWindow: false,
     cursorFollowAlphaHitTested: false,
     emotionMotionPhasesObserved: [],
     motionTuningApplied: smokeMotionTuningApplied,
