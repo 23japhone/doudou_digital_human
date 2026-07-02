@@ -8,7 +8,12 @@ import {
   type ScreenPoint,
   type WindowDragSession
 } from "./drag.js";
-import type { RuntimeBundle, RuntimeScaleSource, RuntimeSmokeResult } from "./runtime-types.js";
+import type {
+  RuntimeBundle,
+  RuntimeCursorHitTestResult,
+  RuntimeScaleSource,
+  RuntimeSmokeResult
+} from "./runtime-types.js";
 import {
   RUNTIME_SCALE_LIMITS,
   calculateCenteredFramedWindowBounds,
@@ -17,12 +22,14 @@ import {
   clampRuntimeScale
 } from "./scale.js";
 import {
+  calculateCursorDodgeStep,
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
   isCursorInsideRuntimeMotionActivationArea,
   type RuntimeMotionDirection,
   type RuntimeMotionPoint
 } from "./motion.js";
+import { classifyRuntimeAlphaReaction, type RuntimeAlphaReaction } from "./reaction.js";
 import type { RuntimePetMotionCue } from "./state.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -387,40 +394,50 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
     if (smokeMode) {
       smokeCursorFollowAlphaHitTested = true;
     }
-    if (!hitTestResult.visible) {
+    const reaction = classifyRuntimeAlphaReaction({ hitTest: hitTestResult });
+    if (reaction === "none") {
       return;
+    }
+    const workArea = screen.getDisplayNearestPoint(cursorPoint).workArea;
+    const motionStep = reaction === "dodge"
+      ? calculateCursorDodgeStep({
+        cursor: cursorPoint,
+        deltaMs,
+        windowBounds: currentBounds,
+        workArea
+      })
+      : calculateCursorFollowStep({
+        cursor: cursorPoint,
+        deltaMs,
+        windowBounds: currentBounds,
+        workArea
+      });
+    publishCursorMotionCue(
+      cursorFollowCueFromStep(motionStep.state, motionStep.direction, motionStep.motionIntensity, reaction)
+    );
+
+    if (!motionStep.moved) {
+      return;
+    }
+
+    mainWindow.setPosition(motionStep.nextBounds.x, motionStep.nextBounds.y, false);
+    if (smokeMode) {
+      const appliedBounds = mainWindow.getBounds();
+      smokeMouseFollowMoved ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
     }
   } finally {
     cursorFollowHitTestPending = false;
   }
-  const workArea = screen.getDisplayNearestPoint(cursorPoint).workArea;
-  const motionStep = calculateCursorFollowStep({
-    cursor: cursorPoint,
-    deltaMs,
-    windowBounds: currentBounds,
-    workArea
-  });
-  publishCursorMotionCue(cursorFollowCueFromStep(motionStep.state, motionStep.direction, motionStep.motionIntensity));
-
-  if (!motionStep.moved) {
-    return;
-  }
-
-  mainWindow.setPosition(motionStep.nextBounds.x, motionStep.nextBounds.y, false);
-  if (smokeMode) {
-    const appliedBounds = mainWindow.getBounds();
-    smokeMouseFollowMoved ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
-  }
 }
 
 interface PendingCursorHitTest {
-  resolve(result: { visible: boolean }): void;
+  resolve(result: RuntimeCursorHitTestResult): void;
   timeout: NodeJS.Timeout;
 }
 
 const pendingCursorHitTests = new Map<number, PendingCursorHitTest>();
 
-function requestCursorHitTest(screenPoint: RuntimeMotionPoint): Promise<{ visible: boolean }> {
+function requestCursorHitTest(screenPoint: RuntimeMotionPoint): Promise<RuntimeCursorHitTestResult> {
   if (!mainWindow || mainWindow.webContents.isDestroyed()) {
     return Promise.resolve({ visible: false });
   }
@@ -448,7 +465,11 @@ function resolveCursorHitTestResponse(response: unknown): void {
   }
   clearTimeout(pending.timeout);
   pendingCursorHitTests.delete(response.requestId);
-  pending.resolve({ visible: response.visible });
+  pending.resolve({
+    canvasPoint: response.canvasPoint,
+    canvasSize: response.canvasSize,
+    visible: response.visible
+  });
 }
 
 function clearPendingCursorHitTests(): void {
@@ -459,12 +480,38 @@ function clearPendingCursorHitTests(): void {
   pendingCursorHitTests.clear();
 }
 
-function isCursorHitTestResponse(response: unknown): response is { requestId: number; visible: boolean } {
+function isCursorHitTestResponse(
+  response: unknown
+): response is RuntimeCursorHitTestResult & { requestId: number } {
   if (!response || typeof response !== "object") {
     return false;
   }
-  const candidate = response as { requestId?: unknown; visible?: unknown };
-  return Number.isFinite(candidate.requestId) && typeof candidate.visible === "boolean";
+  const candidate = response as { canvasPoint?: unknown; canvasSize?: unknown; requestId?: unknown; visible?: unknown };
+  const validPoint = isOptionalFinitePoint(candidate.canvasPoint);
+  const validSize = isOptionalFiniteSize(candidate.canvasSize);
+  return Number.isFinite(candidate.requestId) && typeof candidate.visible === "boolean" && validPoint && validSize;
+}
+
+function isOptionalFinitePoint(point: unknown): boolean {
+  if (point === undefined) {
+    return true;
+  }
+  if (!point || typeof point !== "object") {
+    return false;
+  }
+  const candidate = point as { x?: unknown; y?: unknown };
+  return Number.isFinite(candidate.x) && Number.isFinite(candidate.y);
+}
+
+function isOptionalFiniteSize(size: unknown): boolean {
+  if (size === undefined) {
+    return true;
+  }
+  if (!size || typeof size !== "object") {
+    return false;
+  }
+  const candidate = size as { height?: unknown; width?: unknown };
+  return Number.isFinite(candidate.width) && Number.isFinite(candidate.height);
 }
 
 function publishCursorMotionCue(cue: RuntimePetMotionCue): void {
@@ -477,13 +524,14 @@ function publishCursorMotionCue(cue: RuntimePetMotionCue): void {
 function cursorFollowCueFromStep(
   state: "following" | "settled",
   direction: RuntimeMotionDirection,
-  motionIntensity: number
+  motionIntensity: number,
+  reaction: RuntimeAlphaReaction = "approach"
 ): RuntimePetMotionCue {
   if (state === "following") {
     lastApproachCue = { direction, motionIntensity };
     return {
       ...lastApproachCue,
-      state: "approaching"
+      state: reaction === "dodge" ? "dodging" : "approaching"
     };
   }
   return {

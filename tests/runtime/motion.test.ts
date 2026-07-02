@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   RUNTIME_CURSOR_FOLLOW_CONFIG,
+  calculateCursorDodgeStep,
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
   isCursorInsideRuntimeMotionActivationArea,
@@ -135,6 +136,23 @@ describe("runtime cursor-follow motion", () => {
 
     expect(step.nextBounds.x).toBeGreaterThanOrEqual(workArea.x);
     expect(step.nextBounds.y).toBeGreaterThanOrEqual(workArea.y);
+  });
+
+  test("dodges away from a cursor touching the pet core", () => {
+    const step = calculateCursorDodgeStep({
+      cursor: {
+        x: windowBounds.x + windowBounds.width / 2,
+        y: windowBounds.y + windowBounds.height / 2
+      },
+      deltaMs: 1000,
+      windowBounds,
+      workArea
+    });
+
+    expect(step.state).toBe("following");
+    expect(step.moved).toBe(true);
+    expect(step.direction).toBe<RuntimeMotionDirection>("left");
+    expect(step.nextBounds.x).toBeLessThan(windowBounds.x);
   });
 
   test("creates a deterministic smoke cursor near the current window center", () => {

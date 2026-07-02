@@ -69,17 +69,31 @@ describe("runtime pet state machine", () => {
     expect(machine.pose().stopRebound).toBeCloseTo(0.72, 5);
   });
 
-  test("keeps clicked visual state briefly before returning to waiting", () => {
+  test("returns from dodging to waiting when no fresh motion cue arrives", () => {
+    const machine = createRuntimePetStateMachine();
+
+    machine.motion(motionCue("dodging", 0.75), 1800);
+    expect(machine.current()).toBe("dodging");
+
+    machine.advance(RUNTIME_PET_STATE_TIMING.dodgingToWaitingMs - 1, 1800 + RUNTIME_PET_STATE_TIMING.dodgingToWaitingMs - 1);
+    expect(machine.current()).toBe("dodging");
+
+    machine.advance(1, 1800 + RUNTIME_PET_STATE_TIMING.dodgingToWaitingMs);
+    expect(machine.current()).toBe("waiting");
+    expect(machine.pose().motionIntensity).toBe(0);
+  });
+
+  test("keeps poked visual state briefly before returning to waiting", () => {
     const machine = createRuntimePetStateMachine();
 
     machine.tap(2000);
-    expect(machine.current()).toBe("clicked");
+    expect(machine.current()).toBe("poked");
     expect(machine.pose().clickExpression).toBe("tap_react");
 
-    machine.advance(RUNTIME_PET_STATE_TIMING.clickedMs - 1, 2000 + RUNTIME_PET_STATE_TIMING.clickedMs - 1);
-    expect(machine.current()).toBe("clicked");
+    machine.advance(RUNTIME_PET_STATE_TIMING.pokedMs - 1, 2000 + RUNTIME_PET_STATE_TIMING.pokedMs - 1);
+    expect(machine.current()).toBe("poked");
 
-    machine.advance(1, 2000 + RUNTIME_PET_STATE_TIMING.clickedMs);
+    machine.advance(1, 2000 + RUNTIME_PET_STATE_TIMING.pokedMs);
     expect(machine.current()).toBe("waiting");
   });
 
@@ -100,6 +114,7 @@ describe("runtime pet state machine", () => {
     const machine = createRuntimePetStateMachine();
 
     machine.motion(motionCue("approaching", 0.5), 1000);
+    machine.motion(motionCue("dodging", 0.75), 1050);
     machine.motion(motionCue("stopped", 0.5), 1100);
     machine.tap(1200);
     machine.working(1300);
@@ -108,8 +123,9 @@ describe("runtime pet state machine", () => {
     expect(machine.observed()).toEqual<RuntimePetState[]>([
       "waiting",
       "approaching",
+      "dodging",
       "stopped",
-      "clicked",
+      "poked",
       "working"
     ]);
   });

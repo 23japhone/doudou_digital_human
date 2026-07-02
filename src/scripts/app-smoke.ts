@@ -84,7 +84,7 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
 }
 
 function hasAllRuntimeStates(states: string[]): boolean {
-  return ["approaching", "stopped", "clicked", "waiting", "working"].every((state) => states.includes(state));
+  return ["approaching", "dodging", "poked", "stopped", "waiting", "working"].every((state) => states.includes(state));
 }
 
 function hasMotionDirection(directions: string[]): boolean {

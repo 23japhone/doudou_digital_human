@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { PetManifest } from "../../src/pet_bundle/manifest.js";
 import {
+  createRuntimeScreenHitTestResult,
   isScreenPointInsideRuntimeHitArea,
   isPointInsideFallbackRect,
   isPointInsideRuntimeHitArea,
@@ -60,6 +61,25 @@ describe("runtime hit area", () => {
         windowOrigin: { x: 100, y: 100 }
       })
     ).toBe(false);
+  });
+
+  test("returns canvas coordinates with a visible screen hit result", () => {
+    const sampler = samplerWithAlphaAt(128, 116, 255);
+
+    expect(
+      createRuntimeScreenHitTestResult({
+        canvasClientRect: { x: 12, y: 12, width: 256, height: 256 },
+        canvasSize: { width: 256, height: 256 },
+        hitArea: hitArea(),
+        sampler,
+        screenPoint: { x: 240, y: 228 },
+        windowOrigin: { x: 100, y: 100 }
+      })
+    ).toEqual({
+      canvasPoint: { x: 128, y: 116 },
+      canvasSize: { width: 256, height: 256 },
+      visible: true
+    });
   });
 
   test("keeps fallback rectangle edge behavior compatible with the previous runtime", () => {

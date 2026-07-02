@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld("petRuntime", {
       }
       const result = callback(sanitizePoint(request?.screenPoint));
       ipcRenderer.send("pet:cursor-hit-test-response", {
+        canvasPoint: sanitizeOptionalPoint(result?.canvasPoint),
+        canvasSize: sanitizeOptionalSize(result?.canvasSize),
         requestId,
         visible: Boolean(result?.visible)
       });
@@ -45,13 +47,30 @@ function sanitizePoint(point) {
   };
 }
 
+function sanitizeOptionalPoint(point) {
+  if (!point) {
+    return undefined;
+  }
+  const sanitized = sanitizePoint(point);
+  return Number.isFinite(sanitized.x) && Number.isFinite(sanitized.y) ? sanitized : undefined;
+}
+
+function sanitizeOptionalSize(size) {
+  if (!size) {
+    return undefined;
+  }
+  const width = Number(size?.width);
+  const height = Number(size?.height);
+  return Number.isFinite(width) && Number.isFinite(height) ? { width, height } : undefined;
+}
+
 function sanitizeScaleSource(source) {
   return source === "pointer" || source === "wheel" ? source : undefined;
 }
 
 function sanitizeMotionCue(cue) {
   const state = cue?.state;
-  if (state !== "approaching" && state !== "stopped") {
+  if (state !== "approaching" && state !== "dodging" && state !== "stopped") {
     return undefined;
   }
   return {

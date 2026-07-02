@@ -17,6 +17,10 @@ export interface RuntimeCursorFollowConfig {
   intensityDistance: number;
 }
 
+export interface RuntimeCursorDodgeConfig extends RuntimeCursorFollowConfig {
+  dodgeDistance: number;
+}
+
 export type RuntimeMotionState = "following" | "settled";
 export type RuntimeMotionDirection = "left" | "right" | "up" | "down" | "none";
 
@@ -47,6 +51,13 @@ export const RUNTIME_CURSOR_FOLLOW_CONFIG: RuntimeCursorFollowConfig = {
   minStepPixels: 1,
   easingResponsiveness: 8,
   intensityDistance: 360
+};
+
+export const RUNTIME_CURSOR_DODGE_CONFIG: RuntimeCursorDodgeConfig = {
+  ...RUNTIME_CURSOR_FOLLOW_CONFIG,
+  dodgeDistance: 128,
+  maxSpeedPixelsPerSecond: 920,
+  targetOffset: { x: 0, y: 0 }
 };
 
 export function calculateCursorFollowStep(input: RuntimeCursorFollowInput): RuntimeCursorFollowStep {
@@ -120,6 +131,24 @@ export function createSmokeCursorFollowPoint(windowBounds: RuntimeMotionRect): R
   };
 }
 
+export function calculateCursorDodgeStep(
+  input: RuntimeCursorFollowInput & { config?: RuntimeCursorDodgeConfig }
+): RuntimeCursorFollowStep {
+  const config = input.config ?? RUNTIME_CURSOR_DODGE_CONFIG;
+  const safeWindowBounds = sanitizeRect(input.windowBounds);
+  const currentCenter = rectCenter(safeWindowBounds);
+  const away = awayVectorFromCursor(input.cursor, currentCenter);
+  const targetCenter = {
+    x: currentCenter.x + away.x * Math.max(1, config.dodgeDistance),
+    y: currentCenter.y + away.y * Math.max(1, config.dodgeDistance)
+  };
+  return calculateCursorFollowStep({
+    ...input,
+    config,
+    cursor: targetCenter
+  });
+}
+
 export function isCursorInsideRuntimeMotionActivationArea(
   cursor: RuntimeMotionPoint,
   windowBounds: RuntimeMotionRect
@@ -133,6 +162,19 @@ export function isCursorInsideRuntimeMotionActivationArea(
     cursor.x < safeBounds.x + safeBounds.width &&
     cursor.y < safeBounds.y + safeBounds.height
   );
+}
+
+function awayVectorFromCursor(cursor: RuntimeMotionPoint, currentCenter: RuntimeMotionPoint): RuntimeMotionPoint {
+  const dx = currentCenter.x - cursor.x;
+  const dy = currentCenter.y - cursor.y;
+  const distance = Math.hypot(dx, dy);
+  if (!Number.isFinite(distance) || distance < 1) {
+    return { x: -0.94, y: -0.34 };
+  }
+  return {
+    x: dx / distance,
+    y: dy / distance
+  };
 }
 
 function rectCenter(rect: RuntimeMotionRect): RuntimeMotionPoint {

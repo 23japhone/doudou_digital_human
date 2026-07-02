@@ -2,8 +2,8 @@ import { createAnimationPlayer } from "./animation.js";
 import type { PetAtlas } from "../pet_bundle/manifest.js";
 import type { RuntimeBundle, RuntimeScaleSource, RuntimeSmokeResult } from "./runtime-types.js";
 import {
+  createRuntimeScreenHitTestResult,
   isPointInsideRuntimeHitArea,
-  isScreenPointInsideRuntimeHitArea,
   type CanvasAlphaSampler
 } from "./hit-area.js";
 import {
@@ -121,8 +121,8 @@ window.petRuntime.onMotionState((state) => {
   applyRuntimePetState(stateMachine.motion(state, performance.now()));
 });
 
-window.petRuntime.onCursorHitTest((screenPoint) => ({
-  visible: isScreenPointInsideRuntimeHitArea({
+window.petRuntime.onCursorHitTest((screenPoint) =>
+  createRuntimeScreenHitTestResult({
     canvasClientRect: rectLikeFromDomRect(petCanvas.getBoundingClientRect()),
     canvasSize: bundle.manifest.canvas,
     hitArea: bundle.manifest.hitArea,
@@ -130,7 +130,7 @@ window.petRuntime.onCursorHitTest((screenPoint) => ({
     screenPoint,
     windowOrigin: { x: window.screenX, y: window.screenY }
   })
-}));
+);
 
 petFrame.addEventListener("pointerdown", (event) => {
   const framePoint = framePointFromMouseEvent(event);
@@ -158,7 +158,7 @@ petFrame.addEventListener("pointerdown", (event) => {
   window.petRuntime.startWindowDrag(screenPointFromPointerEvent(event));
   const canvasPoint = canvasPointFromMouseEvent(event);
   if (isInsidePetHitArea(canvasPoint.x, canvasPoint.y, bundle)) {
-    markRuntimeClicked();
+    markRuntimePoked();
     player.tap();
   }
 });
@@ -435,11 +435,16 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
     state: "approaching"
   });
   applyRuntimeMotionCue({
+    direction: "left",
+    motionIntensity: 0.72,
+    state: "dodging"
+  });
+  applyRuntimeMotionCue({
     direction: "right",
     motionIntensity: 0.82,
     state: "stopped"
   });
-  markRuntimeClicked();
+  markRuntimePoked();
   player.tap();
   drawTapExpressionFramesForSmoke();
   window.petRuntime.startWindowDrag({ x: 100, y: 100 });
@@ -489,7 +494,7 @@ function applyRuntimeMotionCue(cue: RuntimePetMotionCue): void {
   applyRuntimePetState(stateMachine.motion(cue, performance.now()));
 }
 
-function markRuntimeClicked(): void {
+function markRuntimePoked(): void {
   applyRuntimePetState(stateMachine.tap(performance.now()));
 }
 
@@ -529,6 +534,8 @@ function applyRuntimeVisualPose(): void {
   petFrame.style.setProperty("--runtime-stop-drop", `${(2 + stopRebound * 5).toFixed(2)}px`);
   petFrame.style.setProperty("--runtime-stop-scale-x", (1 + stopRebound * 0.03).toFixed(3));
   petFrame.style.setProperty("--runtime-stop-scale-y", (1 - stopRebound * 0.045).toFixed(3));
+  petFrame.style.setProperty("--runtime-dodge-x", `${(-directionX * (8 + motionIntensity * 10)).toFixed(2)}px`);
+  petFrame.style.setProperty("--runtime-dodge-rotate", `${(-directionX * (6 + motionIntensity * 5)).toFixed(2)}deg`);
   petFrame.style.setProperty("--runtime-click-pop", pose.clickExpression === "tap_react" ? "1.075" : "1.04");
 }
 

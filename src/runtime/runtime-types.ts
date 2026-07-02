@@ -11,6 +11,14 @@ export interface RuntimeAtlas {
 export type RuntimeScaleSource = "pointer" | "wheel";
 
 export interface RuntimeCursorHitTestResult {
+  canvasPoint?: {
+    x: number;
+    y: number;
+  };
+  canvasSize?: {
+    width: number;
+    height: number;
+  };
   visible: boolean;
 }
 

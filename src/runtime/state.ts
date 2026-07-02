@@ -1,20 +1,22 @@
 import type { RuntimeMotionDirection } from "./motion.js";
 
-export type RuntimePetState = "approaching" | "stopped" | "clicked" | "waiting" | "working";
+export type RuntimePetState = "approaching" | "dodging" | "poked" | "stopped" | "waiting" | "working";
 
-export type RuntimeMotionPetState = Extract<RuntimePetState, "approaching" | "stopped">;
+export type RuntimeMotionPetState = Extract<RuntimePetState, "approaching" | "dodging" | "stopped">;
 
 export const RUNTIME_PET_STATES: readonly RuntimePetState[] = [
   "approaching",
+  "dodging",
   "stopped",
-  "clicked",
+  "poked",
   "waiting",
   "working"
 ];
 
 export interface RuntimePetStateTiming {
   approachingToWaitingMs: number;
-  clickedMs: number;
+  dodgingToWaitingMs: number;
+  pokedMs: number;
   stoppedToWaitingMs: number;
   workingHoldMs: number;
 }
@@ -44,7 +46,8 @@ export interface RuntimePetStateMachine {
 
 export const RUNTIME_PET_STATE_TIMING: RuntimePetStateTiming = {
   approachingToWaitingMs: 520,
-  clickedMs: 420,
+  dodgingToWaitingMs: 460,
+  pokedMs: 420,
   stoppedToWaitingMs: 900,
   workingHoldMs: 520
 };
@@ -79,7 +82,10 @@ export function createRuntimePetStateMachine(
     if (state === "approaching" && elapsedMs >= timing.approachingToWaitingMs) {
       return setState("waiting", nowMs, createNeutralPose());
     }
-    if (state === "clicked" && elapsedMs >= timing.clickedMs) {
+    if (state === "dodging" && elapsedMs >= timing.dodgingToWaitingMs) {
+      return setState("waiting", nowMs, createNeutralPose());
+    }
+    if (state === "poked" && elapsedMs >= timing.pokedMs) {
       return setState("waiting", nowMs, createNeutralPose());
     }
     if (state === "stopped" && elapsedMs >= timing.stoppedToWaitingMs) {
@@ -95,7 +101,7 @@ export function createRuntimePetStateMachine(
     advance,
     current: () => state,
     motion: (cue, nowMs = stateEnteredAtMs) => {
-      if (state === "clicked" || state === "working") {
+      if (state === "poked" || state === "working") {
         return state;
       }
       const motionCue = normalizeMotionCue(cue);
@@ -109,7 +115,7 @@ export function createRuntimePetStateMachine(
     },
     observed: () => [...observedStates],
     pose: () => ({ ...pose }),
-    tap: (nowMs = stateEnteredAtMs) => setState("clicked", nowMs, {
+    tap: (nowMs = stateEnteredAtMs) => setState("poked", nowMs, {
       ...pose,
       clickExpression: "tap_react",
       stopRebound: 0

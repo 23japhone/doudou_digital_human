@@ -1,4 +1,5 @@
 import type { PetManifest } from "../pet_bundle/manifest.js";
+import type { RuntimeCursorHitTestResult } from "./runtime-types.js";
 
 export interface CanvasAlphaSampler {
   width: number;
@@ -46,6 +47,22 @@ export function isPointInsideRuntimeHitArea(
 }
 
 export function isScreenPointInsideRuntimeHitArea(input: RuntimeScreenHitTestInput): boolean {
+  return createRuntimeScreenHitTestResult(input).visible;
+}
+
+export function createRuntimeScreenHitTestResult(input: RuntimeScreenHitTestInput): RuntimeCursorHitTestResult {
+  const canvasPoint = mapScreenPointToCanvasPoint(input);
+  if (!canvasPoint) {
+    return { visible: false };
+  }
+  return {
+    canvasPoint,
+    canvasSize: input.canvasSize,
+    visible: isPointInsideRuntimeHitArea(canvasPoint.x, canvasPoint.y, input.hitArea, input.sampler)
+  };
+}
+
+function mapScreenPointToCanvasPoint(input: RuntimeScreenHitTestInput): { x: number; y: number } | null {
   if (
     !Number.isFinite(input.screenPoint.x) ||
     !Number.isFinite(input.screenPoint.y) ||
@@ -58,13 +75,14 @@ export function isScreenPointInsideRuntimeHitArea(input: RuntimeScreenHitTestInp
     input.canvasClientRect.width <= 0 ||
     input.canvasClientRect.height <= 0
   ) {
-    return false;
+    return null;
   }
   const cssX = input.screenPoint.x - input.windowOrigin.x - input.canvasClientRect.x;
   const cssY = input.screenPoint.y - input.windowOrigin.y - input.canvasClientRect.y;
-  const canvasX = (cssX / input.canvasClientRect.width) * input.canvasSize.width;
-  const canvasY = (cssY / input.canvasClientRect.height) * input.canvasSize.height;
-  return isPointInsideRuntimeHitArea(canvasX, canvasY, input.hitArea, input.sampler);
+  return {
+    x: (cssX / input.canvasClientRect.width) * input.canvasSize.width,
+    y: (cssY / input.canvasClientRect.height) * input.canvasSize.height
+  };
 }
 
 export function isPointInsideFallbackRect(x: number, y: number, rect: RuntimeFallbackRect): boolean {
