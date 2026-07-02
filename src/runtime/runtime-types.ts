@@ -42,6 +42,7 @@ export interface RuntimeSmokeResult {
   scaleChanged: boolean;
   pointerScaleChanged: boolean;
   wheelScaleChanged: boolean;
+  mouseFollowMoved: boolean;
   drawCount: number;
   initialFrameIndex: number;
   currentFrameIndex: number;

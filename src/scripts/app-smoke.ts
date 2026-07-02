@@ -60,6 +60,7 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.runtimeSmoke.scaleChanged ||
       !smokeResult.runtimeSmoke.pointerScaleChanged ||
       !smokeResult.runtimeSmoke.wheelScaleChanged ||
+      !smokeResult.runtimeSmoke.mouseFollowMoved ||
       !smokeResult.runtimeSmoke.nonTransparentPixel ||
       !smokeResult.runtimeSmoke.frameHiddenByDefault ||
       !smokeResult.runtimeSmoke.frameVisibleOnResizeEdge ||

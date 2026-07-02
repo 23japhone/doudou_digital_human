@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, screen } from "electron";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validatePetBundle, type ValidatedPetBundle } from "../pet_bundle/validate.js";
@@ -16,8 +16,16 @@ import {
   calculateRuntimeScaleFromFramedWindowSize,
   clampRuntimeScale
 } from "./scale.js";
+import {
+  calculateCursorFollowStep,
+  createSmokeCursorFollowPoint,
+  type RuntimeMotionPoint
+} from "./motion.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
+const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
+const RUNTIME_CURSOR_FOLLOW_MAX_DELTA_MS = 100;
+const RUNTIME_CURSOR_FOLLOW_RESUME_DELAY_MS = 220;
 
 interface RuntimeOptions {
   bundleDir: string;
@@ -36,7 +44,12 @@ let smokeDragMoved = false;
 let smokeScaleChanged = false;
 let smokePointerScaleChanged = false;
 let smokeWheelScaleChanged = false;
+let smokeMouseFollowMoved = false;
 let smokeTimeout: NodeJS.Timeout | null = null;
+let cursorFollowTimer: NodeJS.Timeout | null = null;
+let cursorFollowPausedUntil = 0;
+let lastCursorFollowTimestamp = 0;
+let smokeCursorFollowPoint: RuntimeMotionPoint | null = null;
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
@@ -112,6 +125,8 @@ function createWindow(bundle: ValidatedPetBundle): void {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
   ignoreMouseEvents = true;
+  smokeCursorFollowPoint = smokeMode ? createSmokeCursorFollowPoint(mainWindow.getBounds()) : null;
+  startCursorFollowMotion();
 
   void mainWindow.loadFile(rendererIndex);
   if (smokeMode) {
@@ -138,6 +153,7 @@ function createWindow(bundle: ValidatedPetBundle): void {
   mainWindow.on("closed", () => {
     mainWindow = null;
     dragSession = null;
+    stopCursorFollowMotion();
   });
 }
 
@@ -176,6 +192,7 @@ ipcMain.on("pet:start-window-drag", (_event, pointer: ScreenPoint) => {
   if (!mainWindow || !isFiniteScreenPoint(pointer)) {
     return;
   }
+  pauseCursorFollowMotion();
   const [x, y] = mainWindow.getPosition();
   dragSession = createWindowDragSession({
     pointer,
@@ -191,6 +208,7 @@ ipcMain.on("pet:drag-window-to", (_event, pointer: ScreenPoint) => {
   if (!mainWindow || !dragSession) {
     return;
   }
+  pauseCursorFollowMotion();
   const dragStartPosition = dragSession.windowStart;
   const nextPosition = calculateDraggedWindowPosition(dragSession, pointer);
   if (!nextPosition) {
@@ -245,7 +263,8 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
         scale: runtimeScale,
         scaleChanged: smokeScaleChanged,
         pointerScaleChanged: smokePointerScaleChanged,
-        wheelScaleChanged: smokeWheelScaleChanged
+        wheelScaleChanged: smokeWheelScaleChanged,
+        mouseFollowMoved: smokeMouseFollowMoved
       })}`
     );
     setTimeout(() => app.quit(), 250);
@@ -264,6 +283,9 @@ function isFiniteScreenPoint(point: ScreenPoint): boolean {
 
 function applyWindowScale(requestedScale: number, source?: RuntimeScaleSource): number {
   const nextScale = clampRuntimeScale(requestedScale);
+  if (source) {
+    pauseCursorFollowMotion();
+  }
   if (!mainWindow || !currentBundle) {
     runtimeScale = nextScale;
     return runtimeScale;
@@ -293,4 +315,57 @@ function applyWindowScale(requestedScale: number, source?: RuntimeScaleSource): 
 
 function sanitizeRuntimeScaleSource(source: unknown): RuntimeScaleSource | undefined {
   return source === "pointer" || source === "wheel" ? source : undefined;
+}
+
+function startCursorFollowMotion(): void {
+  stopCursorFollowMotion();
+  lastCursorFollowTimestamp = Date.now();
+  cursorFollowTimer = setInterval(tickCursorFollowMotion, RUNTIME_CURSOR_FOLLOW_INTERVAL_MS);
+}
+
+function stopCursorFollowMotion(): void {
+  if (!cursorFollowTimer) {
+    return;
+  }
+  clearInterval(cursorFollowTimer);
+  cursorFollowTimer = null;
+}
+
+function pauseCursorFollowMotion(durationMs = RUNTIME_CURSOR_FOLLOW_RESUME_DELAY_MS): void {
+  cursorFollowPausedUntil = Math.max(cursorFollowPausedUntil, Date.now() + durationMs);
+}
+
+function tickCursorFollowMotion(): void {
+  if (!mainWindow || !currentBundle) {
+    return;
+  }
+  const now = Date.now();
+  const deltaMs = Math.min(RUNTIME_CURSOR_FOLLOW_MAX_DELTA_MS, Math.max(0, now - lastCursorFollowTimestamp));
+  lastCursorFollowTimestamp = now;
+
+  if (dragSession || now < cursorFollowPausedUntil) {
+    return;
+  }
+
+  const currentBounds = mainWindow.getBounds();
+  const cursorPoint = smokeMode
+    ? smokeCursorFollowPoint ?? createSmokeCursorFollowPoint(currentBounds)
+    : screen.getCursorScreenPoint();
+  const workArea = screen.getDisplayNearestPoint(cursorPoint).workArea;
+  const motionStep = calculateCursorFollowStep({
+    cursor: cursorPoint,
+    deltaMs,
+    windowBounds: currentBounds,
+    workArea
+  });
+
+  if (!motionStep.moved) {
+    return;
+  }
+
+  mainWindow.setPosition(motionStep.nextBounds.x, motionStep.nextBounds.y, false);
+  if (smokeMode) {
+    const appliedBounds = mainWindow.getBounds();
+    smokeMouseFollowMoved ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
+  }
 }

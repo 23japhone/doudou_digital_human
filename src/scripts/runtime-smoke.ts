@@ -65,6 +65,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.scaleChanged ||
     !smokeResult.pointerScaleChanged ||
     !smokeResult.wheelScaleChanged ||
+    !smokeResult.mouseFollowMoved ||
     !smokeResult.nonTransparentPixel ||
     !smokeResult.idleAdvanced ||
     !smokeResult.frameHiddenByDefault ||
@@ -161,6 +162,7 @@ function parseSmokeResult(output: string) {
     scaleChanged: boolean;
     pointerScaleChanged: boolean;
     wheelScaleChanged: boolean;
+    mouseFollowMoved: boolean;
     drawCount: number;
     initialFrameIndex: number;
     currentFrameIndex: number;

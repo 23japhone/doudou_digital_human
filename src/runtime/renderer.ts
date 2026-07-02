@@ -407,6 +407,7 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     scaleChanged: false,
     pointerScaleChanged: false,
     wheelScaleChanged: false,
+    mouseFollowMoved: false,
     drawCount,
     initialFrameIndex: initialFrameIndex ?? -1,
     currentFrameIndex,
