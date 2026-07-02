@@ -3,9 +3,11 @@ import type { PetAtlas } from "../pet_bundle/manifest.js";
 import type { RuntimeBundle, RuntimeScaleSource, RuntimeSmokeResult } from "./runtime-types.js";
 import { isPointInsideRuntimeHitArea, type CanvasAlphaSampler } from "./hit-area.js";
 import {
+  RUNTIME_FRAME_PADDING,
   calculateDraggedRuntimeScale,
   createRuntimeScaleDragSession,
-  isPointInRuntimeScaleDragZone,
+  isPointInRuntimeFrame,
+  isPointInRuntimeResizeZone,
   mapCssPointToCanvasPoint,
   nextRuntimeScale,
   type RuntimeScaleDragSession
@@ -16,12 +18,17 @@ const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
 if (!canvas) {
   throw new Error("Missing pet canvas.");
 }
+const frame = document.querySelector<HTMLElement>("#pet-frame");
+if (!frame) {
+  throw new Error("Missing pet interaction frame.");
+}
 
 const context = canvas.getContext("2d");
 if (!context) {
   throw new Error("Unable to create 2D canvas context.");
 }
 const petCanvas: HTMLCanvasElement = canvas;
+const petFrame: HTMLElement = frame;
 const drawingContext: CanvasRenderingContext2D = context;
 
 const bundle = await window.petRuntime.getBundle();
@@ -59,6 +66,7 @@ let scaleRequestSerial = 0;
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
+petFrame.style.setProperty("--runtime-frame-padding", `${RUNTIME_FRAME_PADDING}px`);
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
@@ -76,36 +84,46 @@ window.addEventListener("mousemove", (event) => {
     window.petRuntime.setIgnoreMouseEvents(false);
     return;
   }
-  const point = canvasPointFromMouseEvent(event);
-  const insidePet = isInsidePetHitArea(point.x, point.y, bundle);
-  window.petRuntime.setIgnoreMouseEvents(!insidePet);
-  petCanvas.style.cursor = cursorForPointer(point, event);
+  const framePoint = framePointFromMouseEvent(event);
+  const insideFrame = isPointInRuntimeFrame(framePoint, frameSize());
+  window.petRuntime.setIgnoreMouseEvents(!insideFrame);
+  petFrame.style.cursor = cursorForPointer(framePoint, event);
 });
 
-petCanvas.addEventListener("pointerdown", (event) => {
-  const point = canvasPointFromMouseEvent(event);
-  if (event.button !== 0 || !isInsidePetHitArea(point.x, point.y, bundle)) {
+window.addEventListener("mouseleave", () => {
+  if (draggingPointerId === null && scalingPointerId === null) {
+    window.petRuntime.setIgnoreMouseEvents(true);
+  }
+});
+
+petFrame.addEventListener("pointerdown", (event) => {
+  const framePoint = framePointFromMouseEvent(event);
+  if (event.button !== 0 || !isPointInRuntimeFrame(framePoint, frameSize())) {
     return;
   }
-  if (shouldStartScaleDrag(point, event)) {
+  if (shouldStartScaleDrag(framePoint, event)) {
     scalingPointerId = event.pointerId;
     scaleDragSession = createRuntimeScaleDragSession({
+      origin: frameCenterScreenPoint(),
       pointer: screenPointFromPointerEvent(event),
       scale: runtimeScale
     }, bundle.scaleLimits);
-    petCanvas.setPointerCapture(event.pointerId);
+    petFrame.setPointerCapture(event.pointerId);
     window.petRuntime.setIgnoreMouseEvents(false);
     event.preventDefault();
     return;
   }
   draggingPointerId = event.pointerId;
-  petCanvas.setPointerCapture(event.pointerId);
+  petFrame.setPointerCapture(event.pointerId);
   window.petRuntime.setIgnoreMouseEvents(false);
   window.petRuntime.startWindowDrag(screenPointFromPointerEvent(event));
-  player.tap();
+  const canvasPoint = canvasPointFromMouseEvent(event);
+  if (isInsidePetHitArea(canvasPoint.x, canvasPoint.y, bundle)) {
+    player.tap();
+  }
 });
 
-petCanvas.addEventListener("pointermove", (event) => {
+petFrame.addEventListener("pointermove", (event) => {
   if (scalingPointerId === event.pointerId && scaleDragSession) {
     event.preventDefault();
     const requestedScale = calculateDraggedRuntimeScale(
@@ -125,13 +143,13 @@ petCanvas.addEventListener("pointermove", (event) => {
   window.petRuntime.dragWindowTo(screenPointFromPointerEvent(event));
 });
 
-petCanvas.addEventListener("pointerup", endDragIfActive);
-petCanvas.addEventListener("pointercancel", endDragIfActive);
-petCanvas.addEventListener(
+petFrame.addEventListener("pointerup", endDragIfActive);
+petFrame.addEventListener("pointercancel", endDragIfActive);
+petFrame.addEventListener(
   "wheel",
   (event) => {
-    const point = canvasPointFromMouseEvent(event);
-    if (!isInsidePetHitArea(point.x, point.y, bundle)) {
+    const framePoint = framePointFromMouseEvent(event);
+    if (!isPointInRuntimeFrame(framePoint, frameSize())) {
       return;
     }
     event.preventDefault();
@@ -146,8 +164,8 @@ window.addEventListener("blur", () => {
 
 function endDragIfActive(event: PointerEvent): void {
   if (scalingPointerId === event.pointerId) {
-    if (petCanvas.hasPointerCapture(event.pointerId)) {
-      petCanvas.releasePointerCapture(event.pointerId);
+    if (petFrame.hasPointerCapture(event.pointerId)) {
+      petFrame.releasePointerCapture(event.pointerId);
     }
     endScaleDrag();
     return;
@@ -155,8 +173,8 @@ function endDragIfActive(event: PointerEvent): void {
   if (draggingPointerId !== event.pointerId) {
     return;
   }
-  if (petCanvas.hasPointerCapture(event.pointerId)) {
-    petCanvas.releasePointerCapture(event.pointerId);
+  if (petFrame.hasPointerCapture(event.pointerId)) {
+    petFrame.releasePointerCapture(event.pointerId);
   }
   endWindowDrag();
 }
@@ -190,15 +208,37 @@ function canvasPointFromMouseEvent(event: MouseEvent): { x: number; y: number } 
   );
 }
 
+function framePointFromMouseEvent(event: MouseEvent): { x: number; y: number } {
+  const rect = petFrame.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
+function frameSize(): { width: number; height: number } {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight
+  };
+}
+
+function frameCenterScreenPoint(): { x: number; y: number } {
+  return {
+    x: window.screenX + window.innerWidth / 2,
+    y: window.screenY + window.innerHeight / 2
+  };
+}
+
 function shouldStartScaleDrag(point: { x: number; y: number }, event: PointerEvent): boolean {
-  return event.shiftKey || isPointInRuntimeScaleDragZone(point, bundle.manifest.canvas);
+  return event.shiftKey || isPointInRuntimeResizeZone(point, frameSize());
 }
 
 function cursorForPointer(point: { x: number; y: number }, event: MouseEvent): string {
-  if (!isInsidePetHitArea(point.x, point.y, bundle)) {
+  if (!isPointInRuntimeFrame(point, frameSize())) {
     return "default";
   }
-  if (event.shiftKey || isPointInRuntimeScaleDragZone(point, bundle.manifest.canvas)) {
+  if (event.shiftKey || isPointInRuntimeResizeZone(point, frameSize())) {
     return "nwse-resize";
   }
   return "grab";
@@ -335,10 +375,11 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
   window.petRuntime.endWindowDrag();
   runtimeScale = await applyRuntimeScale(nextRuntimeScale(runtimeScale, -24, bundle.scaleLimits), "wheel");
   const scaleSession = createRuntimeScaleDragSession({
-    pointer: { x: 120, y: 160 },
+    origin: { x: 128, y: 128 },
+    pointer: { x: 220, y: 220 },
     scale: runtimeScale
   }, bundle.scaleLimits);
-  const pointerScale = calculateDraggedRuntimeScale(scaleSession, { x: 120, y: 120 }, bundle.scaleLimits);
+  const pointerScale = calculateDraggedRuntimeScale(scaleSession, { x: 240, y: 240 }, bundle.scaleLimits);
   if (pointerScale !== null) {
     runtimeScale = await applyRuntimeScale(pointerScale, "pointer");
   }
@@ -358,8 +399,21 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     wheelScaleChanged: false,
     drawCount,
     initialFrameIndex: initialFrameIndex ?? -1,
-    currentFrameIndex
+    currentFrameIndex,
+    frameVisible: isRuntimeFrameVisible()
   };
+}
+
+function isRuntimeFrameVisible(): boolean {
+  const frameRect = petFrame.getBoundingClientRect();
+  const canvasRect = petCanvas.getBoundingClientRect();
+  const frameStyle = getComputedStyle(petFrame);
+  return (
+    frameRect.width > canvasRect.width &&
+    frameRect.height > canvasRect.height &&
+    frameStyle.borderTopStyle !== "none" &&
+    Number.parseFloat(frameStyle.borderTopWidth) > 0
+  );
 }
 
 function canvasHasNonTransparentPixel(): boolean {

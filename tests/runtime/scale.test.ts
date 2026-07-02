@@ -1,12 +1,17 @@
 import { describe, expect, test } from "vitest";
 import {
+  RUNTIME_FRAME_PADDING,
   RUNTIME_SCALE_LIMITS,
   calculateCenteredScaledWindowBounds,
+  calculateCenteredFramedWindowBounds,
   calculateDraggedRuntimeScale,
+  calculateFramedWindowSize,
+  calculateRuntimeScaleFromFramedWindowSize,
   calculateScaledWindowSize,
   clampRuntimeScale,
   createRuntimeScaleDragSession,
-  isPointInRuntimeScaleDragZone,
+  isPointInRuntimeFrame,
+  isPointInRuntimeResizeZone,
   mapCssPointToCanvasPoint,
   nextRuntimeScale,
   type RuntimeScaleLimits
@@ -41,26 +46,61 @@ describe("runtime window scaling", () => {
     expect(nextRuntimeScale(1, -3, limits, 1)).toBeCloseTo(1.0492, 4);
   });
 
-  test("maps click-drag distance to continuous scale changes", () => {
+  test("maps outward frame resize drag to larger scale and inward drag to smaller scale", () => {
     const limits: RuntimeScaleLimits = { min: 0.5, max: 2, default: 1, wheelSensitivity: 0.001, dragSensitivity: 0.005 };
-    const session = createRuntimeScaleDragSession({ pointer: { x: 80, y: 200 }, scale: 1 }, limits);
+    const session = createRuntimeScaleDragSession({
+      pointer: { x: 220, y: 220 },
+      origin: { x: 128, y: 128 },
+      scale: 1
+    }, limits);
 
-    expect(calculateDraggedRuntimeScale(session, { x: 80, y: 160 }, limits)).toBeCloseTo(1.2214, 4);
-    expect(calculateDraggedRuntimeScale(session, { x: 80, y: 240 }, limits)).toBeCloseTo(0.8187, 4);
+    expect(calculateDraggedRuntimeScale(session, { x: 240, y: 240 }, limits)).toBeGreaterThan(1);
+    expect(calculateDraggedRuntimeScale(session, { x: 180, y: 180 }, limits)).toBeLessThan(1);
   });
 
   test("click-drag scaling clamps to configured limits and ignores invalid pointers", () => {
     const limits: RuntimeScaleLimits = { min: 0.5, max: 2, default: 1, wheelSensitivity: 0.001, dragSensitivity: 0.05 };
-    const session = createRuntimeScaleDragSession({ pointer: { x: 80, y: 200 }, scale: 1.5 }, limits);
+    const session = createRuntimeScaleDragSession({
+      pointer: { x: 220, y: 220 },
+      origin: { x: 128, y: 128 },
+      scale: 1.5
+    }, limits);
 
-    expect(calculateDraggedRuntimeScale(session, { x: 80, y: 0 }, limits)).toBe(2);
+    expect(calculateDraggedRuntimeScale(session, { x: 400, y: 400 }, limits)).toBe(2);
     expect(calculateDraggedRuntimeScale(session, { x: 80, y: Number.NaN }, limits)).toBeNull();
   });
 
-  test("recognizes the lower-right canvas zone as a mouse scale drag affordance", () => {
-    expect(isPointInRuntimeScaleDragZone({ x: 220, y: 220 }, { width: 256, height: 256 })).toBe(true);
-    expect(isPointInRuntimeScaleDragZone({ x: 120, y: 220 }, { width: 256, height: 256 })).toBe(false);
-    expect(isPointInRuntimeScaleDragZone({ x: 220, y: 120 }, { width: 256, height: 256 })).toBe(false);
+  test("adds a visible interaction frame around the scaled pet canvas", () => {
+    expect(calculateFramedWindowSize({ width: 256, height: 128 }, 1.25)).toEqual({
+      width: 320 + RUNTIME_FRAME_PADDING * 2,
+      height: 160 + RUNTIME_FRAME_PADDING * 2
+    });
+    expect(calculateRuntimeScaleFromFramedWindowSize({ width: 320 + RUNTIME_FRAME_PADDING * 2, height: 160 }, { width: 256, height: 128 })).toBe(1.25);
+  });
+
+  test("keeps the framed pet window centered while applying a new scale", () => {
+    expect(
+      calculateCenteredFramedWindowBounds(
+        { x: 100, y: 50, width: 280, height: 280 },
+        { width: 256, height: 256 },
+        1.5
+      )
+    ).toEqual({
+      x: 36,
+      y: -14,
+      width: 384 + RUNTIME_FRAME_PADDING * 2,
+      height: 384 + RUNTIME_FRAME_PADDING * 2
+    });
+  });
+
+  test("recognizes frame movement and corner resize hit areas", () => {
+    const frame = { width: 280, height: 280 };
+
+    expect(isPointInRuntimeFrame({ x: 8, y: 8 }, frame)).toBe(true);
+    expect(isPointInRuntimeFrame({ x: 281, y: 8 }, frame)).toBe(false);
+    expect(isPointInRuntimeResizeZone({ x: 264, y: 264 }, frame)).toBe(true);
+    expect(isPointInRuntimeResizeZone({ x: 16, y: 16 }, frame)).toBe(true);
+    expect(isPointInRuntimeResizeZone({ x: 140, y: 140 }, frame)).toBe(false);
   });
 
   test("rounds scaled window dimensions to whole screen pixels", () => {

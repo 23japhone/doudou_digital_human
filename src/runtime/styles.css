@@ -9,15 +9,42 @@ body {
 }
 
 body {
-  display: grid;
-  place-items: center;
+  display: block;
+}
+
+#pet-frame {
+  --runtime-frame-padding: 12px;
+
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  box-sizing: border-box;
+  border: 1px solid rgba(103, 178, 255, 0.82);
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+
+#pet-frame::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid rgba(103, 178, 255, 0.92);
+  border-bottom: 2px solid rgba(103, 178, 255, 0.92);
+  pointer-events: none;
 }
 
 #pet-canvas {
-  width: 100vw;
-  height: 100vh;
+  position: absolute;
+  left: var(--runtime-frame-padding);
+  top: var(--runtime-frame-padding);
+  width: calc(100vw - var(--runtime-frame-padding) * 2);
+  height: calc(100vh - var(--runtime-frame-padding) * 2);
   display: block;
   background: transparent;
-  touch-action: none;
-  -webkit-app-region: no-drag;
 }

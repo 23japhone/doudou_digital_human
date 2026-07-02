@@ -11,8 +11,9 @@ import {
 import type { RuntimeBundle, RuntimeScaleSource, RuntimeSmokeResult } from "./runtime-types.js";
 import {
   RUNTIME_SCALE_LIMITS,
-  calculateCenteredScaledWindowBounds,
-  calculateScaledWindowSize,
+  calculateCenteredFramedWindowBounds,
+  calculateFramedWindowSize,
+  calculateRuntimeScaleFromFramedWindowSize,
   clampRuntimeScale
 } from "./scale.js";
 
@@ -83,7 +84,7 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
 function createWindow(bundle: ValidatedPetBundle): void {
   const manifest = bundle.manifest;
   const rendererIndex = resolve(currentDir, "../../runtime/renderer/index.html");
-  const initialSize = calculateScaledWindowSize(manifest.canvas, runtimeScale);
+  const initialSize = calculateFramedWindowSize(manifest.canvas, runtimeScale);
 
   mainWindow = new BrowserWindow({
     width: initialSize.width,
@@ -103,8 +104,8 @@ function createWindow(bundle: ValidatedPetBundle): void {
     }
   });
 
-  const minSize = calculateScaledWindowSize(manifest.canvas, RUNTIME_SCALE_LIMITS.min);
-  const maxSize = calculateScaledWindowSize(manifest.canvas, RUNTIME_SCALE_LIMITS.max);
+  const minSize = calculateFramedWindowSize(manifest.canvas, RUNTIME_SCALE_LIMITS.min);
+  const maxSize = calculateFramedWindowSize(manifest.canvas, RUNTIME_SCALE_LIMITS.max);
   mainWindow.setMinimumSize(minSize.width, minSize.height);
   mainWindow.setMaximumSize(maxSize.width, maxSize.height);
   mainWindow.setAlwaysOnTop(true, "floating");
@@ -269,7 +270,7 @@ function applyWindowScale(requestedScale: number, source?: RuntimeScaleSource): 
   }
 
   const currentBounds = mainWindow.getBounds();
-  const nextBounds = calculateCenteredScaledWindowBounds(currentBounds, currentBundle.manifest.canvas, nextScale);
+  const nextBounds = calculateCenteredFramedWindowBounds(currentBounds, currentBundle.manifest.canvas, nextScale);
   const boundsChanged =
     nextBounds.x !== currentBounds.x ||
     nextBounds.y !== currentBounds.y ||
@@ -286,7 +287,7 @@ function applyWindowScale(requestedScale: number, source?: RuntimeScaleSource): 
     smokePointerScaleChanged ||= source === "pointer";
     smokeWheelScaleChanged ||= source === "wheel";
   }
-  runtimeScale = clampRuntimeScale(appliedBounds.width / currentBundle.manifest.canvas.width);
+  runtimeScale = calculateRuntimeScaleFromFramedWindowSize(appliedBounds, currentBundle.manifest.canvas);
   return runtimeScale;
 }
 

@@ -45,4 +45,5 @@ export interface RuntimeSmokeResult {
   drawCount: number;
   initialFrameIndex: number;
   currentFrameIndex: number;
+  frameVisible: boolean;
 }

@@ -10,7 +10,9 @@
     <title>兜兜桌宠运行时</title>
   </head>
   <body>
-    <canvas id="pet-canvas" width="256" height="256" aria-label="桌面宠物"></canvas>
+    <div id="pet-frame" aria-label="桌面宠物外框">
+      <canvas id="pet-canvas" width="256" height="256" aria-label="桌面宠物"></canvas>
+    </div>
     <script type="module" src="./renderer.ts"></script>
   </body>
 </html>

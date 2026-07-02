@@ -42,7 +42,7 @@ Use `npm run dev:app` for the full product flow. Use `npm run dev` only when you
 
 8. Click `启动`.
 
-   Expected result: a transparent always-on-top desktop pet appears and animates. Drag the visible pet body with the primary mouse button to move it. Use the mouse wheel over the visible pet body for continuous scaling between 50% and 200%, or hold the primary mouse button in the lower-right pet area and drag up/down for continuous mouse scaling. `Shift` + primary-button drag over any visible pet body also scales continuously. `停止` becomes available.
+   Expected result: a transparent always-on-top desktop pet appears with a rectangular interaction frame and animates. Drag inside the frame with the primary mouse button to move it. Use the mouse wheel inside the frame for continuous scaling between 50% and 200%, or drag a frame corner outward to enlarge and inward to shrink. `Shift` + primary-button drag inside the frame also scales continuously. `停止` becomes available.
 
 9. Click `停止`.
 
@@ -110,6 +110,7 @@ The smoke should print `guided app smoke:` followed by JSON where these fields a
 - `runtimeSmoke.scaleChanged`
 - `runtimeSmoke.pointerScaleChanged`
 - `runtimeSmoke.wheelScaleChanged`
+- `runtimeSmoke.frameVisible`
 - `runtimeSmoke.nonTransparentPixel`
 - `runtimeSmoke.idleAdvanced`
 
@@ -123,10 +124,10 @@ Manual smoke checklist:
 - Click `生成`, then `预览检查`.
 - Confirm `预览图`, `精灵图集`, and QA check ids render.
 - Click `接受`.
-- Click `启动` and confirm a desktop pet appears above the desktop.
-- Drag the visible pet body and confirm the desktop pet window follows the pointer.
-- Use the mouse wheel over the visible pet body and confirm the desktop pet changes size smoothly without disappearing.
-- Hold the primary mouse button in the lower-right pet area, drag up/down, and confirm the desktop pet changes size smoothly without disappearing. If that area is hard to hit on a specific pet, use `Shift` + primary-button drag over the visible body.
+- Click `启动` and confirm a desktop pet appears above the desktop with a visible rectangular frame.
+- Drag inside the frame and confirm the desktop pet window follows the pointer.
+- Use the mouse wheel inside the frame and confirm the desktop pet changes size smoothly without disappearing.
+- Drag a frame corner outward and confirm the desktop pet grows; drag inward and confirm it shrinks. If a corner is hard to hit on a specific pet, use `Shift` + primary-button drag inside the frame.
 - Click `停止` and confirm the pet disappears.
 - Click `启动` again to confirm relaunch still works.
 - Click `停止` again.
@@ -194,7 +195,7 @@ Run the runtime smoke to verify the renderer can load and draw the pet:
 npm run smoke:runtime
 ```
 
-The expected evidence includes `bundleLoaded:true`, `atlasLoaded:true`, `scaleChanged:true`, `pointerScaleChanged:true`, `wheelScaleChanged:true`, `nonTransparentPixel:true`, and `idleAdvanced:true`.
+The expected evidence includes `bundleLoaded:true`, `atlasLoaded:true`, `scaleChanged:true`, `pointerScaleChanged:true`, `wheelScaleChanged:true`, `frameVisible:true`, `nonTransparentPixel:true`, and `idleAdvanced:true`.
 
 ### `停止` is disabled
 
