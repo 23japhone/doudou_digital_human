@@ -67,7 +67,8 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.wheelScaleChanged ||
     !smokeResult.nonTransparentPixel ||
     !smokeResult.idleAdvanced ||
-    !smokeResult.frameVisible ||
+    !smokeResult.frameHiddenByDefault ||
+    !smokeResult.frameVisibleOnResizeEdge ||
     !smokeResult.renderLoopAdvanced ||
     smokeResult.scale <= 1 ||
     smokeResult.drawCount < 2 ||
@@ -163,7 +164,8 @@ function parseSmokeResult(output: string) {
     drawCount: number;
     initialFrameIndex: number;
     currentFrameIndex: number;
-    frameVisible: boolean;
+    frameHiddenByDefault: boolean;
+    frameVisibleOnResizeEdge: boolean;
   };
 }
 

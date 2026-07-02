@@ -140,9 +140,17 @@ export function isPointInRuntimeResizeZone(point: RuntimePoint, frame: RuntimeCa
     return false;
   }
   const handleSize = Math.min(RUNTIME_FRAME_RESIZE_HANDLE_SIZE, frame.width / 2, frame.height / 2);
-  const inHorizontalHandle = point.x <= handleSize || point.x >= frame.width - handleSize;
-  const inVerticalHandle = point.y <= handleSize || point.y >= frame.height - handleSize;
-  return inHorizontalHandle && inVerticalHandle;
+  const nearVerticalEdge = point.x <= handleSize || point.x >= frame.width - handleSize;
+  const nearHorizontalEdge = point.y <= handleSize || point.y >= frame.height - handleSize;
+  return nearVerticalEdge || nearHorizontalEdge;
+}
+
+export function shouldShowRuntimeFrameAffordance(
+  point: RuntimePoint,
+  frame: RuntimeCanvasSize,
+  resizing: boolean
+): boolean {
+  return resizing || isPointInRuntimeResizeZone(point, frame);
 }
 
 export function calculateScaledWindowSize(

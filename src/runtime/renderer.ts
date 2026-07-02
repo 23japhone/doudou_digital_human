@@ -10,6 +10,7 @@ import {
   isPointInRuntimeResizeZone,
   mapCssPointToCanvasPoint,
   nextRuntimeScale,
+  shouldShowRuntimeFrameAffordance,
   type RuntimeScaleDragSession
 } from "./scale.js";
 import "./styles.css";
@@ -30,6 +31,7 @@ if (!context) {
 const petCanvas: HTMLCanvasElement = canvas;
 const petFrame: HTMLElement = frame;
 const drawingContext: CanvasRenderingContext2D = context;
+const RESIZE_AFFORDANCE_CLASS = "is-resize-affordance-visible";
 
 const bundle = await window.petRuntime.getBundle();
 console.log(`pet renderer: loaded bundle ${bundle.manifest.id}`);
@@ -88,11 +90,13 @@ window.addEventListener("mousemove", (event) => {
   const insideFrame = isPointInRuntimeFrame(framePoint, frameSize());
   window.petRuntime.setIgnoreMouseEvents(!insideFrame);
   petFrame.style.cursor = cursorForPointer(framePoint, event);
+  setFrameResizeAffordanceVisible(insideFrame && shouldShowRuntimeFrameAffordance(framePoint, frameSize(), false));
 });
 
 window.addEventListener("mouseleave", () => {
   if (draggingPointerId === null && scalingPointerId === null) {
     window.petRuntime.setIgnoreMouseEvents(true);
+    setFrameResizeAffordanceVisible(false);
   }
 });
 
@@ -109,6 +113,7 @@ petFrame.addEventListener("pointerdown", (event) => {
       scale: runtimeScale
     }, bundle.scaleLimits);
     petFrame.setPointerCapture(event.pointerId);
+    setFrameResizeAffordanceVisible(true);
     window.petRuntime.setIgnoreMouseEvents(false);
     event.preventDefault();
     return;
@@ -190,6 +195,7 @@ function endWindowDrag(): void {
 function endScaleDrag(): void {
   scalingPointerId = null;
   scaleDragSession = null;
+  setFrameResizeAffordanceVisible(false);
 }
 
 function screenPointFromPointerEvent(event: PointerEvent): { x: number; y: number } {
@@ -242,6 +248,10 @@ function cursorForPointer(point: { x: number; y: number }, event: MouseEvent): s
     return "nwse-resize";
   }
   return "grab";
+}
+
+function setFrameResizeAffordanceVisible(visible: boolean): void {
+  petFrame.classList.toggle(RESIZE_AFFORDANCE_CLASS, visible);
 }
 
 function scheduleRuntimeScale(requestedScale: number, source: RuntimeScaleSource): void {
@@ -400,19 +410,33 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     drawCount,
     initialFrameIndex: initialFrameIndex ?? -1,
     currentFrameIndex,
-    frameVisible: isRuntimeFrameVisible()
+    frameHiddenByDefault: isRuntimeFrameHiddenByDefault(),
+    frameVisibleOnResizeEdge: isRuntimeFrameVisibleOnResizeEdge()
   };
 }
 
-function isRuntimeFrameVisible(): boolean {
+function isRuntimeFrameHiddenByDefault(): boolean {
+  setFrameResizeAffordanceVisible(false);
+  return !isRuntimeFrameAffordanceVisible();
+}
+
+function isRuntimeFrameVisibleOnResizeEdge(): boolean {
+  setFrameResizeAffordanceVisible(true);
+  const visible = isRuntimeFrameAffordanceVisible();
+  setFrameResizeAffordanceVisible(false);
+  return visible;
+}
+
+function isRuntimeFrameAffordanceVisible(): boolean {
   const frameRect = petFrame.getBoundingClientRect();
   const canvasRect = petCanvas.getBoundingClientRect();
   const frameStyle = getComputedStyle(petFrame);
+  const cornerOpacity = Number.parseFloat(getComputedStyle(petFrame, "::after").opacity);
   return (
     frameRect.width > canvasRect.width &&
     frameRect.height > canvasRect.height &&
-    frameStyle.borderTopStyle !== "none" &&
-    Number.parseFloat(frameStyle.borderTopWidth) > 0
+    frameStyle.borderTopColor !== "rgba(0, 0, 0, 0)" &&
+    cornerOpacity > 0
   );
 }
 

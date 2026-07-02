@@ -45,5 +45,6 @@ export interface RuntimeSmokeResult {
   drawCount: number;
   initialFrameIndex: number;
   currentFrameIndex: number;
-  frameVisible: boolean;
+  frameHiddenByDefault: boolean;
+  frameVisibleOnResizeEdge: boolean;
 }

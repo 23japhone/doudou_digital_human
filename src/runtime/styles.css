@@ -19,10 +19,10 @@ body {
   height: 100vh;
   position: relative;
   box-sizing: border-box;
-  border: 1px solid rgba(103, 178, 255, 0.82);
+  border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  box-shadow: none;
   touch-action: none;
   -webkit-app-region: no-drag;
 }
@@ -36,7 +36,17 @@ body {
   height: 12px;
   border-right: 2px solid rgba(103, 178, 255, 0.92);
   border-bottom: 2px solid rgba(103, 178, 255, 0.92);
+  opacity: 0;
   pointer-events: none;
+}
+
+#pet-frame.is-resize-affordance-visible {
+  border-color: rgba(103, 178, 255, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+#pet-frame.is-resize-affordance-visible::after {
+  opacity: 1;
 }
 
 #pet-canvas {

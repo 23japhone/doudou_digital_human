@@ -14,6 +14,7 @@ import {
   isPointInRuntimeResizeZone,
   mapCssPointToCanvasPoint,
   nextRuntimeScale,
+  shouldShowRuntimeFrameAffordance,
   type RuntimeScaleLimits
 } from "../../src/runtime/scale.js";
 
@@ -70,7 +71,7 @@ describe("runtime window scaling", () => {
     expect(calculateDraggedRuntimeScale(session, { x: 80, y: Number.NaN }, limits)).toBeNull();
   });
 
-  test("adds a visible interaction frame around the scaled pet canvas", () => {
+  test("adds an interaction frame around the scaled pet canvas", () => {
     expect(calculateFramedWindowSize({ width: 256, height: 128 }, 1.25)).toEqual({
       width: 320 + RUNTIME_FRAME_PADDING * 2,
       height: 160 + RUNTIME_FRAME_PADDING * 2
@@ -93,14 +94,24 @@ describe("runtime window scaling", () => {
     });
   });
 
-  test("recognizes frame movement and corner resize hit areas", () => {
+  test("recognizes frame movement and edge resize hit areas", () => {
     const frame = { width: 280, height: 280 };
 
     expect(isPointInRuntimeFrame({ x: 8, y: 8 }, frame)).toBe(true);
     expect(isPointInRuntimeFrame({ x: 281, y: 8 }, frame)).toBe(false);
     expect(isPointInRuntimeResizeZone({ x: 264, y: 264 }, frame)).toBe(true);
     expect(isPointInRuntimeResizeZone({ x: 16, y: 16 }, frame)).toBe(true);
+    expect(isPointInRuntimeResizeZone({ x: 140, y: 16 }, frame)).toBe(true);
+    expect(isPointInRuntimeResizeZone({ x: 264, y: 140 }, frame)).toBe(true);
     expect(isPointInRuntimeResizeZone({ x: 140, y: 140 }, frame)).toBe(false);
+  });
+
+  test("shows the resize frame affordance only near resize edges or while resizing", () => {
+    const frame = { width: 280, height: 280 };
+
+    expect(shouldShowRuntimeFrameAffordance({ x: 140, y: 140 }, frame, false)).toBe(false);
+    expect(shouldShowRuntimeFrameAffordance({ x: 264, y: 264 }, frame, false)).toBe(true);
+    expect(shouldShowRuntimeFrameAffordance({ x: 140, y: 140 }, frame, true)).toBe(true);
   });
 
   test("rounds scaled window dimensions to whole screen pixels", () => {
