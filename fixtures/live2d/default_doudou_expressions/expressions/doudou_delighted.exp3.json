@@ -1,0 +1,62 @@
+{
+  "Type": "Live2D Expression",
+  "FadeInTime": 0.28,
+  "FadeOutTime": 0.4,
+  "Parameters": [
+    {
+      "Id": "ParamEyeLOpen",
+      "Value": 0.98,
+      "Blend": "Multiply"
+    },
+    {
+      "Id": "ParamEyeROpen",
+      "Value": 0.98,
+      "Blend": "Multiply"
+    },
+    {
+      "Id": "ParamEyeLSmile",
+      "Value": 0.74,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamEyeRSmile",
+      "Value": 0.74,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamEyeBallForm",
+      "Value": 0.24,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamBrowLY",
+      "Value": 0.24,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamBrowRY",
+      "Value": 0.24,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamMouthForm",
+      "Value": 0.85,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamMouthOpenY",
+      "Value": 0.42,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamCheek",
+      "Value": 0.25,
+      "Blend": "Add"
+    },
+    {
+      "Id": "ParamDoudouSparkle",
+      "Value": 1,
+      "Blend": "Overwrite"
+    }
+  ]
+}

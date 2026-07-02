@@ -40,6 +40,7 @@ Current implementation layout:
 - `src/review/` for preview, QA, accept/install, and deletion workflows that consume already generated bundles.
 - `src/app/` for the guided desktop manager UI and app-level flow orchestration.
 - `src/runtime/` for desktop overlay and behavior state machine.
+- `src/runtime/default-doudou-exp3.ts` and `src/cli/doudou-live2d-exp3.ts` for default 兜兜 Live2D `.exp3.json` research fixture generation and validation. These files stay outside `pet bundle v0.1`.
 - `tests/<domain>/` for tests mirroring source domains.
 - `fixtures/<domain>/` for small, rights-safe sample assets.
 

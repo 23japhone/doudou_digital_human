@@ -9,6 +9,8 @@
 - Unit tests: `npm test`
 - Build: `npm run build`
 - Generate local pet bundle: `npm run generate:pet -- <source-image-path> <output-bundle-dir>`
+- Export default 兜兜 Live2D expressions: `npm run export:doudou-live2d -- <output-dir>`
+- Validate default 兜兜 Live2D expressions: `npm run validate:doudou-live2d -- <output-dir>`
 - Generate stylizer visual QA corpus: `npm run qa:stylizer -- <output-dir>`
 - Generate local-image stylizer preview comparison: `npm run qa:stylizer:compare -- <source-image-path> <output-dir>`
 - Check stylizer default-preset scoring gate: `npm run qa:stylizer:check -- <manual-scoring-template.json> <candidate-preset>`
@@ -38,6 +40,7 @@
 - Review workflow tests cover QA report creation, accepted bundle validation, deletion safety, and privacy-safe review/install metadata.
 - Runtime smoke covers missing manifest, missing asset, unsupported schema, then launches the fixture and a generated bundle. Both require structured renderer evidence: bundle loaded, atlas loaded, drag moved, passive cursor contact did not move the overlay window, cursor-follow alpha hit testing ran, repeated alpha pokes raised runtime emotion-memory wariness, observed `retreating`, `watching`, and `recovering` emotion motion phases, observed default 兜兜 `idle`, `tap`, `repeat_poke_retreat`, `repeat_poke_watch`, `quiet_recovery`, and `working` emotion scenarios with their core emotion ids, observed `approaching`, `dodging`, `retreating`, `watching`, `stopped`, `poked`, `waiting`, and `working` runtime states, motion tuning panel visible, smoke tuning values applied, copy-preset button visible, copy-preset IPC succeeded with the expected one-line command, named preset saved to the local list, named preset listed and applied, motion direction observed, stop rebound strength above zero, `tap_react` expression frames observed, visual state class applied, interaction frame hidden by default, interaction frame visible on resize affordance, scale changed from wheel input, scale changed from pointer drag input, nontransparent canvas pixel, and idle animation advance.
 - Stage B Live2D/model arbitration tests live in `tests/runtime/default-doudou-live2d.test.ts`. They require each default emotion id to have a unique `expressions/doudou_<emotion_id>.exp3.json` spec, Cubism-safe parameter ranges and blend modes, paired eye-open Multiply targets, custom `ParamDoudou*` Overwrite toggles only where needed, and an LLM/VLM JSON schema that exposes only safe intent plus allowlisted emotion suggestions.
+- Stage C Live2D `.exp3.json` tests live in `tests/runtime/default-doudou-exp3.test.ts`. They require the serializer to emit only real Cubism expression fields, the committed `fixtures/live2d/default_doudou_expressions/` snapshot to match the Stage B specs, and the CLI to return stable JSON with relative paths for both success and malformed-file failures.
 - Guided app smoke launches the Electron manager UI, selects mock-cloud generation, confirms upload, clicks through source selection, local Style Compare developer preview, generation, QA, accept, runtime launch, draft deletion, and accepted deletion, then verifies the developer preview images and runtime smoke evidence returned through the UI flow. Flow-level unit tests cover managed runtime launch/stop behavior, including keeping Stop available after draft cleanup while a pet is running. The live smoke reuses this flow with `openai_live` only when the required env vars are present, and can use either its synthetic source image or an explicit `--source` / `DOUDOU_APP_SMOKE_SOURCE_IMAGE` path.
 - Guided app visual QA covers the Chinese layout surface rather than workflow behavior. It should be run after visible Chinese copy, button labels, status text, or sidebar layout changes. Generated screenshots are local QA artifacts and must stay out of git.
 
@@ -50,6 +53,7 @@ Tests should mirror functional domains:
 - `tests/pet_bundle/`
 - `tests/runtime/`
 - `fixtures/pet_bundles/`
+- `fixtures/live2d/`
 - `fixtures/source_images/`
 
 Fixtures must be small, rights-safe, and documented.
@@ -61,6 +65,7 @@ Fixtures must be small, rights-safe, and documented.
 - UI flow changes include at least one end-to-end or manual smoke checklist.
 - Privacy-sensitive changes verify logs, fixtures, and errors do not expose source images or secrets.
 - Fixture assets must be synthetic or explicitly licensed. The current fixture is generated from simple project-owned geometric shapes.
+- Live2D expression fixtures are JSON parameter fixtures generated from project-owned default 兜兜 specs; they must not include source images, prompts, provider responses, secrets, or absolute paths.
 - Bundle validation changes must keep negative coverage for unreferenced files, source-like payloads, bad preview images, missing assets, and unsupported schema versions.
 - Generation adapter changes must cover valid frame output, source-derived local stylization where applicable, missing frames, out-of-range frame indexes, bad preview assets, and sanitized provenance metadata.
 - Deterministic stylizer default-parameter changes must include generated stylizer QA artifacts and completed manual scoring evidence before changing the default adapter constants. The scoring JSON must pass `npm run qa:stylizer:check -- <manual-scoring-template.json> <candidate-preset>`, and the changed file set must pass `npm run qa:stylizer:default-gate -- ...` so scoring is required only when default stylizer parameter files changed.
