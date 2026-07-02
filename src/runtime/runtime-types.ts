@@ -38,6 +38,7 @@ export interface PetRuntimeBridge {
   onCursorHitTest(callback: (screenPoint: ScreenPoint) => RuntimeCursorHitTestResult): () => void;
   onMotionState(callback: (cue: RuntimePetMotionCue) => void): () => void;
   quit(): void;
+  recordPoke(point?: ScreenPoint): void;
   reportSmokeResult(result: RuntimeSmokeResult): void;
   setIgnoreMouseEvents(ignore: boolean): void;
   setWindowScale(scale: number, source?: RuntimeScaleSource): Promise<number>;
@@ -59,6 +60,7 @@ export interface RuntimeSmokeResult {
   wheelScaleChanged: boolean;
   mouseFollowMoved: boolean;
   cursorFollowAlphaHitTested: boolean;
+  maxEmotionWariness: number;
   runtimeStatesObserved: RuntimePetState[];
   visualStateApplied: boolean;
   motionDirectionsObserved: string[];

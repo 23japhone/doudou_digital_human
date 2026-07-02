@@ -155,9 +155,11 @@ petFrame.addEventListener("pointerdown", (event) => {
   markRuntimeWorking();
   petFrame.setPointerCapture(event.pointerId);
   window.petRuntime.setIgnoreMouseEvents(false);
-  window.petRuntime.startWindowDrag(screenPointFromPointerEvent(event));
+  const screenPoint = screenPointFromPointerEvent(event);
+  window.petRuntime.startWindowDrag(screenPoint);
   const canvasPoint = canvasPointFromMouseEvent(event);
   if (isInsidePetHitArea(canvasPoint.x, canvasPoint.y, bundle)) {
+    window.petRuntime.recordPoke(screenPoint);
     markRuntimePoked();
     player.tap();
   }
@@ -444,6 +446,9 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
     motionIntensity: 0.82,
     state: "stopped"
   });
+  const smokePokePoint = frameCenterScreenPoint();
+  window.petRuntime.recordPoke(smokePokePoint);
+  window.petRuntime.recordPoke(smokePokePoint);
   markRuntimePoked();
   player.tap();
   drawTapExpressionFramesForSmoke();
@@ -477,6 +482,7 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     wheelScaleChanged: false,
     mouseFollowMoved: false,
     cursorFollowAlphaHitTested: false,
+    maxEmotionWariness: 0,
     runtimeStatesObserved: stateMachine.observed(),
     visualStateApplied: isRuntimeVisualStateApplied(),
     motionDirectionsObserved: [...motionDirectionsObserved],

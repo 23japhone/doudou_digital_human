@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld("petRuntime", {
     return () => ipcRenderer.off("pet:motion-state", listener);
   },
   quit: () => ipcRenderer.send("pet:quit"),
+  recordPoke: (point) => ipcRenderer.send("pet:record-poke", sanitizeOptionalPoint(point)),
   reportSmokeResult: (result) => ipcRenderer.send("pet:smoke-result", result),
   setIgnoreMouseEvents: (ignore) => ipcRenderer.send("pet:set-ignore-mouse-events", Boolean(ignore)),
   setWindowScale: (scale, source) => ipcRenderer.invoke("pet:set-window-scale", Number(scale), sanitizeScaleSource(source)),

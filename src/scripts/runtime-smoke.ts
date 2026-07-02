@@ -67,6 +67,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.wheelScaleChanged ||
     !smokeResult.mouseFollowMoved ||
     !smokeResult.cursorFollowAlphaHitTested ||
+    smokeResult.maxEmotionWariness <= 0.5 ||
     !smokeResult.visualStateApplied ||
     !hasAllRuntimeStates(smokeResult.runtimeStatesObserved) ||
     !hasTapExpressionFrames(smokeResult.tapExpressionFramesObserved) ||
@@ -182,6 +183,7 @@ function parseSmokeResult(output: string) {
     wheelScaleChanged: boolean;
     mouseFollowMoved: boolean;
     cursorFollowAlphaHitTested: boolean;
+    maxEmotionWariness: number;
     runtimeStatesObserved: string[];
     visualStateApplied: boolean;
     motionDirectionsObserved: string[];

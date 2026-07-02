@@ -22,6 +22,7 @@ import {
   clampRuntimeScale
 } from "./scale.js";
 import {
+  RUNTIME_CURSOR_DODGE_CONFIG,
   calculateCursorDodgeStep,
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
@@ -29,7 +30,15 @@ import {
   type RuntimeMotionDirection,
   type RuntimeMotionPoint
 } from "./motion.js";
-import { classifyRuntimeAlphaReaction, type RuntimeAlphaReaction } from "./reaction.js";
+import {
+  classifyRuntimeAlphaReaction,
+  createRuntimeEmotionMemory,
+  decayRuntimeEmotionMemory,
+  recordRuntimePokeEmotion,
+  runtimeDodgeDistanceForEmotion,
+  runtimeMotionIntensityForEmotion,
+  type RuntimeAlphaReaction
+} from "./reaction.js";
 import type { RuntimePetMotionCue } from "./state.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -57,6 +66,7 @@ let smokePointerScaleChanged = false;
 let smokeWheelScaleChanged = false;
 let smokeMouseFollowMoved = false;
 let smokeCursorFollowAlphaHitTested = false;
+let smokeMaxEmotionWariness = 0;
 let smokeTimeout: NodeJS.Timeout | null = null;
 let cursorFollowTimer: NodeJS.Timeout | null = null;
 let cursorFollowPausedUntil = 0;
@@ -68,6 +78,7 @@ let lastApproachCue: Pick<RuntimePetMotionCue, "direction" | "motionIntensity"> 
   direction: "none",
   motionIntensity: 0
 };
+let runtimeEmotionMemory = createRuntimeEmotionMemory();
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
@@ -143,6 +154,8 @@ function createWindow(bundle: ValidatedPetBundle): void {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
   ignoreMouseEvents = true;
+  runtimeEmotionMemory = createRuntimeEmotionMemory();
+  smokeMaxEmotionWariness = 0;
   smokeCursorFollowPoint = smokeMode ? createSmokeCursorFollowPoint(mainWindow.getBounds()) : null;
   startCursorFollowMotion();
 
@@ -261,6 +274,14 @@ ipcMain.on("pet:quit", () => {
   app.quit();
 });
 
+ipcMain.on("pet:record-poke", (_event, pointer?: ScreenPoint) => {
+  if (pointer !== undefined && !isFiniteScreenPoint(pointer)) {
+    return;
+  }
+  runtimeEmotionMemory = recordRuntimePokeEmotion(runtimeEmotionMemory, Date.now());
+  smokeMaxEmotionWariness = Math.max(smokeMaxEmotionWariness, runtimeEmotionMemory.wariness);
+});
+
 ipcMain.on("pet:renderer-ready", () => {
   if (readySignalMode) {
     console.log("runtime ready: renderer");
@@ -285,7 +306,8 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
         pointerScaleChanged: smokePointerScaleChanged,
         wheelScaleChanged: smokeWheelScaleChanged,
         mouseFollowMoved: smokeMouseFollowMoved,
-        cursorFollowAlphaHitTested: smokeCursorFollowAlphaHitTested
+        cursorFollowAlphaHitTested: smokeCursorFollowAlphaHitTested,
+        maxEmotionWariness: smokeMaxEmotionWariness
       })}`
     );
     setTimeout(() => app.quit(), 250);
@@ -376,6 +398,7 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
   const now = Date.now();
   const deltaMs = Math.min(RUNTIME_CURSOR_FOLLOW_MAX_DELTA_MS, Math.max(0, now - lastCursorFollowTimestamp));
   lastCursorFollowTimestamp = now;
+  runtimeEmotionMemory = decayRuntimeEmotionMemory(runtimeEmotionMemory, now);
 
   if (dragSession || now < cursorFollowPausedUntil) {
     return;
@@ -394,7 +417,7 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
     if (smokeMode) {
       smokeCursorFollowAlphaHitTested = true;
     }
-    const reaction = classifyRuntimeAlphaReaction({ hitTest: hitTestResult });
+    const reaction = classifyRuntimeAlphaReaction({ hitTest: hitTestResult, emotionMemory: runtimeEmotionMemory });
     if (reaction === "none") {
       return;
     }
@@ -403,6 +426,13 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
       ? calculateCursorDodgeStep({
         cursor: cursorPoint,
         deltaMs,
+        config: {
+          ...RUNTIME_CURSOR_DODGE_CONFIG,
+          dodgeDistance: runtimeDodgeDistanceForEmotion(
+            runtimeEmotionMemory,
+            RUNTIME_CURSOR_DODGE_CONFIG.dodgeDistance
+          )
+        },
         windowBounds: currentBounds,
         workArea
       })
@@ -413,7 +443,14 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
         workArea
       });
     publishCursorMotionCue(
-      cursorFollowCueFromStep(motionStep.state, motionStep.direction, motionStep.motionIntensity, reaction)
+      cursorFollowCueFromStep(
+        motionStep.state,
+        motionStep.direction,
+        reaction === "dodge"
+          ? runtimeMotionIntensityForEmotion(motionStep.motionIntensity, runtimeEmotionMemory)
+          : motionStep.motionIntensity,
+        reaction
+      )
     );
 
     if (!motionStep.moved) {
