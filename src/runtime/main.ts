@@ -2,6 +2,12 @@ import { app, BrowserWindow, ipcMain, Menu } from "electron";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validatePetBundle, type ValidatedPetBundle } from "../pet_bundle/validate.js";
+import {
+  calculateDraggedWindowPosition,
+  createWindowDragSession,
+  type ScreenPoint,
+  type WindowDragSession
+} from "./drag.js";
 import type { RuntimeBundle, RuntimeSmokeResult } from "./runtime-types.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
@@ -17,6 +23,8 @@ let currentBundle: ValidatedPetBundle | null = null;
 let smokeMode = false;
 let readySignalMode = false;
 let ignoreMouseEvents = false;
+let dragSession: WindowDragSession | null = null;
+let smokeDragMoved = false;
 let smokeTimeout: NodeJS.Timeout | null = null;
 
 async function main(): Promise<void> {
@@ -113,6 +121,7 @@ function createWindow(bundle: ValidatedPetBundle): void {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+    dragSession = null;
   });
 }
 
@@ -127,7 +136,8 @@ ipcMain.handle("pet:get-bundle", () => {
       id: atlas.id,
       url: pathToFileURL(join(currentBundle!.rootDir, atlas.path)).href
     })),
-    previewUrl: pathToFileURL(join(currentBundle.rootDir, manifest.assets.preview)).href
+    previewUrl: pathToFileURL(join(currentBundle.rootDir, manifest.assets.preview)).href,
+    smoke: smokeMode
   };
   return runtimeBundle;
 });
@@ -138,6 +148,41 @@ ipcMain.on("pet:set-ignore-mouse-events", (_event, ignore: boolean) => {
   }
   mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
   ignoreMouseEvents = ignore;
+});
+
+ipcMain.on("pet:start-window-drag", (_event, pointer: ScreenPoint) => {
+  if (!mainWindow || !isFiniteScreenPoint(pointer)) {
+    return;
+  }
+  const [x, y] = mainWindow.getPosition();
+  dragSession = createWindowDragSession({
+    pointer,
+    windowPosition: { x, y }
+  });
+  if (ignoreMouseEvents) {
+    mainWindow.setIgnoreMouseEvents(false, { forward: true });
+    ignoreMouseEvents = false;
+  }
+});
+
+ipcMain.on("pet:drag-window-to", (_event, pointer: ScreenPoint) => {
+  if (!mainWindow || !dragSession) {
+    return;
+  }
+  const dragStartPosition = dragSession.windowStart;
+  const nextPosition = calculateDraggedWindowPosition(dragSession, pointer);
+  if (!nextPosition) {
+    return;
+  }
+  mainWindow.setPosition(nextPosition.x, nextPosition.y, false);
+  if (smokeMode) {
+    const [x, y] = mainWindow.getPosition();
+    smokeDragMoved ||= x !== dragStartPosition.x || y !== dragStartPosition.y;
+  }
+});
+
+ipcMain.on("pet:end-window-drag", () => {
+  dragSession = null;
 });
 
 ipcMain.on("pet:show-context-menu", () => {
@@ -171,7 +216,7 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
       clearTimeout(smokeTimeout);
       smokeTimeout = null;
     }
-    console.log(`runtime smoke: ${JSON.stringify(result)}`);
+    console.log(`runtime smoke: ${JSON.stringify({ ...result, dragMoved: smokeDragMoved })}`);
     setTimeout(() => app.quit(), 250);
   }
 });
@@ -181,3 +226,7 @@ app.on("window-all-closed", () => {
 });
 
 void main();
+
+function isFiniteScreenPoint(point: ScreenPoint): boolean {
+  return Number.isFinite(point?.x) && Number.isFinite(point?.y);
+}

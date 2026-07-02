@@ -61,6 +61,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
   if (
     !smokeResult.bundleLoaded ||
     !smokeResult.atlasLoaded ||
+    !smokeResult.dragMoved ||
     !smokeResult.nonTransparentPixel ||
     !smokeResult.idleAdvanced ||
     !smokeResult.renderLoopAdvanced ||
@@ -146,6 +147,7 @@ function parseSmokeResult(output: string) {
   return JSON.parse(line.slice(prefix.length)) as {
     atlasLoaded: boolean;
     bundleLoaded: boolean;
+    dragMoved: boolean;
     idleAdvanced: boolean;
     nonTransparentPixel: boolean;
     renderLoopAdvanced: boolean;

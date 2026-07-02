@@ -40,7 +40,9 @@ let lastTimestamp = performance.now();
 let drawCount = 0;
 let initialFrameIndex: number | null = null;
 let currentFrameIndex = -1;
+let smokeDragExercised = false;
 let smokeResultReported = false;
+let draggingPointerId: number | null = null;
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
@@ -57,14 +59,60 @@ window.addEventListener("contextmenu", (event) => {
 });
 
 window.addEventListener("mousemove", (event) => {
+  if (draggingPointerId !== null) {
+    window.petRuntime.setIgnoreMouseEvents(false);
+    return;
+  }
   window.petRuntime.setIgnoreMouseEvents(!isInsidePetHitArea(event.offsetX, event.offsetY, bundle));
 });
 
 petCanvas.addEventListener("pointerdown", (event) => {
-  if (isInsidePetHitArea(event.offsetX, event.offsetY, bundle)) {
-    player.tap();
+  if (event.button !== 0 || !isInsidePetHitArea(event.offsetX, event.offsetY, bundle)) {
+    return;
   }
+  draggingPointerId = event.pointerId;
+  petCanvas.setPointerCapture(event.pointerId);
+  window.petRuntime.setIgnoreMouseEvents(false);
+  window.petRuntime.startWindowDrag(screenPointFromPointerEvent(event));
+  player.tap();
 });
+
+petCanvas.addEventListener("pointermove", (event) => {
+  if (draggingPointerId !== event.pointerId) {
+    return;
+  }
+  event.preventDefault();
+  window.petRuntime.dragWindowTo(screenPointFromPointerEvent(event));
+});
+
+petCanvas.addEventListener("pointerup", endDragIfActive);
+petCanvas.addEventListener("pointercancel", endDragIfActive);
+window.addEventListener("blur", endWindowDrag);
+
+function endDragIfActive(event: PointerEvent): void {
+  if (draggingPointerId !== event.pointerId) {
+    return;
+  }
+  if (petCanvas.hasPointerCapture(event.pointerId)) {
+    petCanvas.releasePointerCapture(event.pointerId);
+  }
+  endWindowDrag();
+}
+
+function endWindowDrag(): void {
+  if (draggingPointerId === null) {
+    return;
+  }
+  draggingPointerId = null;
+  window.petRuntime.endWindowDrag();
+}
+
+function screenPointFromPointerEvent(event: PointerEvent): { x: number; y: number } {
+  return {
+    x: event.screenX,
+    y: event.screenY
+  };
+}
 
 function render(timestamp: number): void {
   const deltaMs = timestamp - lastTimestamp;
@@ -153,14 +201,26 @@ function reportSmokeResultIfReady(): void {
   if (!renderLoopAdvanced) {
     return;
   }
+  exerciseSmokeDragIfNeeded();
   smokeResultReported = true;
   window.petRuntime.reportSmokeResult(createSmokeResult(renderLoopAdvanced));
+}
+
+function exerciseSmokeDragIfNeeded(): void {
+  if (!bundle.smoke || smokeDragExercised) {
+    return;
+  }
+  smokeDragExercised = true;
+  window.petRuntime.startWindowDrag({ x: 100, y: 100 });
+  window.petRuntime.dragWindowTo({ x: 112, y: 116 });
+  window.petRuntime.endWindowDrag();
 }
 
 function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
   return {
     atlasLoaded: atlasImages.size === bundle.manifest.assets.atlases.length,
     bundleLoaded: bundle.manifest.schemaVersion.startsWith("0.1."),
+    dragMoved: false,
     idleAdvanced: renderLoopAdvanced,
     nonTransparentPixel: canvasHasNonTransparentPixel(),
     renderLoopAdvanced,

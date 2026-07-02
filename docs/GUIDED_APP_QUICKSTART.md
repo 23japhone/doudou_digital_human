@@ -42,7 +42,7 @@ Use `npm run dev:app` for the full product flow. Use `npm run dev` only when you
 
 8. Click `启动`.
 
-   Expected result: a transparent always-on-top desktop pet appears and animates. `停止` becomes available.
+   Expected result: a transparent always-on-top desktop pet appears and animates. Drag the visible pet body with the primary mouse button to move it. `停止` becomes available.
 
 9. Click `停止`.
 
@@ -121,6 +121,7 @@ Manual smoke checklist:
 - Confirm `预览图`, `精灵图集`, and QA check ids render.
 - Click `接受`.
 - Click `启动` and confirm a desktop pet appears above the desktop.
+- Drag the visible pet body and confirm the desktop pet window follows the pointer.
 - Click `停止` and confirm the pet disappears.
 - Click `启动` again to confirm relaunch still works.
 - Click `停止` again.
