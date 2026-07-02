@@ -2,6 +2,12 @@ import { createAnimationPlayer } from "./animation.js";
 import type { PetAtlas } from "../pet_bundle/manifest.js";
 import type { RuntimeBundle, RuntimeScaleSource, RuntimeSmokeResult } from "./runtime-types.js";
 import {
+  doudouEmotionForRuntimeScenario,
+  doudouEmotionScenarioForRuntimeState,
+  type DefaultDoudouEmotionId,
+  type DefaultDoudouEmotionScenario
+} from "./default-doudou-emotions.js";
+import {
   createRuntimeScreenHitTestResult,
   isPointInsideRuntimeHitArea,
   type CanvasAlphaSampler
@@ -101,6 +107,8 @@ let smokeMotionTuningPresetText = "";
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = bundle.motionTuningPresets;
 const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
+const defaultDoudouEmotionIdsObserved = new Set<DefaultDoudouEmotionId>();
+const defaultDoudouEmotionScenariosObserved = new Set<DefaultDoudouEmotionScenario>();
 type RuntimeMotionTuningKey = keyof RuntimeMotionTuning;
 interface RuntimeTuningControl {
   key: RuntimeMotionTuningKey;
@@ -481,16 +489,7 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
     motionIntensity: 0.72,
     state: "dodging"
   });
-  applyRuntimeMotionCue({
-    direction: "left",
-    motionIntensity: 0.88,
-    state: "retreating"
-  });
-  applyRuntimeMotionCue({
-    direction: "right",
-    motionIntensity: 0.64,
-    state: "watching"
-  });
+  exerciseQuietRecoveryForSmoke();
   applyRuntimeMotionCue({
     direction: "right",
     motionIntensity: 0.82,
@@ -533,6 +532,8 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     wheelScaleChanged: false,
     passiveCursorMovedWindow: false,
     cursorFollowAlphaHitTested: false,
+    defaultDoudouEmotionIdsObserved: [...defaultDoudouEmotionIdsObserved],
+    defaultDoudouEmotionScenariosObserved: [...defaultDoudouEmotionScenariosObserved],
     emotionMotionPhasesObserved: [],
     motionTuningApplied: smokeMotionTuningApplied,
     motionTuningPanelVisible: smokeMotionTuningPanelVisible,
@@ -559,6 +560,19 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
 
 function applyRuntimeMotionCue(cue: RuntimePetMotionCue): void {
   applyRuntimePetState(stateMachine.motion(cue, performance.now()));
+}
+
+function exerciseQuietRecoveryForSmoke(): void {
+  const nowMs = performance.now();
+  applyRuntimePetState(stateMachine.motion({
+    direction: "left",
+    motionIntensity: 0.88,
+    state: "retreating"
+  }, nowMs));
+  const watchingAtMs = nowMs + runtimeStateTiming.retreatingToWatchingMs;
+  applyRuntimePetState(stateMachine.advance(runtimeStateTiming.retreatingToWatchingMs, watchingAtMs));
+  const waitingAtMs = watchingAtMs + runtimeStateTiming.watchingToWaitingMs;
+  applyRuntimePetState(stateMachine.advance(runtimeStateTiming.watchingToWaitingMs, waitingAtMs));
 }
 
 async function exerciseRuntimeMotionTuningForSmoke(): Promise<void> {
@@ -812,12 +826,23 @@ function markRuntimeWorking(): void {
 }
 
 function applyRuntimePetState(state: RuntimePetState): void {
+  const previousState = visualState;
   visualState = state;
   petFrame.dataset.runtimeState = state;
+  recordDefaultDoudouEmotionState(state, previousState);
   for (const candidate of RUNTIME_PET_STATES) {
     petFrame.classList.toggle(runtimePetStateClass(candidate), candidate === state);
   }
   applyRuntimeVisualPose();
+}
+
+function recordDefaultDoudouEmotionState(state: RuntimePetState, previousState: RuntimePetState): void {
+  const scenario = doudouEmotionScenarioForRuntimeState(state, previousState);
+  const scenarioEmotion = doudouEmotionForRuntimeScenario(scenario);
+  petFrame.dataset.doudouEmotion = scenarioEmotion.id;
+  petFrame.dataset.doudouEmotionLabel = scenarioEmotion.labelZh;
+  defaultDoudouEmotionIdsObserved.add(scenarioEmotion.id);
+  defaultDoudouEmotionScenariosObserved.add(scenario);
 }
 
 function isRuntimeVisualStateApplied(): boolean {

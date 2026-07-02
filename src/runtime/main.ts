@@ -563,7 +563,7 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
     );
   } finally {
     // Passive cursor cues must not move the window; smoke records actual bounds.
-    if (smokeMode) {
+    if (smokeMode && mainWindow) {
       const appliedBounds = mainWindow.getBounds();
       smokePassiveCursorMovedWindow ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
     }

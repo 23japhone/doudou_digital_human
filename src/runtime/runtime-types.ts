@@ -1,4 +1,5 @@
 import type { PetManifest } from "../pet_bundle/manifest.js";
+import type { DefaultDoudouEmotionId, DefaultDoudouEmotionScenario } from "./default-doudou-emotions.js";
 import type { ScreenPoint } from "./drag.js";
 import type { RuntimeScaleLimits } from "./scale.js";
 import type { RuntimePetMotionCue, RuntimePetState } from "./state.js";
@@ -68,6 +69,8 @@ export interface RuntimeSmokeResult {
   wheelScaleChanged: boolean;
   passiveCursorMovedWindow: boolean;
   cursorFollowAlphaHitTested: boolean;
+  defaultDoudouEmotionIdsObserved: DefaultDoudouEmotionId[];
+  defaultDoudouEmotionScenariosObserved: DefaultDoudouEmotionScenario[];
   emotionMotionPhasesObserved: string[];
   motionTuningApplied: boolean;
   motionTuningPanelVisible: boolean;

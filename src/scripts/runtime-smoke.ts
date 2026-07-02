@@ -68,6 +68,8 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     smokeResult.passiveCursorMovedWindow ||
     !smokeResult.cursorFollowAlphaHitTested ||
     !hasAllEmotionMotionPhases(smokeResult.emotionMotionPhasesObserved) ||
+    !hasAllDefaultDoudouEmotionScenarios(smokeResult.defaultDoudouEmotionScenariosObserved) ||
+    !hasAllDefaultDoudouEmotionIds(smokeResult.defaultDoudouEmotionIdsObserved) ||
     !smokeResult.motionTuningApplied ||
     !smokeResult.motionTuningPanelVisible ||
     !smokeResult.motionTuningPresetButtonVisible ||
@@ -104,6 +106,24 @@ function hasAllRuntimeStates(states: string[]): boolean {
 
 function hasAllEmotionMotionPhases(phases: string[]): boolean {
   return ["retreating", "watching", "recovering"].every((phase) => phases.includes(phase));
+}
+
+function hasAllDefaultDoudouEmotionScenarios(scenarios: string[]): boolean {
+  if (!Array.isArray(scenarios)) {
+    return false;
+  }
+  return ["idle", "tap", "repeat_poke_retreat", "repeat_poke_watch", "quiet_recovery", "working"].every((scenario) =>
+    scenarios.includes(scenario)
+  );
+}
+
+function hasAllDefaultDoudouEmotionIds(emotions: string[]): boolean {
+  if (!Array.isArray(emotions)) {
+    return false;
+  }
+  return ["calm_idle", "surprised", "annoyed_pout", "teary", "comfort_soft", "focused_working"].every((emotion) =>
+    emotions.includes(emotion)
+  );
 }
 
 function hasSmokeMotionTuning(tuning: { recoverySpeedPixelsPerSecond: number; retreatDistancePixels: number; watchingPauseMs: number }): boolean {
@@ -213,6 +233,8 @@ function parseSmokeResult(output: string) {
     passiveCursorMovedWindow: boolean;
     cursorFollowAlphaHitTested: boolean;
     emotionMotionPhasesObserved: string[];
+    defaultDoudouEmotionIdsObserved: string[];
+    defaultDoudouEmotionScenariosObserved: string[];
     motionTuningApplied: boolean;
     motionTuningPanelVisible: boolean;
     motionTuningPresetButtonVisible: boolean;
