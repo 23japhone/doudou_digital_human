@@ -19,6 +19,7 @@ import {
 import {
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
+  isCursorInsideRuntimeMotionActivationArea,
   type RuntimeMotionDirection,
   type RuntimeMotionPoint
 } from "./motion.js";
@@ -357,6 +358,9 @@ function tickCursorFollowMotion(): void {
   const cursorPoint = smokeMode
     ? smokeCursorFollowPoint ?? createSmokeCursorFollowPoint(currentBounds)
     : screen.getCursorScreenPoint();
+  if (!isCursorInsideRuntimeMotionActivationArea(cursorPoint, currentBounds)) {
+    return;
+  }
   const workArea = screen.getDisplayNearestPoint(cursorPoint).workArea;
   const motionStep = calculateCursorFollowStep({
     cursor: cursorPoint,

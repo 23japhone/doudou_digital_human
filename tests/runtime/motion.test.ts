@@ -3,6 +3,7 @@ import {
   RUNTIME_CURSOR_FOLLOW_CONFIG,
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
+  isCursorInsideRuntimeMotionActivationArea,
   type RuntimeMotionDirection,
   type RuntimeMotionRect
 } from "../../src/runtime/motion.js";
@@ -98,6 +99,15 @@ describe("runtime cursor-follow motion", () => {
     expect(step.nextBounds).toEqual(windowBounds);
   });
 
+  test("activates cursor-follow motion only while the cursor is inside the pet window", () => {
+    expect(isCursorInsideRuntimeMotionActivationArea({ x: 120, y: 140 }, windowBounds)).toBe(true);
+    expect(isCursorInsideRuntimeMotionActivationArea({ x: 379, y: 379 }, windowBounds)).toBe(true);
+    expect(isCursorInsideRuntimeMotionActivationArea({ x: 99, y: 140 }, windowBounds)).toBe(false);
+    expect(isCursorInsideRuntimeMotionActivationArea({ x: 380, y: 140 }, windowBounds)).toBe(false);
+    expect(isCursorInsideRuntimeMotionActivationArea({ x: 120, y: 380 }, windowBounds)).toBe(false);
+    expect(isCursorInsideRuntimeMotionActivationArea({ x: 120, y: 381 }, windowBounds)).toBe(false);
+  });
+
   test("does not overshoot the target when the frame delta is large", () => {
     const targetCursor = {
       x: windowBounds.x + windowBounds.width / 2 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.x + 36,
@@ -129,6 +139,7 @@ describe("runtime cursor-follow motion", () => {
 
   test("creates a deterministic smoke cursor away from the current window center", () => {
     const smokeCursor = createSmokeCursorFollowPoint(windowBounds);
+    expect(isCursorInsideRuntimeMotionActivationArea(smokeCursor, windowBounds)).toBe(true);
     const step = calculateCursorFollowStep({
       cursor: smokeCursor,
       deltaMs: 33,

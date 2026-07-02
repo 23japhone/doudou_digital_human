@@ -113,11 +113,26 @@ export function calculateCursorFollowStep(input: RuntimeCursorFollowInput): Runt
 }
 
 export function createSmokeCursorFollowPoint(windowBounds: RuntimeMotionRect): RuntimeMotionPoint {
-  const currentCenter = rectCenter(sanitizeRect(windowBounds));
+  const safeBounds = sanitizeRect(windowBounds);
   return {
-    x: currentCenter.x + 260 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.x,
-    y: currentCenter.y + 110 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.y
+    x: safeBounds.x + safeBounds.width - 40,
+    y: safeBounds.y + safeBounds.height - 60
   };
+}
+
+export function isCursorInsideRuntimeMotionActivationArea(
+  cursor: RuntimeMotionPoint,
+  windowBounds: RuntimeMotionRect
+): boolean {
+  const safeBounds = sanitizeRect(windowBounds);
+  return (
+    Number.isFinite(cursor.x) &&
+    Number.isFinite(cursor.y) &&
+    cursor.x >= safeBounds.x &&
+    cursor.y >= safeBounds.y &&
+    cursor.x < safeBounds.x + safeBounds.width &&
+    cursor.y < safeBounds.y + safeBounds.height
+  );
 }
 
 function rectCenter(rect: RuntimeMotionRect): RuntimeMotionPoint {

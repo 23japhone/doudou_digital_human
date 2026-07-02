@@ -31,6 +31,18 @@ describe("runtime pet state machine", () => {
     expect(machine.current()).toBe("waiting");
   });
 
+  test("returns from approaching to waiting when no fresh motion cue arrives", () => {
+    const machine = createRuntimePetStateMachine();
+
+    machine.motion(motionCue("approaching", 0.65), 1000);
+    machine.advance(RUNTIME_PET_STATE_TIMING.approachingToWaitingMs - 1, 1000 + RUNTIME_PET_STATE_TIMING.approachingToWaitingMs - 1);
+    expect(machine.current()).toBe("approaching");
+
+    machine.advance(1, 1000 + RUNTIME_PET_STATE_TIMING.approachingToWaitingMs);
+    expect(machine.current()).toBe("waiting");
+    expect(machine.pose().motionIntensity).toBe(0);
+  });
+
   test("keeps stop rebound strength from the latest approach intensity", () => {
     const machine = createRuntimePetStateMachine();
 

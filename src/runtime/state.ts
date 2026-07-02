@@ -13,6 +13,7 @@ export const RUNTIME_PET_STATES: readonly RuntimePetState[] = [
 ];
 
 export interface RuntimePetStateTiming {
+  approachingToWaitingMs: number;
   clickedMs: number;
   stoppedToWaitingMs: number;
   workingHoldMs: number;
@@ -42,6 +43,7 @@ export interface RuntimePetStateMachine {
 }
 
 export const RUNTIME_PET_STATE_TIMING: RuntimePetStateTiming = {
+  approachingToWaitingMs: 520,
   clickedMs: 420,
   stoppedToWaitingMs: 900,
   workingHoldMs: 520
@@ -74,6 +76,9 @@ export function createRuntimePetStateMachine(
 
   function advance(_deltaMs: number, nowMs = stateEnteredAtMs): RuntimePetState {
     const elapsedMs = Math.max(0, nowMs - stateEnteredAtMs);
+    if (state === "approaching" && elapsedMs >= timing.approachingToWaitingMs) {
+      return setState("waiting", nowMs, createNeutralPose());
+    }
     if (state === "clicked" && elapsedMs >= timing.clickedMs) {
       return setState("waiting", nowMs, createNeutralPose());
     }
