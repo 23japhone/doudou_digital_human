@@ -274,6 +274,35 @@ describe("GuidedPetFlow", () => {
     });
   });
 
+  test("rejects launch when the desktop runtime exits before becoming ready", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    const fakeRuntimePath = path.join(workspace, "fake-runtime-crash.cjs");
+    await writeFile(sourcePath, createPngSource());
+    await writeFile(fakeRuntimePath, createCrashingRuntimeScript());
+    const flow = new GuidedPetFlow({
+      workspaceDir: path.join(workspace, "app-data"),
+      runtimeElectronPath: process.execPath,
+      runtimeMainPath: fakeRuntimePath,
+      now: fixedNow
+    });
+    await flow.initialize();
+    await flow.setSourceImagePath(sourcePath);
+    await flow.generatePet();
+    await flow.acceptPet();
+
+    await expect(flow.launchPet()).rejects.toMatchObject({ code: "RUNTIME_LAUNCH_FAILED" });
+    expect(flow.getPublicState()).toMatchObject({
+      status: "accepted",
+      launch: null,
+      lastError: expect.objectContaining({ code: "RUNTIME_LAUNCH_FAILED" }),
+      actions: expect.objectContaining({
+        canLaunch: true,
+        canStopLaunch: false
+      })
+    });
+  });
+
   test("requires explicit confirmation before mock cloud generation creates a draft", async () => {
     const workspace = await createTempDir();
     const sourcePath = path.join(workspace, "source.png");
@@ -534,12 +563,19 @@ function createFakeRuntimeScript(startedPath: string, stoppedPath: string): stri
   return `
 const { writeFileSync } = require("node:fs");
 writeFileSync(${JSON.stringify(startedPath)}, String(process.pid));
+console.log("runtime ready: renderer");
 process.on("SIGTERM", () => {
   writeFileSync(${JSON.stringify(stoppedPath)}, "stopped");
   process.exit(0);
 });
 setTimeout(() => process.exit(0), 5000);
 setInterval(() => undefined, 1000);
+`;
+}
+
+function createCrashingRuntimeScript(): string {
+  return `
+process.exit(1);
 `;
 }
 

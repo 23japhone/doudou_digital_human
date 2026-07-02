@@ -54,6 +54,7 @@ export interface GuidedPetFlowOptions {
   now?: Date;
   runtimeElectronPath?: string;
   runtimeMainPath?: string;
+  runtimeReadyTimeoutMs?: number;
   env?: NodeJS.ProcessEnv;
   openAiFetch?: typeof fetch;
 }
@@ -203,6 +204,7 @@ export class GuidedPetFlow {
   private readonly now?: Date;
   private readonly runtimeElectronPath: string;
   private readonly runtimeMainPath?: string;
+  private readonly runtimeReadyTimeoutMs: number;
   private readonly env: NodeJS.ProcessEnv;
   private readonly openAiFetch?: typeof fetch;
   private generationSettings: Required<GuidedGenerationSettings> = {
@@ -231,6 +233,7 @@ export class GuidedPetFlow {
     this.now = options.now;
     this.runtimeElectronPath = options.runtimeElectronPath ?? process.execPath;
     this.runtimeMainPath = options.runtimeMainPath;
+    this.runtimeReadyTimeoutMs = options.runtimeReadyTimeoutMs ?? 5000;
     this.env = options.env ?? process.env;
     this.openAiFetch = options.openAiFetch;
   }
@@ -412,25 +415,7 @@ export class GuidedPetFlow {
     let running = false;
     if (!options.smoke) {
       await this.stopRuntimeProcess();
-      const child = this.spawnRuntime(this.accepted.installedBundleDir, false);
-      this.runtimeProcess = child;
-      child.once("close", () => {
-        if (this.runtimeProcess === child) {
-          this.runtimeProcess = null;
-          if (this.launch?.running) {
-            this.launch = null;
-            this.status = this.statusAfterRuntimeStops();
-          }
-        }
-      });
-      child.once("error", (error) => {
-        if (this.runtimeProcess === child) {
-          this.runtimeProcess = null;
-          this.launch = null;
-          this.status = this.statusAfterRuntimeStops();
-          this.setError(new GuidedPetFlowError("RUNTIME_LAUNCH_FAILED", error.message));
-        }
-      });
+      await this.launchRuntimeProcess(this.accepted.installedBundleDir);
       running = true;
     }
     this.launch = {
@@ -713,6 +698,96 @@ export class GuidedPetFlow {
     return spawn(this.runtimeElectronPath, args, {
       env: { ...process.env, NODE_OPTIONS: "" },
       stdio: "ignore"
+    });
+  }
+
+  private launchRuntimeProcess(bundleDir: string): Promise<ChildProcess> {
+    if (!this.runtimeMainPath) {
+      throw this.setError(new GuidedPetFlowError("RUNTIME_LAUNCH_FAILED", "Runtime entrypoint is not configured."));
+    }
+    const child = spawn(this.runtimeElectronPath, [this.runtimeMainPath, "--bundle", bundleDir, "--ready-signal"], {
+      env: { ...process.env, NODE_OPTIONS: "" },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    this.runtimeProcess = child;
+
+    return new Promise((resolvePromise, reject) => {
+      let settled = false;
+      let bufferedOutput = "";
+      const timeout = setTimeout(() => {
+        fail("Runtime did not report readiness before timeout.");
+        if (child.exitCode === null && child.signalCode === null) {
+          child.kill("SIGTERM");
+        }
+      }, this.runtimeReadyTimeoutMs);
+
+      const cleanup = (): void => {
+        clearTimeout(timeout);
+        child.stdout?.off("data", onData);
+        child.stderr?.off("data", onData);
+      };
+
+      const finish = (): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolvePromise(child);
+      };
+
+      const fail = (message: string): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        if (this.runtimeProcess === child) {
+          this.runtimeProcess = null;
+        }
+        reject(this.setError(new GuidedPetFlowError("RUNTIME_LAUNCH_FAILED", message)));
+      };
+
+      function onData(chunk: Buffer): void {
+        bufferedOutput += chunk.toString();
+        const lines = bufferedOutput.split(/\r?\n/);
+        bufferedOutput = lines.pop() ?? "";
+        if (lines.some((line) => line === "runtime ready: renderer")) {
+          finish();
+        }
+      }
+
+      const onError = (error: Error): void => {
+        if (!settled) {
+          fail(error.message);
+          return;
+        }
+        if (this.runtimeProcess === child) {
+          this.runtimeProcess = null;
+          this.launch = null;
+          this.status = this.statusAfterRuntimeStops();
+          this.setError(new GuidedPetFlowError("RUNTIME_LAUNCH_FAILED", error.message));
+        }
+      };
+
+      const onClose = (code: number | null, signal: NodeJS.Signals | null): void => {
+        if (!settled) {
+          fail(`Runtime exited before renderer readiness (${code === null ? signal ?? "unknown" : `code ${code}`}).`);
+          return;
+        }
+        if (this.runtimeProcess === child) {
+          this.runtimeProcess = null;
+          if (this.launch?.running) {
+            this.launch = null;
+            this.status = this.statusAfterRuntimeStops();
+          }
+        }
+      };
+
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", onData);
+      child.once("error", onError);
+      child.once("close", onClose);
     });
   }
 

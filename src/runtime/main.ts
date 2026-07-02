@@ -8,12 +8,14 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 
 interface RuntimeOptions {
   bundleDir: string;
+  readySignal: boolean;
   smoke: boolean;
 }
 
 let mainWindow: BrowserWindow | null = null;
 let currentBundle: ValidatedPetBundle | null = null;
 let smokeMode = false;
+let readySignalMode = false;
 let ignoreMouseEvents = false;
 let smokeTimeout: NodeJS.Timeout | null = null;
 
@@ -25,6 +27,7 @@ async function main(): Promise<void> {
   }
 
   smokeMode = options.smoke ?? false;
+  readySignalMode = options.readySignal ?? false;
 
   try {
     currentBundle = await validatePetBundle(options.bundleDir);
@@ -44,7 +47,7 @@ async function main(): Promise<void> {
 }
 
 function parseArgs(args: string[]): Partial<RuntimeOptions> {
-  const options: Partial<RuntimeOptions> = { smoke: false };
+  const options: Partial<RuntimeOptions> = { readySignal: false, smoke: false };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--bundle") {
@@ -52,6 +55,8 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
       index += 1;
     } else if (arg === "--smoke") {
       options.smoke = true;
+    } else if (arg === "--ready-signal") {
+      options.readySignal = true;
     }
   }
   return options;
@@ -152,6 +157,9 @@ ipcMain.on("pet:quit", () => {
 });
 
 ipcMain.on("pet:renderer-ready", () => {
+  if (readySignalMode) {
+    console.log("runtime ready: renderer");
+  }
   if (smokeMode) {
     console.log("runtime smoke ready: renderer");
   }
