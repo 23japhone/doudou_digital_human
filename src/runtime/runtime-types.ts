@@ -1,7 +1,7 @@
 import type { PetManifest } from "../pet_bundle/manifest.js";
 import type { ScreenPoint } from "./drag.js";
 import type { RuntimeScaleLimits } from "./scale.js";
-import type { RuntimeMotionPetState, RuntimePetState } from "./state.js";
+import type { RuntimePetMotionCue, RuntimePetState } from "./state.js";
 
 export interface RuntimeAtlas {
   id: string;
@@ -23,7 +23,7 @@ export interface PetRuntimeBridge {
   dragWindowTo(pointer: ScreenPoint): void;
   endWindowDrag(): void;
   getBundle(): Promise<RuntimeBundle>;
-  onMotionState(callback: (state: RuntimeMotionPetState) => void): () => void;
+  onMotionState(callback: (cue: RuntimePetMotionCue) => void): () => void;
   quit(): void;
   reportSmokeResult(result: RuntimeSmokeResult): void;
   setIgnoreMouseEvents(ignore: boolean): void;
@@ -47,6 +47,9 @@ export interface RuntimeSmokeResult {
   mouseFollowMoved: boolean;
   runtimeStatesObserved: RuntimePetState[];
   visualStateApplied: boolean;
+  motionDirectionsObserved: string[];
+  maxStopRebound: number;
+  tapExpressionFramesObserved: number[];
   drawCount: number;
   initialFrameIndex: number;
   currentFrameIndex: number;

@@ -68,6 +68,9 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.mouseFollowMoved ||
     !smokeResult.visualStateApplied ||
     !hasAllRuntimeStates(smokeResult.runtimeStatesObserved) ||
+    !hasTapExpressionFrames(smokeResult.tapExpressionFramesObserved) ||
+    !hasMotionDirection(smokeResult.motionDirectionsObserved) ||
+    smokeResult.maxStopRebound <= 0 ||
     !smokeResult.nonTransparentPixel ||
     !smokeResult.idleAdvanced ||
     !smokeResult.frameHiddenByDefault ||
@@ -84,6 +87,14 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
 
 function hasAllRuntimeStates(states: string[]): boolean {
   return ["approaching", "stopped", "clicked", "waiting", "working"].every((state) => states.includes(state));
+}
+
+function hasMotionDirection(directions: string[]): boolean {
+  return directions.some((direction) => direction !== "none");
+}
+
+function hasTapExpressionFrames(frames: number[]): boolean {
+  return [4, 5, 6].every((frame) => frames.includes(frame));
 }
 
 async function assertInvalidBundleFails(
@@ -171,6 +182,9 @@ function parseSmokeResult(output: string) {
     mouseFollowMoved: boolean;
     runtimeStatesObserved: string[];
     visualStateApplied: boolean;
+    motionDirectionsObserved: string[];
+    maxStopRebound: number;
+    tapExpressionFramesObserved: number[];
     drawCount: number;
     initialFrameIndex: number;
     currentFrameIndex: number;

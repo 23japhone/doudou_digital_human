@@ -3,6 +3,7 @@ import {
   RUNTIME_CURSOR_FOLLOW_CONFIG,
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
+  type RuntimeMotionDirection,
   type RuntimeMotionRect
 } from "../../src/runtime/motion.js";
 
@@ -24,9 +25,59 @@ describe("runtime cursor-follow motion", () => {
 
     expect(step.state).toBe("following");
     expect(step.moved).toBe(true);
+    expect(step.direction).toBe<RuntimeMotionDirection>("right");
+    expect(step.motionIntensity).toBeGreaterThan(0);
     expect(step.nextBounds.x).toBeGreaterThan(windowBounds.x);
     expect(step.nextBounds.y).toBeGreaterThan(windowBounds.y);
     expect(step.distanceToTarget).toBeGreaterThan(100);
+  });
+
+  test("reports the dominant vertical approach direction", () => {
+    const step = calculateCursorFollowStep({
+      cursor: {
+        x: windowBounds.x + windowBounds.width / 2 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.x,
+        y: windowBounds.y + windowBounds.height / 2 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.y - 260
+      },
+      deltaMs: 33,
+      windowBounds,
+      workArea
+    });
+
+    expect(step.direction).toBe<RuntimeMotionDirection>("up");
+  });
+
+  test("uses an easing curve that takes larger steps when farther away", () => {
+    const nearStep = calculateCursorFollowStep({
+      cursor: {
+        x: windowBounds.x + windowBounds.width / 2 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.x + 80,
+        y: windowBounds.y + windowBounds.height / 2 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.y
+      },
+      deltaMs: 33,
+      windowBounds,
+      workArea,
+      config: {
+        ...RUNTIME_CURSOR_FOLLOW_CONFIG,
+        maxSpeedPixelsPerSecond: 2000
+      }
+    });
+    const farStep = calculateCursorFollowStep({
+      cursor: {
+        x: windowBounds.x + windowBounds.width / 2 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.x + 480,
+        y: windowBounds.y + windowBounds.height / 2 - RUNTIME_CURSOR_FOLLOW_CONFIG.targetOffset.y
+      },
+      deltaMs: 33,
+      windowBounds,
+      workArea,
+      config: {
+        ...RUNTIME_CURSOR_FOLLOW_CONFIG,
+        maxSpeedPixelsPerSecond: 2000
+      }
+    });
+
+    expect(farStep.stepDistance).toBeGreaterThan(nearStep.stepDistance);
+    expect(farStep.easingProgress).toBeGreaterThan(0);
+    expect(farStep.easingProgress).toBeLessThan(1);
+    expect(farStep.motionIntensity).toBeGreaterThan(nearStep.motionIntensity);
   });
 
   test("settles when the pet is already close to the cursor target", () => {
@@ -42,6 +93,8 @@ describe("runtime cursor-follow motion", () => {
 
     expect(step.state).toBe("settled");
     expect(step.moved).toBe(false);
+    expect(step.direction).toBe("none");
+    expect(step.motionIntensity).toBe(0);
     expect(step.nextBounds).toEqual(windowBounds);
   });
 

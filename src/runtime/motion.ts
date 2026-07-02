@@ -13,9 +13,12 @@ export interface RuntimeCursorFollowConfig {
   settleDistance: number;
   maxSpeedPixelsPerSecond: number;
   minStepPixels: number;
+  easingResponsiveness: number;
+  intensityDistance: number;
 }
 
 export type RuntimeMotionState = "following" | "settled";
+export type RuntimeMotionDirection = "left" | "right" | "up" | "down" | "none";
 
 export interface RuntimeCursorFollowInput {
   cursor: RuntimeMotionPoint;
@@ -26,18 +29,24 @@ export interface RuntimeCursorFollowInput {
 }
 
 export interface RuntimeCursorFollowStep {
+  direction: RuntimeMotionDirection;
+  easingProgress: number;
   state: RuntimeMotionState;
   nextBounds: RuntimeMotionRect;
   targetCenter: RuntimeMotionPoint;
   distanceToTarget: number;
+  motionIntensity: number;
   moved: boolean;
+  stepDistance: number;
 }
 
 export const RUNTIME_CURSOR_FOLLOW_CONFIG: RuntimeCursorFollowConfig = {
   targetOffset: { x: -84, y: 72 },
   settleDistance: 10,
   maxSpeedPixelsPerSecond: 760,
-  minStepPixels: 1
+  minStepPixels: 1,
+  easingResponsiveness: 8,
+  intensityDistance: 360
 };
 
 export function calculateCursorFollowStep(input: RuntimeCursorFollowInput): RuntimeCursorFollowStep {
@@ -54,20 +63,27 @@ export function calculateCursorFollowStep(input: RuntimeCursorFollowInput): Runt
     safeWorkArea
   );
   const distanceToTarget = distanceBetween(currentCenter, targetCenter);
+  const direction = motionDirection(currentCenter, targetCenter);
 
   if (!Number.isFinite(distanceToTarget) || distanceToTarget <= config.settleDistance) {
     return {
+      direction: "none",
+      easingProgress: 0,
       state: "settled",
       nextBounds: safeWindowBounds,
       targetCenter,
       distanceToTarget: Number.isFinite(distanceToTarget) ? distanceToTarget : 0,
-      moved: false
+      motionIntensity: 0,
+      moved: false,
+      stepDistance: 0
     };
   }
 
   const deltaSeconds = Math.max(0, input.deltaMs) / 1000;
+  const easingProgress = clamp(1 - Math.exp(-Math.max(0.1, config.easingResponsiveness) * deltaSeconds), 0, 0.999);
+  const easedStep = distanceToTarget * easingProgress;
   const maxStep = Math.max(config.minStepPixels, config.maxSpeedPixelsPerSecond * deltaSeconds);
-  const stepDistance = Math.min(distanceToTarget, maxStep);
+  const stepDistance = Math.min(distanceToTarget, Math.max(config.minStepPixels, Math.min(easedStep, maxStep)));
   const ratio = stepDistance / distanceToTarget;
   const nextCenter = {
     x: currentCenter.x + (targetCenter.x - currentCenter.x) * ratio,
@@ -84,11 +100,15 @@ export function calculateCursorFollowStep(input: RuntimeCursorFollowInput): Runt
   const moved = roundedNextBounds.x !== safeWindowBounds.x || roundedNextBounds.y !== safeWindowBounds.y;
 
   return {
+    direction,
+    easingProgress,
     state: moved ? "following" : "settled",
     nextBounds: roundedNextBounds,
     targetCenter,
     distanceToTarget,
-    moved
+    motionIntensity: clamp(distanceToTarget / Math.max(1, config.intensityDistance), 0, 1),
+    moved,
+    stepDistance
   };
 }
 
@@ -118,6 +138,18 @@ function rectFromCenter(center: RuntimeMotionPoint, basis: RuntimeMotionRect): R
 
 function distanceBetween(a: RuntimeMotionPoint, b: RuntimeMotionPoint): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function motionDirection(from: RuntimeMotionPoint, to: RuntimeMotionPoint): RuntimeMotionDirection {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) {
+    return "none";
+  }
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0 ? "right" : "left";
+  }
+  return dy >= 0 ? "down" : "up";
 }
 
 function clampCenterToWorkArea(

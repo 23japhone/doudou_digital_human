@@ -3,6 +3,7 @@ import {
   RUNTIME_PET_STATE_TIMING,
   createRuntimePetStateMachine,
   runtimePetStateClass,
+  type RuntimePetMotionCue,
   type RuntimePetState
 } from "../../src/runtime/state.js";
 
@@ -17,10 +18,10 @@ describe("runtime pet state machine", () => {
   test("moves from approaching to stopped and then back to waiting", () => {
     const machine = createRuntimePetStateMachine();
 
-    machine.motion("approaching", 1000);
+    machine.motion(motionCue("approaching", 0.65), 1000);
     expect(machine.current()).toBe("approaching");
 
-    machine.motion("stopped", 1100);
+    machine.motion(motionCue("stopped", 0.65), 1100);
     expect(machine.current()).toBe("stopped");
 
     machine.advance(RUNTIME_PET_STATE_TIMING.stoppedToWaitingMs - 1, 1100 + RUNTIME_PET_STATE_TIMING.stoppedToWaitingMs - 1);
@@ -30,11 +31,38 @@ describe("runtime pet state machine", () => {
     expect(machine.current()).toBe("waiting");
   });
 
+  test("keeps stop rebound strength from the latest approach intensity", () => {
+    const machine = createRuntimePetStateMachine();
+
+    machine.motion(motionCue("approaching", 0.78), 1000);
+    expect(machine.pose()).toMatchObject({
+      direction: "right",
+      motionIntensity: 0.78,
+      stopRebound: 0
+    });
+
+    machine.motion(motionCue("stopped", 0.78), 1200);
+
+    expect(machine.current()).toBe("stopped");
+    expect(machine.pose().stopRebound).toBeCloseTo(0.78, 5);
+  });
+
+  test("uses the previous approach intensity when a settled cue has no motion intensity", () => {
+    const machine = createRuntimePetStateMachine();
+
+    machine.motion(motionCue("approaching", 0.72), 1000);
+    machine.motion(motionCue("stopped", 0), 1200);
+
+    expect(machine.current()).toBe("stopped");
+    expect(machine.pose().stopRebound).toBeCloseTo(0.72, 5);
+  });
+
   test("keeps clicked visual state briefly before returning to waiting", () => {
     const machine = createRuntimePetStateMachine();
 
     machine.tap(2000);
     expect(machine.current()).toBe("clicked");
+    expect(machine.pose().clickExpression).toBe("tap_react");
 
     machine.advance(RUNTIME_PET_STATE_TIMING.clickedMs - 1, 2000 + RUNTIME_PET_STATE_TIMING.clickedMs - 1);
     expect(machine.current()).toBe("clicked");
@@ -59,11 +87,11 @@ describe("runtime pet state machine", () => {
   test("records observed states in first-seen order without duplicates", () => {
     const machine = createRuntimePetStateMachine();
 
-    machine.motion("approaching", 1000);
-    machine.motion("stopped", 1100);
+    machine.motion(motionCue("approaching", 0.5), 1000);
+    machine.motion(motionCue("stopped", 0.5), 1100);
     machine.tap(1200);
     machine.working(1300);
-    machine.motion("approaching", 1400);
+    machine.motion(motionCue("approaching", 0.5), 1400);
 
     expect(machine.observed()).toEqual<RuntimePetState[]>([
       "waiting",
@@ -74,3 +102,11 @@ describe("runtime pet state machine", () => {
     ]);
   });
 });
+
+function motionCue(state: RuntimePetMotionCue["state"], motionIntensity: number): RuntimePetMotionCue {
+  return {
+    direction: "right",
+    motionIntensity,
+    state
+  };
+}

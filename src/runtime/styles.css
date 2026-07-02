@@ -14,6 +14,13 @@ body {
 
 #pet-frame {
   --runtime-frame-padding: 12px;
+  --runtime-approach-lift: -3px;
+  --runtime-approach-rotate: 0deg;
+  --runtime-approach-scale: 1.015;
+  --runtime-click-pop: 1.06;
+  --runtime-stop-drop: 2px;
+  --runtime-stop-scale-x: 1;
+  --runtime-stop-scale-y: 0.99;
 
   width: 100vw;
   height: 100vh;
@@ -69,16 +76,16 @@ body {
 
 #pet-frame.runtime-state-approaching #pet-canvas {
   filter: drop-shadow(0 8px 8px rgba(28, 72, 92, 0.18));
-  transform: translateY(-3px) rotate(-2deg) scale(1.015);
+  transform: translateY(var(--runtime-approach-lift)) rotate(var(--runtime-approach-rotate)) scale(var(--runtime-approach-scale));
 }
 
 #pet-frame.runtime-state-stopped #pet-canvas {
-  transform: translateY(2px) scale(0.99);
+  transform: translateY(var(--runtime-stop-drop)) scale(var(--runtime-stop-scale-x), var(--runtime-stop-scale-y));
 }
 
 #pet-frame.runtime-state-clicked #pet-canvas {
   filter: drop-shadow(0 10px 10px rgba(70, 120, 255, 0.24));
-  transform: translateY(-8px) scale(1.06);
+  transform: translateY(-8px) scale(var(--runtime-click-pop));
 }
 
 #pet-frame.runtime-state-working #pet-canvas {

@@ -17,7 +17,7 @@ import {
   RUNTIME_PET_STATES,
   createRuntimePetStateMachine,
   runtimePetStateClass,
-  type RuntimeMotionPetState,
+  type RuntimePetMotionCue,
   type RuntimePetState
 } from "./state.js";
 import "./styles.css";
@@ -74,6 +74,9 @@ let scalingPointerId: number | null = null;
 let scaleDragSession: RuntimeScaleDragSession | null = null;
 let scaleRequestSerial = 0;
 let visualState: RuntimePetState = stateMachine.current();
+let maxStopRebound = 0;
+const motionDirectionsObserved = new Set<string>();
+const tapExpressionFramesObserved = new Set<number>();
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
@@ -332,6 +335,7 @@ function drawCurrentFrame(): void {
     bundle.manifest.canvas.height
   );
   recordDraw(frame.index);
+  recordTapExpressionFrame(frame.index);
 }
 
 function recordDraw(frameIndex: number): void {
@@ -401,9 +405,19 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
     return;
   }
   smokeInteractionsExercised = true;
-  applyRuntimeMotionState("approaching");
-  applyRuntimeMotionState("stopped");
+  applyRuntimeMotionCue({
+    direction: "right",
+    motionIntensity: 0.82,
+    state: "approaching"
+  });
+  applyRuntimeMotionCue({
+    direction: "right",
+    motionIntensity: 0.82,
+    state: "stopped"
+  });
   markRuntimeClicked();
+  player.tap();
+  drawTapExpressionFramesForSmoke();
   window.petRuntime.startWindowDrag({ x: 100, y: 100 });
   markRuntimeWorking();
   window.petRuntime.dragWindowTo({ x: 112, y: 116 });
@@ -435,6 +449,9 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     mouseFollowMoved: false,
     runtimeStatesObserved: stateMachine.observed(),
     visualStateApplied: isRuntimeVisualStateApplied(),
+    motionDirectionsObserved: [...motionDirectionsObserved],
+    maxStopRebound,
+    tapExpressionFramesObserved: [...tapExpressionFramesObserved],
     drawCount,
     initialFrameIndex: initialFrameIndex ?? -1,
     currentFrameIndex,
@@ -443,8 +460,8 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
   };
 }
 
-function applyRuntimeMotionState(state: RuntimeMotionPetState): void {
-  applyRuntimePetState(stateMachine.motion(state, performance.now()));
+function applyRuntimeMotionCue(cue: RuntimePetMotionCue): void {
+  applyRuntimePetState(stateMachine.motion(cue, performance.now()));
 }
 
 function markRuntimeClicked(): void {
@@ -456,19 +473,69 @@ function markRuntimeWorking(): void {
 }
 
 function applyRuntimePetState(state: RuntimePetState): void {
-  if (state === visualState && petFrame.dataset.runtimeState === state) {
-    return;
-  }
   visualState = state;
   petFrame.dataset.runtimeState = state;
   for (const candidate of RUNTIME_PET_STATES) {
     petFrame.classList.toggle(runtimePetStateClass(candidate), candidate === state);
   }
+  applyRuntimeVisualPose();
 }
 
 function isRuntimeVisualStateApplied(): boolean {
   const currentState = stateMachine.current();
-  return petFrame.dataset.runtimeState === currentState && petFrame.classList.contains(runtimePetStateClass(currentState));
+  return (
+    petFrame.dataset.runtimeState === currentState &&
+    petFrame.classList.contains(runtimePetStateClass(currentState)) &&
+    petFrame.style.getPropertyValue("--runtime-approach-scale") !== ""
+  );
+}
+
+function applyRuntimeVisualPose(): void {
+  const pose = stateMachine.pose();
+  const directionX = horizontalDirectionMultiplier(pose.direction);
+  const motionIntensity = clamp01(pose.motionIntensity);
+  const stopRebound = clamp01(pose.stopRebound);
+  motionDirectionsObserved.add(pose.direction);
+  maxStopRebound = Math.max(maxStopRebound, stopRebound);
+  petFrame.dataset.motionDirection = pose.direction;
+  petFrame.style.setProperty("--runtime-approach-lift", `${-(3 + motionIntensity * 5).toFixed(2)}px`);
+  petFrame.style.setProperty("--runtime-approach-rotate", `${(directionX * (2 + motionIntensity * 5)).toFixed(2)}deg`);
+  petFrame.style.setProperty("--runtime-approach-scale", (1 + motionIntensity * 0.028).toFixed(3));
+  petFrame.style.setProperty("--runtime-stop-drop", `${(2 + stopRebound * 5).toFixed(2)}px`);
+  petFrame.style.setProperty("--runtime-stop-scale-x", (1 + stopRebound * 0.03).toFixed(3));
+  petFrame.style.setProperty("--runtime-stop-scale-y", (1 - stopRebound * 0.045).toFixed(3));
+  petFrame.style.setProperty("--runtime-click-pop", pose.clickExpression === "tap_react" ? "1.075" : "1.04");
+}
+
+function horizontalDirectionMultiplier(direction: string): number {
+  if (direction === "left") {
+    return -1;
+  }
+  if (direction === "right") {
+    return 1;
+  }
+  return 0;
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
+}
+
+function recordTapExpressionFrame(frameIndex: number): void {
+  if (player.currentAnimationName() === bundle.manifest.behavior.onTap) {
+    tapExpressionFramesObserved.add(frameIndex);
+  }
+}
+
+function drawTapExpressionFramesForSmoke(): void {
+  const tapAnimation = bundle.manifest.animations[bundle.manifest.behavior.onTap];
+  for (const frame of tapAnimation.frames) {
+    drawCurrentFrame();
+    player.advance(frame.durationMs);
+  }
 }
 
 function isRuntimeFrameHiddenByDefault(): boolean {

@@ -63,6 +63,9 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.runtimeSmoke.mouseFollowMoved ||
       !smokeResult.runtimeSmoke.visualStateApplied ||
       !hasAllRuntimeStates(smokeResult.runtimeSmoke.runtimeStatesObserved) ||
+      !hasTapExpressionFrames(smokeResult.runtimeSmoke.tapExpressionFramesObserved) ||
+      !hasMotionDirection(smokeResult.runtimeSmoke.motionDirectionsObserved) ||
+      smokeResult.runtimeSmoke.maxStopRebound <= 0 ||
       !smokeResult.runtimeSmoke.nonTransparentPixel ||
       !smokeResult.runtimeSmoke.frameHiddenByDefault ||
       !smokeResult.runtimeSmoke.frameVisibleOnResizeEdge ||
@@ -81,6 +84,14 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
 
 function hasAllRuntimeStates(states: string[]): boolean {
   return ["approaching", "stopped", "clicked", "waiting", "working"].every((state) => states.includes(state));
+}
+
+function hasMotionDirection(directions: string[]): boolean {
+  return directions.some((direction) => direction !== "none");
+}
+
+function hasTapExpressionFrames(frames: number[]): boolean {
+  return [4, 5, 6].every((frame) => frames.includes(frame));
 }
 
 export async function prepareGuidedAppSmokeSource(

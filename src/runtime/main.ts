@@ -19,10 +19,10 @@ import {
 import {
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
-  type RuntimeMotionState,
+  type RuntimeMotionDirection,
   type RuntimeMotionPoint
 } from "./motion.js";
-import type { RuntimeMotionPetState } from "./state.js";
+import type { RuntimePetMotionCue } from "./state.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
@@ -52,6 +52,10 @@ let cursorFollowTimer: NodeJS.Timeout | null = null;
 let cursorFollowPausedUntil = 0;
 let lastCursorFollowTimestamp = 0;
 let smokeCursorFollowPoint: RuntimeMotionPoint | null = null;
+let lastApproachCue: Pick<RuntimePetMotionCue, "direction" | "motionIntensity"> = {
+  direction: "none",
+  motionIntensity: 0
+};
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
@@ -360,7 +364,7 @@ function tickCursorFollowMotion(): void {
     windowBounds: currentBounds,
     workArea
   });
-  publishCursorMotionState(motionStep.state);
+  publishCursorMotionCue(cursorFollowCueFromStep(motionStep.state, motionStep.direction, motionStep.motionIntensity));
 
   if (!motionStep.moved) {
     return;
@@ -373,10 +377,28 @@ function tickCursorFollowMotion(): void {
   }
 }
 
-function publishCursorMotionState(state: RuntimeMotionState): void {
+function publishCursorMotionCue(cue: RuntimePetMotionCue): void {
   if (!mainWindow || mainWindow.webContents.isDestroyed()) {
     return;
   }
-  const runtimeState: RuntimeMotionPetState = state === "following" ? "approaching" : "stopped";
-  mainWindow.webContents.send("pet:motion-state", runtimeState);
+  mainWindow.webContents.send("pet:motion-state", cue);
+}
+
+function cursorFollowCueFromStep(
+  state: "following" | "settled",
+  direction: RuntimeMotionDirection,
+  motionIntensity: number
+): RuntimePetMotionCue {
+  if (state === "following") {
+    lastApproachCue = { direction, motionIntensity };
+    return {
+      ...lastApproachCue,
+      state: "approaching"
+    };
+  }
+  return {
+    direction: lastApproachCue.direction,
+    motionIntensity: lastApproachCue.motionIntensity,
+    state: "stopped"
+  };
 }
