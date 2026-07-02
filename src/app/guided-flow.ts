@@ -16,7 +16,8 @@ import type { PetGenerationAdapter } from "../generation/adapters/types.js";
 import {
   acceptPetBundle,
   createPetReview,
-  deletePetAssets
+  deletePetAssets,
+  PetReviewError
 } from "../review/pet-review.js";
 import type { RuntimeSmokeResult } from "../runtime/runtime-types.js";
 
@@ -392,11 +393,7 @@ export class GuidedPetFlow {
     if (!this.draft) {
       throw this.setError(new GuidedPetFlowError("DRAFT_BUNDLE_REQUIRED", "Generate a pet bundle before accepting."));
     }
-    const result = await acceptPetBundle({
-      bundleDir: this.draft.bundleDir,
-      libraryDir: this.libraryRoot,
-      now: this.now
-    });
+    const result = await this.acceptCurrentDraftBundle();
     this.accepted = {
       installedBundleDir: result.installedBundleDir,
       petId: result.installation.bundle.id,
@@ -405,6 +402,33 @@ export class GuidedPetFlow {
     this.status = "accepted";
     this.lastError = null;
     return this.accepted;
+  }
+
+  private async acceptCurrentDraftBundle(): Promise<Awaited<ReturnType<typeof acceptPetBundle>>> {
+    if (!this.draft) {
+      throw this.setError(new GuidedPetFlowError("DRAFT_BUNDLE_REQUIRED", "Generate a pet bundle before accepting."));
+    }
+    try {
+      return await acceptPetBundle({
+        bundleDir: this.draft.bundleDir,
+        libraryDir: this.libraryRoot,
+        now: this.now
+      });
+    } catch (error) {
+      if (!(error instanceof PetReviewError) || error.code !== "INSTALLATION_ALREADY_EXISTS") {
+        throw error;
+      }
+    }
+
+    await deletePetAssets({
+      targetDir: join(this.libraryRoot, this.draft.petId),
+      allowedRoot: this.libraryRoot
+    });
+    return acceptPetBundle({
+      bundleDir: this.draft.bundleDir,
+      libraryDir: this.libraryRoot,
+      now: this.now
+    });
   }
 
   async launchPet(options: LaunchFlowOptions = {}): Promise<LaunchFlowResult> {

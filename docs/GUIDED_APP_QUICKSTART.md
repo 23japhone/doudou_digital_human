@@ -38,7 +38,7 @@ Use `npm run dev:app` for the full product flow. Use `npm run dev` only when you
 
 7. Click `接受`.
 
-   Expected result: the generated bundle is installed into the local app library and `启动` becomes available.
+   Expected result: the generated bundle is installed into the local app library and `启动` becomes available. If an older generated bundle with the same pet id is already in the app library, the guided manager replaces that old app-library copy with the current accepted draft.
 
 8. Click `启动`.
 

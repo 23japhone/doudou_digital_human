@@ -184,6 +184,55 @@ describe("GuidedPetFlow", () => {
     });
   });
 
+  test("replaces an existing accepted local bundle so repeated accept keeps launch available", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "source.png");
+    const appDataDir = path.join(workspace, "app-data");
+    await writeFile(sourcePath, createPngSource());
+
+    const firstFlow = new GuidedPetFlow({
+      workspaceDir: appDataDir,
+      now: new Date("2026-06-30T12:00:01.000Z")
+    });
+    await firstFlow.initialize();
+    await firstFlow.setSourceImagePath(sourcePath);
+    await firstFlow.generatePet();
+    await firstFlow.createReview();
+    const firstAccepted = await firstFlow.acceptPet();
+    const firstSourceMetaText = await readFile(path.join(firstAccepted.installedBundleDir, "source.meta.json"), "utf8");
+    expect(firstSourceMetaText).toContain("2026-06-30T12:00:01.000Z");
+
+    const secondFlow = new GuidedPetFlow({
+      workspaceDir: appDataDir,
+      now: new Date("2026-06-30T12:00:02.000Z")
+    });
+    await secondFlow.initialize();
+    await secondFlow.setSourceImagePath(sourcePath);
+    await secondFlow.generatePet();
+    await secondFlow.createReview();
+
+    const secondAccepted = await secondFlow.acceptPet();
+
+    expect(secondAccepted.installedBundleDir).toBe(firstAccepted.installedBundleDir);
+    await expect(validatePetBundle(secondAccepted.installedBundleDir)).resolves.toMatchObject({
+      manifest: expect.objectContaining({ id: "generated_local_pet" })
+    });
+    const secondSourceMetaText = await readFile(
+      path.join(secondAccepted.installedBundleDir, "source.meta.json"),
+      "utf8"
+    );
+    expect(secondSourceMetaText).toContain("2026-06-30T12:00:02.000Z");
+    expect(secondFlow.getPublicState()).toMatchObject({
+      status: "accepted",
+      accepted: expect.objectContaining({ petId: "generated_local_pet" }),
+      actions: expect.objectContaining({
+        canLaunch: true,
+        canStopLaunch: false
+      }),
+      lastError: null
+    });
+  });
+
   test("cleans up developer preview output when local comparison fails", async () => {
     const workspace = await createTempDir();
     const sourcePath = path.join(workspace, "bad.png");
