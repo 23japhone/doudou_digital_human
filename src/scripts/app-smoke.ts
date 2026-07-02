@@ -57,6 +57,7 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.launched ||
       !smokeResult.runtimeSmoke?.bundleLoaded ||
       !smokeResult.runtimeSmoke.atlasLoaded ||
+      !smokeResult.runtimeSmoke.scaleChanged ||
       !smokeResult.runtimeSmoke.nonTransparentPixel ||
       !smokeResult.runtimeSmoke.idleAdvanced ||
       !smokeResult.deletedDraft ||

@@ -42,7 +42,7 @@ Use `npm run dev:app` for the full product flow. Use `npm run dev` only when you
 
 8. Click `启动`.
 
-   Expected result: a transparent always-on-top desktop pet appears and animates. Drag the visible pet body with the primary mouse button to move it. `停止` becomes available.
+   Expected result: a transparent always-on-top desktop pet appears and animates. Drag the visible pet body with the primary mouse button to move it, and use the mouse wheel over the visible pet body to scale it between 50% and 200%. `停止` becomes available.
 
 9. Click `停止`.
 
@@ -107,6 +107,7 @@ The smoke should print `guided app smoke:` followed by JSON where these fields a
 - `deletedAccepted`
 - `runtimeSmoke.bundleLoaded`
 - `runtimeSmoke.atlasLoaded`
+- `runtimeSmoke.scaleChanged`
 - `runtimeSmoke.nonTransparentPixel`
 - `runtimeSmoke.idleAdvanced`
 
@@ -122,6 +123,7 @@ Manual smoke checklist:
 - Click `接受`.
 - Click `启动` and confirm a desktop pet appears above the desktop.
 - Drag the visible pet body and confirm the desktop pet window follows the pointer.
+- Use the mouse wheel over the visible pet body and confirm the desktop pet changes size without disappearing.
 - Click `停止` and confirm the pet disappears.
 - Click `启动` again to confirm relaunch still works.
 - Click `停止` again.
@@ -189,7 +191,7 @@ Run the runtime smoke to verify the renderer can load and draw the pet:
 npm run smoke:runtime
 ```
 
-The expected evidence includes `bundleLoaded:true`, `atlasLoaded:true`, `nonTransparentPixel:true`, and `idleAdvanced:true`.
+The expected evidence includes `bundleLoaded:true`, `atlasLoaded:true`, `scaleChanged:true`, `nonTransparentPixel:true`, and `idleAdvanced:true`.
 
 ### `停止` is disabled
 

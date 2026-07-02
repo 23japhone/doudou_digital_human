@@ -62,9 +62,11 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.bundleLoaded ||
     !smokeResult.atlasLoaded ||
     !smokeResult.dragMoved ||
+    !smokeResult.scaleChanged ||
     !smokeResult.nonTransparentPixel ||
     !smokeResult.idleAdvanced ||
     !smokeResult.renderLoopAdvanced ||
+    smokeResult.scale <= 1 ||
     smokeResult.drawCount < 2 ||
     smokeResult.currentFrameIndex === smokeResult.initialFrameIndex
   ) {
@@ -151,6 +153,8 @@ function parseSmokeResult(output: string) {
     idleAdvanced: boolean;
     nonTransparentPixel: boolean;
     renderLoopAdvanced: boolean;
+    scale: number;
+    scaleChanged: boolean;
     drawCount: number;
     initialFrameIndex: number;
     currentFrameIndex: number;

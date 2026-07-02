@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("petRuntime", {
   quit: () => ipcRenderer.send("pet:quit"),
   reportSmokeResult: (result) => ipcRenderer.send("pet:smoke-result", result),
   setIgnoreMouseEvents: (ignore) => ipcRenderer.send("pet:set-ignore-mouse-events", Boolean(ignore)),
+  setWindowScale: (scale) => ipcRenderer.invoke("pet:set-window-scale", Number(scale)),
   showContextMenu: () => ipcRenderer.send("pet:show-context-menu"),
   startWindowDrag: (point) => ipcRenderer.send("pet:start-window-drag", sanitizePoint(point)),
   rendererReady: () => ipcRenderer.send("pet:renderer-ready")

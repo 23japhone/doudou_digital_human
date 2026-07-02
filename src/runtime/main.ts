@@ -9,6 +9,12 @@ import {
   type WindowDragSession
 } from "./drag.js";
 import type { RuntimeBundle, RuntimeSmokeResult } from "./runtime-types.js";
+import {
+  RUNTIME_SCALE_LIMITS,
+  calculateCenteredScaledWindowBounds,
+  calculateScaledWindowSize,
+  clampRuntimeScale
+} from "./scale.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 
@@ -24,7 +30,9 @@ let smokeMode = false;
 let readySignalMode = false;
 let ignoreMouseEvents = false;
 let dragSession: WindowDragSession | null = null;
+let runtimeScale = RUNTIME_SCALE_LIMITS.default;
 let smokeDragMoved = false;
+let smokeScaleChanged = false;
 let smokeTimeout: NodeJS.Timeout | null = null;
 
 async function main(): Promise<void> {
@@ -73,10 +81,11 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
 function createWindow(bundle: ValidatedPetBundle): void {
   const manifest = bundle.manifest;
   const rendererIndex = resolve(currentDir, "../../runtime/renderer/index.html");
+  const initialSize = calculateScaledWindowSize(manifest.canvas, runtimeScale);
 
   mainWindow = new BrowserWindow({
-    width: manifest.canvas.width,
-    height: manifest.canvas.height,
+    width: initialSize.width,
+    height: initialSize.height,
     transparent: true,
     frame: false,
     resizable: false,
@@ -92,6 +101,10 @@ function createWindow(bundle: ValidatedPetBundle): void {
     }
   });
 
+  const minSize = calculateScaledWindowSize(manifest.canvas, RUNTIME_SCALE_LIMITS.min);
+  const maxSize = calculateScaledWindowSize(manifest.canvas, RUNTIME_SCALE_LIMITS.max);
+  mainWindow.setMinimumSize(minSize.width, minSize.height);
+  mainWindow.setMaximumSize(maxSize.width, maxSize.height);
   mainWindow.setAlwaysOnTop(true, "floating");
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   mainWindow.setIgnoreMouseEvents(true, { forward: true });
@@ -137,6 +150,8 @@ ipcMain.handle("pet:get-bundle", () => {
       url: pathToFileURL(join(currentBundle!.rootDir, atlas.path)).href
     })),
     previewUrl: pathToFileURL(join(currentBundle.rootDir, manifest.assets.preview)).href,
+    scale: runtimeScale,
+    scaleLimits: RUNTIME_SCALE_LIMITS,
     smoke: smokeMode
   };
   return runtimeBundle;
@@ -149,6 +164,8 @@ ipcMain.on("pet:set-ignore-mouse-events", (_event, ignore: boolean) => {
   mainWindow.setIgnoreMouseEvents(ignore, { forward: true });
   ignoreMouseEvents = ignore;
 });
+
+ipcMain.handle("pet:set-window-scale", (_event, requestedScale: number) => applyWindowScale(requestedScale));
 
 ipcMain.on("pet:start-window-drag", (_event, pointer: ScreenPoint) => {
   if (!mainWindow || !isFiniteScreenPoint(pointer)) {
@@ -216,7 +233,14 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
       clearTimeout(smokeTimeout);
       smokeTimeout = null;
     }
-    console.log(`runtime smoke: ${JSON.stringify({ ...result, dragMoved: smokeDragMoved })}`);
+    console.log(
+      `runtime smoke: ${JSON.stringify({
+        ...result,
+        dragMoved: smokeDragMoved,
+        scale: runtimeScale,
+        scaleChanged: smokeScaleChanged
+      })}`
+    );
     setTimeout(() => app.quit(), 250);
   }
 });
@@ -229,4 +253,31 @@ void main();
 
 function isFiniteScreenPoint(point: ScreenPoint): boolean {
   return Number.isFinite(point?.x) && Number.isFinite(point?.y);
+}
+
+function applyWindowScale(requestedScale: number): number {
+  const nextScale = clampRuntimeScale(requestedScale);
+  if (!mainWindow || !currentBundle) {
+    runtimeScale = nextScale;
+    return runtimeScale;
+  }
+
+  const currentBounds = mainWindow.getBounds();
+  const nextBounds = calculateCenteredScaledWindowBounds(currentBounds, currentBundle.manifest.canvas, nextScale);
+  const boundsChanged =
+    nextBounds.x !== currentBounds.x ||
+    nextBounds.y !== currentBounds.y ||
+    nextBounds.width !== currentBounds.width ||
+    nextBounds.height !== currentBounds.height;
+
+  if (boundsChanged) {
+    mainWindow.setBounds(nextBounds, false);
+  }
+  const appliedBounds = mainWindow.getBounds();
+  const appliedSizeChanged = appliedBounds.width !== currentBounds.width || appliedBounds.height !== currentBounds.height;
+  if (smokeMode && appliedSizeChanged && nextScale !== runtimeScale) {
+    smokeScaleChanged = true;
+  }
+  runtimeScale = clampRuntimeScale(appliedBounds.width / currentBundle.manifest.canvas.width);
+  return runtimeScale;
 }

@@ -2,6 +2,7 @@ import { createAnimationPlayer } from "./animation.js";
 import type { PetAtlas } from "../pet_bundle/manifest.js";
 import type { RuntimeBundle, RuntimeSmokeResult } from "./runtime-types.js";
 import { isPointInsideRuntimeHitArea, type CanvasAlphaSampler } from "./hit-area.js";
+import { mapCssPointToCanvasPoint, nextRuntimeScale } from "./scale.js";
 import "./styles.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
@@ -40,7 +41,9 @@ let lastTimestamp = performance.now();
 let drawCount = 0;
 let initialFrameIndex: number | null = null;
 let currentFrameIndex = -1;
-let smokeDragExercised = false;
+let runtimeScale = bundle.scale;
+let smokeInteractionsExercised = false;
+let smokeResultReporting = false;
 let smokeResultReported = false;
 let draggingPointerId: number | null = null;
 
@@ -63,11 +66,13 @@ window.addEventListener("mousemove", (event) => {
     window.petRuntime.setIgnoreMouseEvents(false);
     return;
   }
-  window.petRuntime.setIgnoreMouseEvents(!isInsidePetHitArea(event.offsetX, event.offsetY, bundle));
+  const point = canvasPointFromMouseEvent(event);
+  window.petRuntime.setIgnoreMouseEvents(!isInsidePetHitArea(point.x, point.y, bundle));
 });
 
 petCanvas.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0 || !isInsidePetHitArea(event.offsetX, event.offsetY, bundle)) {
+  const point = canvasPointFromMouseEvent(event);
+  if (event.button !== 0 || !isInsidePetHitArea(point.x, point.y, bundle)) {
     return;
   }
   draggingPointerId = event.pointerId;
@@ -87,6 +92,29 @@ petCanvas.addEventListener("pointermove", (event) => {
 
 petCanvas.addEventListener("pointerup", endDragIfActive);
 petCanvas.addEventListener("pointercancel", endDragIfActive);
+petCanvas.addEventListener(
+  "wheel",
+  (event) => {
+    const point = canvasPointFromMouseEvent(event);
+    if (!isInsidePetHitArea(point.x, point.y, bundle)) {
+      return;
+    }
+    event.preventDefault();
+    const requestedScale = nextRuntimeScale(runtimeScale, event.deltaY, bundle.scaleLimits);
+    if (requestedScale === runtimeScale) {
+      return;
+    }
+    void window.petRuntime
+      .setWindowScale(requestedScale)
+      .then((appliedScale) => {
+        runtimeScale = appliedScale;
+      })
+      .catch((error: unknown) => {
+        console.error(error instanceof Error ? error.message : String(error));
+      });
+  },
+  { passive: false }
+);
 window.addEventListener("blur", endWindowDrag);
 
 function endDragIfActive(event: PointerEvent): void {
@@ -112,6 +140,15 @@ function screenPointFromPointerEvent(event: PointerEvent): { x: number; y: numbe
     x: event.screenX,
     y: event.screenY
   };
+}
+
+function canvasPointFromMouseEvent(event: MouseEvent): { x: number; y: number } {
+  const rect = petCanvas.getBoundingClientRect();
+  return mapCssPointToCanvasPoint(
+    { x: event.clientX - rect.left, y: event.clientY - rect.top },
+    { width: rect.width, height: rect.height },
+    bundle.manifest.canvas
+  );
 }
 
 function render(timestamp: number): void {
@@ -194,26 +231,36 @@ window.petRuntime.rendererReady();
 requestAnimationFrame(render);
 
 function reportSmokeResultIfReady(): void {
-  if (smokeResultReported || initialFrameIndex === null) {
+  if (smokeResultReported || smokeResultReporting || initialFrameIndex === null) {
     return;
   }
   const renderLoopAdvanced = drawCount >= 2 && currentFrameIndex !== initialFrameIndex;
   if (!renderLoopAdvanced) {
     return;
   }
-  exerciseSmokeDragIfNeeded();
+  smokeResultReporting = true;
+  void reportSmokeResultAfterInteractions(renderLoopAdvanced);
+}
+
+async function reportSmokeResultAfterInteractions(renderLoopAdvanced: boolean): Promise<void> {
+  try {
+    await exerciseSmokeInteractionsIfNeeded();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+  }
   smokeResultReported = true;
   window.petRuntime.reportSmokeResult(createSmokeResult(renderLoopAdvanced));
 }
 
-function exerciseSmokeDragIfNeeded(): void {
-  if (!bundle.smoke || smokeDragExercised) {
+async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
+  if (!bundle.smoke || smokeInteractionsExercised) {
     return;
   }
-  smokeDragExercised = true;
+  smokeInteractionsExercised = true;
   window.petRuntime.startWindowDrag({ x: 100, y: 100 });
   window.petRuntime.dragWindowTo({ x: 112, y: 116 });
   window.petRuntime.endWindowDrag();
+  runtimeScale = await window.petRuntime.setWindowScale(nextRuntimeScale(runtimeScale, -1, bundle.scaleLimits));
 }
 
 function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
@@ -224,6 +271,8 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     idleAdvanced: renderLoopAdvanced,
     nonTransparentPixel: canvasHasNonTransparentPixel(),
     renderLoopAdvanced,
+    scale: runtimeScale,
+    scaleChanged: false,
     drawCount,
     initialFrameIndex: initialFrameIndex ?? -1,
     currentFrameIndex
