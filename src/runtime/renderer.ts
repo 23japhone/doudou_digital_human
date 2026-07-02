@@ -13,6 +13,13 @@ import {
   shouldShowRuntimeFrameAffordance,
   type RuntimeScaleDragSession
 } from "./scale.js";
+import {
+  RUNTIME_PET_STATES,
+  createRuntimePetStateMachine,
+  runtimePetStateClass,
+  type RuntimeMotionPetState,
+  type RuntimePetState
+} from "./state.js";
 import "./styles.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
@@ -36,6 +43,7 @@ const RESIZE_AFFORDANCE_CLASS = "is-resize-affordance-visible";
 const bundle = await window.petRuntime.getBundle();
 console.log(`pet renderer: loaded bundle ${bundle.manifest.id}`);
 const player = createAnimationPlayer(bundle.manifest);
+const stateMachine = createRuntimePetStateMachine();
 const atlasImages = await loadAtlases(bundle);
 console.log(`pet renderer: loaded ${atlasImages.size} atlas image(s)`);
 const canvasAlphaSampler: CanvasAlphaSampler = {
@@ -65,10 +73,12 @@ let draggingPointerId: number | null = null;
 let scalingPointerId: number | null = null;
 let scaleDragSession: RuntimeScaleDragSession | null = null;
 let scaleRequestSerial = 0;
+let visualState: RuntimePetState = stateMachine.current();
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
 petFrame.style.setProperty("--runtime-frame-padding", `${RUNTIME_FRAME_PADDING}px`);
+applyRuntimePetState(visualState);
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
@@ -100,12 +110,17 @@ window.addEventListener("mouseleave", () => {
   }
 });
 
+window.petRuntime.onMotionState((state) => {
+  applyRuntimePetState(stateMachine.motion(state, performance.now()));
+});
+
 petFrame.addEventListener("pointerdown", (event) => {
   const framePoint = framePointFromMouseEvent(event);
   if (event.button !== 0 || !isPointInRuntimeFrame(framePoint, frameSize())) {
     return;
   }
   if (shouldStartScaleDrag(framePoint, event)) {
+    markRuntimeWorking();
     scalingPointerId = event.pointerId;
     scaleDragSession = createRuntimeScaleDragSession({
       origin: frameCenterScreenPoint(),
@@ -119,11 +134,13 @@ petFrame.addEventListener("pointerdown", (event) => {
     return;
   }
   draggingPointerId = event.pointerId;
+  markRuntimeWorking();
   petFrame.setPointerCapture(event.pointerId);
   window.petRuntime.setIgnoreMouseEvents(false);
   window.petRuntime.startWindowDrag(screenPointFromPointerEvent(event));
   const canvasPoint = canvasPointFromMouseEvent(event);
   if (isInsidePetHitArea(canvasPoint.x, canvasPoint.y, bundle)) {
+    markRuntimeClicked();
     player.tap();
   }
 });
@@ -137,6 +154,7 @@ petFrame.addEventListener("pointermove", (event) => {
       bundle.scaleLimits
     );
     if (requestedScale !== null) {
+      markRuntimeWorking();
       scheduleRuntimeScale(requestedScale, "pointer");
     }
     return;
@@ -145,6 +163,7 @@ petFrame.addEventListener("pointermove", (event) => {
     return;
   }
   event.preventDefault();
+  markRuntimeWorking();
   window.petRuntime.dragWindowTo(screenPointFromPointerEvent(event));
 });
 
@@ -158,6 +177,7 @@ petFrame.addEventListener(
       return;
     }
     event.preventDefault();
+    markRuntimeWorking();
     scheduleRuntimeScale(nextRuntimeScale(runtimeScale, event.deltaY, bundle.scaleLimits, event.deltaMode), "wheel");
   },
   { passive: false }
@@ -277,6 +297,7 @@ function logRuntimeError(error: unknown): void {
 function render(timestamp: number): void {
   const deltaMs = timestamp - lastTimestamp;
   lastTimestamp = timestamp;
+  applyRuntimePetState(stateMachine.advance(deltaMs, timestamp));
   player.advance(deltaMs);
   drawCurrentFrame();
   reportSmokeResultIfReady();
@@ -380,7 +401,11 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
     return;
   }
   smokeInteractionsExercised = true;
+  applyRuntimeMotionState("approaching");
+  applyRuntimeMotionState("stopped");
+  markRuntimeClicked();
   window.petRuntime.startWindowDrag({ x: 100, y: 100 });
+  markRuntimeWorking();
   window.petRuntime.dragWindowTo({ x: 112, y: 116 });
   window.petRuntime.endWindowDrag();
   runtimeScale = await applyRuntimeScale(nextRuntimeScale(runtimeScale, -24, bundle.scaleLimits), "wheel");
@@ -408,12 +433,42 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     pointerScaleChanged: false,
     wheelScaleChanged: false,
     mouseFollowMoved: false,
+    runtimeStatesObserved: stateMachine.observed(),
+    visualStateApplied: isRuntimeVisualStateApplied(),
     drawCount,
     initialFrameIndex: initialFrameIndex ?? -1,
     currentFrameIndex,
     frameHiddenByDefault: isRuntimeFrameHiddenByDefault(),
     frameVisibleOnResizeEdge: isRuntimeFrameVisibleOnResizeEdge()
   };
+}
+
+function applyRuntimeMotionState(state: RuntimeMotionPetState): void {
+  applyRuntimePetState(stateMachine.motion(state, performance.now()));
+}
+
+function markRuntimeClicked(): void {
+  applyRuntimePetState(stateMachine.tap(performance.now()));
+}
+
+function markRuntimeWorking(): void {
+  applyRuntimePetState(stateMachine.working(performance.now()));
+}
+
+function applyRuntimePetState(state: RuntimePetState): void {
+  if (state === visualState && petFrame.dataset.runtimeState === state) {
+    return;
+  }
+  visualState = state;
+  petFrame.dataset.runtimeState = state;
+  for (const candidate of RUNTIME_PET_STATES) {
+    petFrame.classList.toggle(runtimePetStateClass(candidate), candidate === state);
+  }
+}
+
+function isRuntimeVisualStateApplied(): boolean {
+  const currentState = stateMachine.current();
+  return petFrame.dataset.runtimeState === currentState && petFrame.classList.contains(runtimePetStateClass(currentState));
 }
 
 function isRuntimeFrameHiddenByDefault(): boolean {

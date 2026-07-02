@@ -57,4 +57,57 @@ body {
   height: calc(100vh - var(--runtime-frame-padding) * 2);
   display: block;
   background: transparent;
+  transform-origin: 50% 82%;
+  transition:
+    filter 140ms ease,
+    transform 140ms ease;
+}
+
+#pet-frame.runtime-state-waiting #pet-canvas {
+  animation: runtime-waiting-breathe 1800ms ease-in-out infinite;
+}
+
+#pet-frame.runtime-state-approaching #pet-canvas {
+  filter: drop-shadow(0 8px 8px rgba(28, 72, 92, 0.18));
+  transform: translateY(-3px) rotate(-2deg) scale(1.015);
+}
+
+#pet-frame.runtime-state-stopped #pet-canvas {
+  transform: translateY(2px) scale(0.99);
+}
+
+#pet-frame.runtime-state-clicked #pet-canvas {
+  filter: drop-shadow(0 10px 10px rgba(70, 120, 255, 0.24));
+  transform: translateY(-8px) scale(1.06);
+}
+
+#pet-frame.runtime-state-working #pet-canvas {
+  animation: runtime-working-pulse 720ms ease-in-out infinite;
+  filter: drop-shadow(0 0 10px rgba(103, 178, 255, 0.42));
+}
+
+#pet-frame.runtime-state-working {
+  border-color: rgba(103, 178, 255, 0.56);
+}
+
+@keyframes runtime-waiting-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-2px) scale(1.012);
+  }
+}
+
+@keyframes runtime-working-pulse {
+  0%,
+  100% {
+    transform: translateY(-1px) scale(1.01);
+  }
+
+  50% {
+    transform: translateY(-5px) scale(1.035);
+  }
 }

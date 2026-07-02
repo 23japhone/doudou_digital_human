@@ -19,8 +19,10 @@ import {
 import {
   calculateCursorFollowStep,
   createSmokeCursorFollowPoint,
+  type RuntimeMotionState,
   type RuntimeMotionPoint
 } from "./motion.js";
+import type { RuntimeMotionPetState } from "./state.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
@@ -358,6 +360,7 @@ function tickCursorFollowMotion(): void {
     windowBounds: currentBounds,
     workArea
   });
+  publishCursorMotionState(motionStep.state);
 
   if (!motionStep.moved) {
     return;
@@ -368,4 +371,12 @@ function tickCursorFollowMotion(): void {
     const appliedBounds = mainWindow.getBounds();
     smokeMouseFollowMoved ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
   }
+}
+
+function publishCursorMotionState(state: RuntimeMotionState): void {
+  if (!mainWindow || mainWindow.webContents.isDestroyed()) {
+    return;
+  }
+  const runtimeState: RuntimeMotionPetState = state === "following" ? "approaching" : "stopped";
+  mainWindow.webContents.send("pet:motion-state", runtimeState);
 }

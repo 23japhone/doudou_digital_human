@@ -61,6 +61,8 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !smokeResult.runtimeSmoke.pointerScaleChanged ||
       !smokeResult.runtimeSmoke.wheelScaleChanged ||
       !smokeResult.runtimeSmoke.mouseFollowMoved ||
+      !smokeResult.runtimeSmoke.visualStateApplied ||
+      !hasAllRuntimeStates(smokeResult.runtimeSmoke.runtimeStatesObserved) ||
       !smokeResult.runtimeSmoke.nonTransparentPixel ||
       !smokeResult.runtimeSmoke.frameHiddenByDefault ||
       !smokeResult.runtimeSmoke.frameVisibleOnResizeEdge ||
@@ -75,6 +77,10 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
   } finally {
     await rm(tempRoot, { force: true, recursive: true });
   }
+}
+
+function hasAllRuntimeStates(states: string[]): boolean {
+  return ["approaching", "stopped", "clicked", "waiting", "working"].every((state) => states.includes(state));
 }
 
 export async function prepareGuidedAppSmokeSource(

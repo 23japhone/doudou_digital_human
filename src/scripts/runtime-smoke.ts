@@ -66,6 +66,8 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.pointerScaleChanged ||
     !smokeResult.wheelScaleChanged ||
     !smokeResult.mouseFollowMoved ||
+    !smokeResult.visualStateApplied ||
+    !hasAllRuntimeStates(smokeResult.runtimeStatesObserved) ||
     !smokeResult.nonTransparentPixel ||
     !smokeResult.idleAdvanced ||
     !smokeResult.frameHiddenByDefault ||
@@ -78,6 +80,10 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     throw new Error(`${label} runtime smoke returned incomplete result\n${validResult.output}`);
   }
   console.log(`runtime smoke ${label}: ${JSON.stringify(smokeResult)}`);
+}
+
+function hasAllRuntimeStates(states: string[]): boolean {
+  return ["approaching", "stopped", "clicked", "waiting", "working"].every((state) => states.includes(state));
 }
 
 async function assertInvalidBundleFails(
@@ -163,6 +169,8 @@ function parseSmokeResult(output: string) {
     pointerScaleChanged: boolean;
     wheelScaleChanged: boolean;
     mouseFollowMoved: boolean;
+    runtimeStatesObserved: string[];
+    visualStateApplied: boolean;
     drawCount: number;
     initialFrameIndex: number;
     currentFrameIndex: number;
