@@ -28,6 +28,7 @@ import {
   RUNTIME_MOTION_TUNING_DEFAULTS,
   RUNTIME_MOTION_TUNING_LIMITS,
   createRuntimeStateTiming,
+  formatRuntimeMotionTuningPreset,
   resolveRuntimeMotionTuning,
   type RuntimeMotionTuning
 } from "./tuning.js";
@@ -90,6 +91,9 @@ let visualState: RuntimePetState = stateMachine.current();
 let maxStopRebound = 0;
 let smokeMotionTuningApplied = false;
 let smokeMotionTuningPanelVisible = false;
+let smokeMotionTuningPresetButtonVisible = false;
+let smokeMotionTuningPresetCopied = false;
+let smokeMotionTuningPresetText = "";
 const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
 type RuntimeMotionTuningKey = keyof RuntimeMotionTuning;
@@ -107,6 +111,7 @@ const runtimeTuningControls: readonly RuntimeTuningControl[] = [
 ];
 const tuningPanelOutputs = new Map<RuntimeMotionTuningKey, HTMLOutputElement>();
 const tuningPanelInputs = new Map<RuntimeMotionTuningKey, HTMLInputElement>();
+let tuningPresetStatus: HTMLElement | null = null;
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
@@ -524,6 +529,9 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     emotionMotionPhasesObserved: [],
     motionTuningApplied: smokeMotionTuningApplied,
     motionTuningPanelVisible: smokeMotionTuningPanelVisible,
+    motionTuningPresetButtonVisible: smokeMotionTuningPresetButtonVisible,
+    motionTuningPresetCopied: smokeMotionTuningPresetCopied,
+    motionTuningPresetText: smokeMotionTuningPresetText,
     motionTuningSnapshot: runtimeMotionTuning,
     maxEmotionWariness: 0,
     runtimeStatesObserved: stateMachine.observed(),
@@ -558,6 +566,9 @@ async function exerciseRuntimeMotionTuningForSmoke(): Promise<void> {
     runtimeMotionTuning.recoverySpeedPixelsPerSecond === 240 &&
     runtimeMotionTuning.retreatDistancePixels === 260 &&
     runtimeMotionTuning.watchingPauseMs === 560;
+  smokeMotionTuningPresetButtonVisible = Boolean(document.querySelector("#runtime-copy-tuning-preset"));
+  smokeMotionTuningPresetText = currentRuntimeMotionTuningPresetText();
+  smokeMotionTuningPresetCopied = await copyRuntimeMotionTuningPreset();
 }
 
 function setupRuntimeTuningPanel(): void {
@@ -578,13 +589,30 @@ function setupRuntimeTuningPanel(): void {
     panel.append(createRuntimeTuningControl(control));
   }
 
+  const actionRow = document.createElement("div");
+  actionRow.className = "runtime-tuning-actions";
+
+  const copyButton = document.createElement("button");
+  copyButton.id = "runtime-copy-tuning-preset";
+  copyButton.type = "button";
+  copyButton.textContent = "复制预设";
+  copyButton.addEventListener("click", () => {
+    void copyRuntimeMotionTuningPreset();
+  });
+
   const resetButton = document.createElement("button");
   resetButton.type = "button";
   resetButton.textContent = "重置";
   resetButton.addEventListener("click", () => {
     void updateRuntimeMotionTuning(RUNTIME_MOTION_TUNING_DEFAULTS);
   });
-  panel.append(resetButton);
+  actionRow.append(copyButton, resetButton);
+  panel.append(actionRow);
+
+  tuningPresetStatus = document.createElement("div");
+  tuningPresetStatus.className = "runtime-tuning-status";
+  tuningPresetStatus.setAttribute("aria-live", "polite");
+  panel.append(tuningPresetStatus);
 
   panel.addEventListener("pointerdown", (event) => event.stopPropagation());
   panel.addEventListener("pointermove", (event) => event.stopPropagation());
@@ -629,9 +657,25 @@ async function updateRuntimeMotionTuning(patch: Partial<RuntimeMotionTuning>): P
   applyRuntimeMotionTuning(appliedTuning);
 }
 
+async function copyRuntimeMotionTuningPreset(): Promise<boolean> {
+  const presetText = currentRuntimeMotionTuningPresetText();
+  const copied = await window.petRuntime.copyMotionTuningPreset(presetText);
+  if (tuningPresetStatus) {
+    tuningPresetStatus.textContent = copied ? "已复制预设" : "复制失败";
+  }
+  return copied;
+}
+
+function currentRuntimeMotionTuningPresetText(): string {
+  return formatRuntimeMotionTuningPreset(runtimeMotionTuning);
+}
+
 function applyRuntimeMotionTuning(nextTuning: RuntimeMotionTuning): void {
   runtimeMotionTuning = resolveRuntimeMotionTuning(nextTuning);
   Object.assign(runtimeStateTiming, createRuntimeStateTiming(runtimeMotionTuning));
+  if (tuningPresetStatus) {
+    tuningPresetStatus.textContent = "";
+  }
   updateRuntimeTuningPanelValues();
 }
 

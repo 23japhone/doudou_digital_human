@@ -82,6 +82,17 @@ export function createRuntimeRecoveryFollowConfig(tuning: RuntimeMotionTuning): 
   };
 }
 
+export function formatRuntimeMotionTuningPreset(tuning: RuntimeMotionTuning): string {
+  const resolved = resolveRuntimeMotionTuning(tuning);
+  return [
+    "DOUDOU_RUNTIME_TUNING=1",
+    `DOUDOU_RUNTIME_RETREAT_DISTANCE=${resolved.retreatDistancePixels}`,
+    `DOUDOU_RUNTIME_WATCH_MS=${resolved.watchingPauseMs}`,
+    `DOUDOU_RUNTIME_RECOVERY_SPEED=${resolved.recoverySpeedPixelsPerSecond}`,
+    "npm run dev"
+  ].join(" ");
+}
+
 export function runtimeRetreatDistanceForTuning(
   memory: RuntimeEmotionMemory,
   baseDistance: number,

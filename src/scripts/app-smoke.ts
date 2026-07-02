@@ -65,6 +65,9 @@ export async function runGuidedAppSmoke(options: GuidedAppSmokeRunOptions = {}):
       !hasAllEmotionMotionPhases(smokeResult.runtimeSmoke.emotionMotionPhasesObserved) ||
       !smokeResult.runtimeSmoke.motionTuningApplied ||
       !smokeResult.runtimeSmoke.motionTuningPanelVisible ||
+      !smokeResult.runtimeSmoke.motionTuningPresetButtonVisible ||
+      !smokeResult.runtimeSmoke.motionTuningPresetCopied ||
+      !hasSmokeMotionTuningPreset(smokeResult.runtimeSmoke.motionTuningPresetText) ||
       !hasSmokeMotionTuning(smokeResult.runtimeSmoke.motionTuningSnapshot) ||
       smokeResult.runtimeSmoke.maxEmotionWariness <= 0.5 ||
       !smokeResult.runtimeSmoke.visualStateApplied ||
@@ -104,6 +107,10 @@ function hasSmokeMotionTuning(tuning: { recoverySpeedPixelsPerSecond: number; re
     tuning.retreatDistancePixels === 260 &&
     tuning.watchingPauseMs === 560
   );
+}
+
+function hasSmokeMotionTuningPreset(text: string): boolean {
+  return text === "DOUDOU_RUNTIME_TUNING=1 DOUDOU_RUNTIME_RETREAT_DISTANCE=260 DOUDOU_RUNTIME_WATCH_MS=560 DOUDOU_RUNTIME_RECOVERY_SPEED=240 npm run dev";
 }
 
 function hasMotionDirection(directions: string[]): boolean {

@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("petRuntime", {
+  copyMotionTuningPreset: (text) => ipcRenderer.invoke("pet:copy-motion-tuning-preset", sanitizeClipboardText(text)),
   dragWindowTo: (point) => ipcRenderer.send("pet:drag-window-to", sanitizePoint(point)),
   endWindowDrag: () => ipcRenderer.send("pet:end-window-drag"),
   getBundle: () => ipcRenderer.invoke("pet:get-bundle"),
@@ -68,6 +69,13 @@ function sanitizeOptionalSize(size) {
 
 function sanitizeScaleSource(source) {
   return source === "pointer" || source === "wheel" ? source : undefined;
+}
+
+function sanitizeClipboardText(text) {
+  if (typeof text !== "string") {
+    return "";
+  }
+  return text.slice(0, 512);
 }
 
 function sanitizeMotionTuningPatch(patch) {

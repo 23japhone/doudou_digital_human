@@ -35,6 +35,7 @@ export interface RuntimeBundle {
 }
 
 export interface PetRuntimeBridge {
+  copyMotionTuningPreset(text: string): Promise<boolean>;
   dragWindowTo(pointer: ScreenPoint): void;
   endWindowDrag(): void;
   getBundle(): Promise<RuntimeBundle>;
@@ -67,6 +68,9 @@ export interface RuntimeSmokeResult {
   emotionMotionPhasesObserved: string[];
   motionTuningApplied: boolean;
   motionTuningPanelVisible: boolean;
+  motionTuningPresetButtonVisible: boolean;
+  motionTuningPresetCopied: boolean;
+  motionTuningPresetText: string;
   motionTuningSnapshot: RuntimeMotionTuning;
   maxEmotionWariness: number;
   runtimeStatesObserved: RuntimePetState[];

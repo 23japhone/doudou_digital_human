@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, screen } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, Menu, screen } from "electron";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validatePetBundle, type ValidatedPetBundle } from "../pet_bundle/validate.js";
@@ -55,6 +55,7 @@ const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
 const RUNTIME_CURSOR_FOLLOW_MAX_DELTA_MS = 100;
 const RUNTIME_CURSOR_HIT_TEST_TIMEOUT_MS = 80;
 const RUNTIME_CURSOR_FOLLOW_RESUME_DELAY_MS = 220;
+const RUNTIME_CLIPBOARD_TEXT_MAX_LENGTH = 512;
 
 interface RuntimeOptions {
   bundleDir: string;
@@ -247,6 +248,15 @@ ipcMain.handle("pet:set-motion-tuning", (_event, patch: Partial<RuntimeMotionTun
   }
   runtimeMotionTuning = resolveRuntimeMotionTuning(patch, runtimeMotionTuning);
   return runtimeMotionTuning;
+});
+
+ipcMain.handle("pet:copy-motion-tuning-preset", (_event, text: unknown) => {
+  const presetText = sanitizeClipboardText(text);
+  if (!runtimeMotionTuningEnabled || presetText.length === 0) {
+    return false;
+  }
+  clipboard.writeText(presetText);
+  return true;
 });
 
 ipcMain.on("pet:start-window-drag", (_event, pointer: ScreenPoint) => {
@@ -697,4 +707,11 @@ function numberFromEnv(value: string | undefined): number | undefined {
     return undefined;
   }
   return Number(value);
+}
+
+function sanitizeClipboardText(value: unknown): string {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.slice(0, RUNTIME_CLIPBOARD_TEXT_MAX_LENGTH);
 }

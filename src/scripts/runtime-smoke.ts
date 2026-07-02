@@ -70,6 +70,9 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !hasAllEmotionMotionPhases(smokeResult.emotionMotionPhasesObserved) ||
     !smokeResult.motionTuningApplied ||
     !smokeResult.motionTuningPanelVisible ||
+    !smokeResult.motionTuningPresetButtonVisible ||
+    !smokeResult.motionTuningPresetCopied ||
+    !hasSmokeMotionTuningPreset(smokeResult.motionTuningPresetText) ||
     !hasSmokeMotionTuning(smokeResult.motionTuningSnapshot) ||
     smokeResult.maxEmotionWariness <= 0.5 ||
     !smokeResult.visualStateApplied ||
@@ -106,6 +109,10 @@ function hasSmokeMotionTuning(tuning: { recoverySpeedPixelsPerSecond: number; re
     tuning.retreatDistancePixels === 260 &&
     tuning.watchingPauseMs === 560
   );
+}
+
+function hasSmokeMotionTuningPreset(text: string): boolean {
+  return text === "DOUDOU_RUNTIME_TUNING=1 DOUDOU_RUNTIME_RETREAT_DISTANCE=260 DOUDOU_RUNTIME_WATCH_MS=560 DOUDOU_RUNTIME_RECOVERY_SPEED=240 npm run dev";
 }
 
 function hasMotionDirection(directions: string[]): boolean {
@@ -203,6 +210,9 @@ function parseSmokeResult(output: string) {
     emotionMotionPhasesObserved: string[];
     motionTuningApplied: boolean;
     motionTuningPanelVisible: boolean;
+    motionTuningPresetButtonVisible: boolean;
+    motionTuningPresetCopied: boolean;
+    motionTuningPresetText: string;
     motionTuningSnapshot: {
       recoverySpeedPixelsPerSecond: number;
       retreatDistancePixels: number;

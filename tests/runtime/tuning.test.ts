@@ -5,6 +5,7 @@ import {
   createRuntimeEmotionPhaseConfig,
   createRuntimeRecoveryFollowConfig,
   createRuntimeStateTiming,
+  formatRuntimeMotionTuningPreset,
   resolveRuntimeMotionTuning,
   runtimeRetreatDistanceForTuning
 } from "../../src/runtime/tuning.js";
@@ -41,6 +42,18 @@ describe("runtime motion tuning", () => {
     const tuning = resolveRuntimeMotionTuning({ recoverySpeedPixelsPerSecond: 240 });
 
     expect(createRuntimeRecoveryFollowConfig(tuning).maxSpeedPixelsPerSecond).toBe(240);
+  });
+
+  test("formats tuning as a copyable runtime preset command", () => {
+    const tuning = resolveRuntimeMotionTuning({
+      recoverySpeedPixelsPerSecond: 240,
+      retreatDistancePixels: 260,
+      watchingPauseMs: 560
+    });
+
+    expect(formatRuntimeMotionTuningPreset(tuning)).toBe(
+      "DOUDOU_RUNTIME_TUNING=1 DOUDOU_RUNTIME_RETREAT_DISTANCE=260 DOUDOU_RUNTIME_WATCH_MS=560 DOUDOU_RUNTIME_RECOVERY_SPEED=240 npm run dev"
+    );
   });
 
   test("uses retreat distance tuning as the high-wariness dodge distance", () => {
