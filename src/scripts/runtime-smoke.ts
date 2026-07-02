@@ -63,6 +63,8 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.atlasLoaded ||
     !smokeResult.dragMoved ||
     !smokeResult.scaleChanged ||
+    !smokeResult.pointerScaleChanged ||
+    !smokeResult.wheelScaleChanged ||
     !smokeResult.nonTransparentPixel ||
     !smokeResult.idleAdvanced ||
     !smokeResult.renderLoopAdvanced ||
@@ -155,6 +157,8 @@ function parseSmokeResult(output: string) {
     renderLoopAdvanced: boolean;
     scale: number;
     scaleChanged: boolean;
+    pointerScaleChanged: boolean;
+    wheelScaleChanged: boolean;
     drawCount: number;
     initialFrameIndex: number;
     currentFrameIndex: number;

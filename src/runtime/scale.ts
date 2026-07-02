@@ -1,8 +1,9 @@
 export interface RuntimeScaleLimits {
   min: number;
   max: number;
-  step: number;
   default: number;
+  wheelSensitivity: number;
+  dragSensitivity: number;
 }
 
 export interface RuntimeCanvasSize {
@@ -22,12 +23,22 @@ export interface RuntimePoint {
   y: number;
 }
 
+export interface RuntimeScaleDragSession {
+  pointerStart: RuntimePoint;
+  scaleStart: number;
+}
+
 export const RUNTIME_SCALE_LIMITS: RuntimeScaleLimits = {
   min: 0.5,
   max: 2,
-  step: 0.1,
-  default: 1
+  default: 1,
+  wheelSensitivity: 0.001,
+  dragSensitivity: 0.005
 };
+
+const WHEEL_LINE_PIXEL_HEIGHT = 16;
+const WHEEL_PAGE_PIXEL_HEIGHT = 256;
+const SCALE_DRAG_ZONE_START_RATIO = 0.68;
 
 export function clampRuntimeScale(
   requestedScale: number,
@@ -36,19 +47,49 @@ export function clampRuntimeScale(
   if (!Number.isFinite(requestedScale)) {
     return limits.default;
   }
-  return roundScale(Math.min(limits.max, Math.max(limits.min, requestedScale)));
+  return Math.min(limits.max, Math.max(limits.min, requestedScale));
 }
 
 export function nextRuntimeScale(
   currentScale: number,
   wheelDeltaY: number,
-  limits: RuntimeScaleLimits = RUNTIME_SCALE_LIMITS
+  limits: RuntimeScaleLimits = RUNTIME_SCALE_LIMITS,
+  wheelDeltaMode = 0
 ): number {
   if (wheelDeltaY === 0) {
     return clampRuntimeScale(currentScale, limits);
   }
-  const direction = wheelDeltaY < 0 ? 1 : -1;
-  return clampRuntimeScale(currentScale + direction * limits.step, limits);
+  const normalizedDeltaY = normalizeWheelDeltaY(wheelDeltaY, wheelDeltaMode);
+  return clampRuntimeScale(currentScale * Math.exp(-normalizedDeltaY * limits.wheelSensitivity), limits);
+}
+
+export function createRuntimeScaleDragSession(
+  start: { pointer: RuntimePoint; scale: number },
+  limits: RuntimeScaleLimits = RUNTIME_SCALE_LIMITS
+): RuntimeScaleDragSession {
+  return {
+    pointerStart: start.pointer,
+    scaleStart: clampRuntimeScale(start.scale, limits)
+  };
+}
+
+export function calculateDraggedRuntimeScale(
+  session: RuntimeScaleDragSession,
+  pointer: RuntimePoint,
+  limits: RuntimeScaleLimits = RUNTIME_SCALE_LIMITS
+): number | null {
+  if (!isFinitePoint(pointer) || !isFinitePoint(session.pointerStart)) {
+    return null;
+  }
+  const dragDeltaY = session.pointerStart.y - pointer.y;
+  return clampRuntimeScale(session.scaleStart * Math.exp(dragDeltaY * limits.dragSensitivity), limits);
+}
+
+export function isPointInRuntimeScaleDragZone(point: RuntimePoint, canvas: RuntimeCanvasSize): boolean {
+  if (!isFinitePoint(point) || canvas.width <= 0 || canvas.height <= 0) {
+    return false;
+  }
+  return point.x >= canvas.width * SCALE_DRAG_ZONE_START_RATIO && point.y >= canvas.height * SCALE_DRAG_ZONE_START_RATIO;
 }
 
 export function calculateScaledWindowSize(
@@ -94,6 +135,19 @@ export function mapCssPointToCanvasPoint(
   };
 }
 
-function roundScale(scale: number): number {
-  return Math.round(scale * 100) / 100;
+function normalizeWheelDeltaY(deltaY: number, deltaMode: number): number {
+  if (!Number.isFinite(deltaY)) {
+    return 0;
+  }
+  if (deltaMode === 1) {
+    return deltaY * WHEEL_LINE_PIXEL_HEIGHT;
+  }
+  if (deltaMode === 2) {
+    return deltaY * WHEEL_PAGE_PIXEL_HEIGHT;
+  }
+  return deltaY;
+}
+
+function isFinitePoint(point: RuntimePoint): boolean {
+  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }

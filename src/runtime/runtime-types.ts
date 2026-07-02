@@ -7,6 +7,8 @@ export interface RuntimeAtlas {
   url: string;
 }
 
+export type RuntimeScaleSource = "pointer" | "wheel";
+
 export interface RuntimeBundle {
   manifest: PetManifest;
   atlases: RuntimeAtlas[];
@@ -23,7 +25,7 @@ export interface PetRuntimeBridge {
   quit(): void;
   reportSmokeResult(result: RuntimeSmokeResult): void;
   setIgnoreMouseEvents(ignore: boolean): void;
-  setWindowScale(scale: number): Promise<number>;
+  setWindowScale(scale: number, source?: RuntimeScaleSource): Promise<number>;
   showContextMenu(): void;
   startWindowDrag(pointer: ScreenPoint): void;
   rendererReady(): void;
@@ -38,6 +40,8 @@ export interface RuntimeSmokeResult {
   renderLoopAdvanced: boolean;
   scale: number;
   scaleChanged: boolean;
+  pointerScaleChanged: boolean;
+  wheelScaleChanged: boolean;
   drawCount: number;
   initialFrameIndex: number;
   currentFrameIndex: number;

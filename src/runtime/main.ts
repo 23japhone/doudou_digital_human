@@ -8,7 +8,7 @@ import {
   type ScreenPoint,
   type WindowDragSession
 } from "./drag.js";
-import type { RuntimeBundle, RuntimeSmokeResult } from "./runtime-types.js";
+import type { RuntimeBundle, RuntimeScaleSource, RuntimeSmokeResult } from "./runtime-types.js";
 import {
   RUNTIME_SCALE_LIMITS,
   calculateCenteredScaledWindowBounds,
@@ -33,6 +33,8 @@ let dragSession: WindowDragSession | null = null;
 let runtimeScale = RUNTIME_SCALE_LIMITS.default;
 let smokeDragMoved = false;
 let smokeScaleChanged = false;
+let smokePointerScaleChanged = false;
+let smokeWheelScaleChanged = false;
 let smokeTimeout: NodeJS.Timeout | null = null;
 
 async function main(): Promise<void> {
@@ -165,7 +167,9 @@ ipcMain.on("pet:set-ignore-mouse-events", (_event, ignore: boolean) => {
   ignoreMouseEvents = ignore;
 });
 
-ipcMain.handle("pet:set-window-scale", (_event, requestedScale: number) => applyWindowScale(requestedScale));
+ipcMain.handle("pet:set-window-scale", (_event, requestedScale: number, source?: unknown) =>
+  applyWindowScale(requestedScale, sanitizeRuntimeScaleSource(source))
+);
 
 ipcMain.on("pet:start-window-drag", (_event, pointer: ScreenPoint) => {
   if (!mainWindow || !isFiniteScreenPoint(pointer)) {
@@ -238,7 +242,9 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
         ...result,
         dragMoved: smokeDragMoved,
         scale: runtimeScale,
-        scaleChanged: smokeScaleChanged
+        scaleChanged: smokeScaleChanged,
+        pointerScaleChanged: smokePointerScaleChanged,
+        wheelScaleChanged: smokeWheelScaleChanged
       })}`
     );
     setTimeout(() => app.quit(), 250);
@@ -255,7 +261,7 @@ function isFiniteScreenPoint(point: ScreenPoint): boolean {
   return Number.isFinite(point?.x) && Number.isFinite(point?.y);
 }
 
-function applyWindowScale(requestedScale: number): number {
+function applyWindowScale(requestedScale: number, source?: RuntimeScaleSource): number {
   const nextScale = clampRuntimeScale(requestedScale);
   if (!mainWindow || !currentBundle) {
     runtimeScale = nextScale;
@@ -277,7 +283,13 @@ function applyWindowScale(requestedScale: number): number {
   const appliedSizeChanged = appliedBounds.width !== currentBounds.width || appliedBounds.height !== currentBounds.height;
   if (smokeMode && appliedSizeChanged && nextScale !== runtimeScale) {
     smokeScaleChanged = true;
+    smokePointerScaleChanged ||= source === "pointer";
+    smokeWheelScaleChanged ||= source === "wheel";
   }
   runtimeScale = clampRuntimeScale(appliedBounds.width / currentBundle.manifest.canvas.width);
   return runtimeScale;
+}
+
+function sanitizeRuntimeScaleSource(source: unknown): RuntimeScaleSource | undefined {
+  return source === "pointer" || source === "wheel" ? source : undefined;
 }
