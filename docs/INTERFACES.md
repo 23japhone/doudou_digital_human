@@ -36,6 +36,7 @@ Potential developer interfaces:
 - `npm run export:doudou-live2d -- <output-dir>` builds the Stage C CLI and writes the 12 default 兜兜 Live2D expressions to `<output-dir>/expressions/doudou_<emotion_id>.exp3.json` using real Cubism `.exp3.json` fields only.
 - `npm run validate:doudou-live2d -- <output-dir>` rebuilds the same CLI and validates that a default 兜兜 Live2D expression directory matches `DEFAULT_DOUDOU_LIVE2D_EXPRESSION_SPECS`. Success and failure output are stable JSON and use only relative expression file paths.
 - `fixtures/live2d/default_doudou_expressions/` is the committed Stage C fixture snapshot for the default 兜兜 `.exp3.json` expressions. It is research/runtime fixture data only and is not part of `pet bundle v0.1`.
+- `npm run preview:doudou-live2d -- <expressions-dir> <from-emotion-id> <to-emotion-id>` builds the Stage D preview CLI, loads the 12 default `.exp3.json` files as future Cubism SDK expression load requests, reports a direct expression switch, then reports an accepted model-arbitration probe through the existing safe emotion gate. Output is stable JSON and uses only relative expression file paths.
 
 ## Compatibility
 

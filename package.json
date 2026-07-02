@@ -17,6 +17,7 @@
     "generate:pet:cloud": "npm run build:main && node dist/src/cli/generate-pet-cloud.js",
     "export:doudou-live2d": "npm run build:main && node dist/src/cli/doudou-live2d-exp3.js export",
     "validate:doudou-live2d": "npm run build:main && node dist/src/cli/doudou-live2d-exp3.js validate",
+    "preview:doudou-live2d": "npm run build:main && node dist/src/cli/doudou-live2d-preview.js",
     "qa:stylizer": "npm run build:main && node dist/src/scripts/stylizer-qa.js",
     "qa:stylizer:check": "npm run build:main && node dist/src/scripts/stylizer-qa-check.js",
     "qa:stylizer:compare": "npm run build:main && node dist/src/scripts/stylizer-preview-comparison.js",
