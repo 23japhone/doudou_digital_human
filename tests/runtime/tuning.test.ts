@@ -10,6 +10,14 @@ import {
 } from "../../src/runtime/tuning.js";
 
 describe("runtime motion tuning", () => {
+  test("uses the tuned comfortable defaults from manual runtime tuning", () => {
+    expect(RUNTIME_MOTION_TUNING_DEFAULTS).toEqual({
+      recoverySpeedPixelsPerSecond: 280,
+      retreatDistancePixels: 216,
+      watchingPauseMs: 680
+    });
+  });
+
   test("merges partial tuning patches and clamps unsafe values", () => {
     const tuning = resolveRuntimeMotionTuning({
       recoverySpeedPixelsPerSecond: Number.NaN,

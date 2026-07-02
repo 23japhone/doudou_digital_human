@@ -1,5 +1,4 @@
 import {
-  RUNTIME_CURSOR_DODGE_CONFIG,
   RUNTIME_CURSOR_FOLLOW_CONFIG,
   type RuntimeCursorFollowConfig
 } from "./motion.js";
@@ -26,9 +25,9 @@ interface RuntimeMotionTuningLimits {
 }
 
 export const RUNTIME_MOTION_TUNING_DEFAULTS: RuntimeMotionTuning = {
-  recoverySpeedPixelsPerSecond: 320,
-  retreatDistancePixels: RUNTIME_CURSOR_DODGE_CONFIG.dodgeDistance + 96,
-  watchingPauseMs: RUNTIME_EMOTION_MOTION_PHASE_CONFIG.watchingMs
+  recoverySpeedPixelsPerSecond: 280,
+  retreatDistancePixels: 216,
+  watchingPauseMs: 680
 };
 
 export const RUNTIME_MOTION_TUNING_LIMITS: RuntimeMotionTuningLimits = {
