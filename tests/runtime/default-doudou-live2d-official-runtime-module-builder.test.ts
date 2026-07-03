@@ -208,6 +208,66 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("waits for the official sample CompleteSetup state before loading expressions", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-ready-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir, { readiness: "delayedCompleteSetup" });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-ready-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async (coreScriptUrl) => {
+          calls.push(`loadCore:${coreScriptUrl}`);
+        }
+      });
+
+      await host.loadDefaultModel(library);
+
+      const completeSetupIndex = calls.indexOf("LAppModel.completeSetup");
+      const firstExpressionLoadIndex = calls.findIndex((call) => call.startsWith("LAppModel.loadExpression:"));
+      expect(completeSetupIndex).toBeGreaterThanOrEqual(0);
+      expect(firstExpressionLoadIndex).toBeGreaterThan(completeSetupIndex);
+      expect(host.evidence()).toMatchObject({
+        expressionCount: 12,
+        modelLoaded: true,
+        runtimeModuleProbe: "loaded"
+      });
+    } finally {
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("passes framework mode through the CLI instead of falling back to sample mode", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-runtime-cli-mode-"));
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -269,7 +329,11 @@ describe("default doudou official Live2D runtime module builder", () => {
   });
 });
 
-async function writeSyntheticCubismSampleSdk(sdkDir: string): Promise<void> {
+async function writeSyntheticCubismSampleSdk(
+  sdkDir: string,
+  options: { readiness?: "loadedFlag" | "delayedCompleteSetup" } = {}
+): Promise<void> {
+  const readiness = options.readiness ?? "loadedFlag";
   await mkdir(path.join(sdkDir, "Framework/src/live2dcubismframework.ts", ".."), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/math"), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/motion"), { recursive: true });
@@ -325,6 +389,7 @@ export class CubismExpressionUpdater {
     `
 import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
 const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
+const readiness = ${JSON.stringify(readiness)};
 export class LAppModel {
   constructor() {
     this._model = {};
@@ -344,8 +409,19 @@ export class LAppModel {
     calls().push("LAppModel.setSubdelegate:" + Boolean(subdelegate.getCanvas()));
   }
   loadAssets(dir, fileName) {
-    this.loaded = true;
     calls().push("LAppModel.loadAssets:" + dir + ":" + fileName);
+    if (readiness === "delayedCompleteSetup") {
+      this._updating = false;
+      this._initialized = true;
+      this._state = 21;
+      calls().push("LAppModel.waitLoadTexture");
+      setTimeout(() => {
+        this._state = 22;
+        calls().push("LAppModel.completeSetup");
+      }, 40);
+    } else {
+      this.loaded = true;
+    }
   }
   loadExpression(_buffer, size, name) {
     calls().push("LAppModel.loadExpression:" + name + ":" + size);

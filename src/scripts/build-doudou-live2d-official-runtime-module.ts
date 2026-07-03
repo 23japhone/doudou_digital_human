@@ -435,8 +435,24 @@ async function waitForSampleModelReady(model) {
 
 function isSampleModelReady(model) {
   return model.loaded === true ||
-    model._state === 23 ||
-    (model._model && model._updating === false && model._initialized === true);
+    hasSampleCompleteSetupState(model) ||
+    hasFinishedSampleTextureSetup(model);
+}
+
+function hasSampleCompleteSetupState(model) {
+  return model._state === 22 ||
+    model._stateName === "CompleteSetup";
+}
+
+function hasFinishedSampleTextureSetup(model) {
+  const textureCount = model._modelSetting?.getTextureCount?.();
+  return Boolean(model._model) &&
+    model._updating === false &&
+    model._initialized === true &&
+    typeof textureCount === "number" &&
+    textureCount > 0 &&
+    typeof model._textureCount === "number" &&
+    model._textureCount >= textureCount;
 }
 
 function delay(milliseconds) {
