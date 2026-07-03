@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
+import { DEFAULT_DOUDOU_LIVE2D_EXPRESSION_SPECS } from "../../src/runtime/default-doudou-live2d.js";
 import {
   resolveDoudouOfficialLive2DRendererRuntime,
   type DoudouOfficialLive2DRendererRuntimeEvidence
@@ -41,7 +42,7 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
         available: true,
         configured: true,
         model: {
-          expressionCount: 1,
+          expressionCount: 12,
           moc: "default-doudou.moc3",
           model3Json: "default-doudou.model3.json",
           motionGroupCount: 1,
@@ -160,6 +161,49 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
           reason: "model_asset_missing"
         },
         reason: "model_asset_missing"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
+  test("rejects stale official Sample Data expressions that were not rewritten to default doudou expressions", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-stale-sample-expressions-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      await writeLocalOfficialSdkFixture(sdkDir);
+      await mkdir(path.join(modelDir, "textures"), { recursive: true });
+      await mkdir(path.join(modelDir, "expressions"), { recursive: true });
+      await writeFile(path.join(modelDir, "default-doudou.moc3"), "moc3", "utf8");
+      await writeFile(path.join(modelDir, "textures/default-doudou.png"), "png", "utf8");
+      await writeFile(path.join(modelDir, "expressions/exp_01.exp3.json"), "{}", "utf8");
+      await writeFile(
+        path.join(modelDir, "default-doudou.model3.json"),
+        JSON.stringify({
+          Version: 3,
+          FileReferences: {
+            Moc: "default-doudou.moc3",
+            Textures: ["textures/default-doudou.png"],
+            Expressions: [{ Name: "exp_01", File: "expressions/exp_01.exp3.json" }],
+            Motions: {}
+          }
+        }),
+        "utf8"
+      );
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "model_expression_mismatch"
+        },
+        reason: "model_expression_mismatch"
       });
       expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
     } finally {
@@ -454,7 +498,9 @@ async function writeDefaultDoudouModelFixture(modelDir: string): Promise<void> {
   await mkdir(path.join(modelDir, "motions"), { recursive: true });
   await writeFile(path.join(modelDir, "default-doudou.moc3"), "moc3", "utf8");
   await writeFile(path.join(modelDir, "textures/default-doudou.png"), "png", "utf8");
-  await writeFile(path.join(modelDir, "expressions/doudou_delighted.exp3.json"), "{}", "utf8");
+  for (const spec of DEFAULT_DOUDOU_LIVE2D_EXPRESSION_SPECS) {
+    await writeFile(path.join(modelDir, spec.expressionFile), "{}", "utf8");
+  }
   await writeFile(path.join(modelDir, "motions/idle.motion3.json"), "{}", "utf8");
   await writeFile(
     path.join(modelDir, "default-doudou.model3.json"),
@@ -463,7 +509,10 @@ async function writeDefaultDoudouModelFixture(modelDir: string): Promise<void> {
       FileReferences: {
         Moc: "default-doudou.moc3",
         Textures: ["textures/default-doudou.png"],
-        Expressions: [{ Name: "delighted", File: "expressions/doudou_delighted.exp3.json" }],
+        Expressions: DEFAULT_DOUDOU_LIVE2D_EXPRESSION_SPECS.map((spec) => ({
+          Name: spec.expressionName,
+          File: spec.expressionFile
+        })),
         Motions: {
           Idle: [{ File: "motions/idle.motion3.json" }]
         }

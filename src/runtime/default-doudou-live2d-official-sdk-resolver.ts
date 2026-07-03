@@ -1,6 +1,7 @@
 import { access, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { DEFAULT_DOUDOU_LIVE2D_EXPRESSION_SPECS } from "./default-doudou-live2d.js";
 
 export type DoudouOfficialLive2DRendererRuntimeUnavailableReason =
   | "not_configured"
@@ -9,6 +10,7 @@ export type DoudouOfficialLive2DRendererRuntimeUnavailableReason =
   | "sdk_sample_runtime_missing"
   | "model3_missing"
   | "model3_invalid"
+  | "model_expression_mismatch"
   | "model_asset_missing"
   | "runtime_module_missing"
   | "unsafe_model_reference";
@@ -172,6 +174,9 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
   }
   if (references.some((reference) => !isSafeRelativeModelReference(reference))) {
     return unavailable("unsafe_model_reference", true);
+  }
+  if (!hasDefaultDoudouExpressions(model)) {
+    return unavailable("model_expression_mismatch", true);
   }
   if (!await allModelAssetsExist(modelDir, references)) {
     return unavailable("model_asset_missing", true);
@@ -345,6 +350,27 @@ function collectModelReferences(model: DoudouModel3Json): string[] | null {
     }
   }
   return references;
+}
+
+function hasDefaultDoudouExpressions(model: DoudouModel3Json): boolean {
+  const expressions = model.FileReferences.Expressions;
+  if (!Array.isArray(expressions) || expressions.length !== DEFAULT_DOUDOU_LIVE2D_EXPRESSION_SPECS.length) {
+    return false;
+  }
+  const actualExpressions = new Set<string>();
+  for (const expression of expressions) {
+    if (typeof expression.File !== "string" || typeof expression.Name !== "string") {
+      return false;
+    }
+    actualExpressions.add(modelExpressionKey(expression.Name, expression.File));
+  }
+  return DEFAULT_DOUDOU_LIVE2D_EXPRESSION_SPECS.every((spec) =>
+    actualExpressions.has(modelExpressionKey(spec.expressionName, spec.expressionFile))
+  );
+}
+
+function modelExpressionKey(name: string, file: string): string {
+  return `${name}\u0000${file}`;
 }
 
 function isSafeRelativeModelReference(reference: string): boolean {
