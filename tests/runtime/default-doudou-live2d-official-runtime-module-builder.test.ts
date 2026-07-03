@@ -93,8 +93,9 @@ describe("default doudou official Live2D runtime module builder", () => {
       expect(calls.filter((call) => call === "LAppPal.updateTime").length).toBeGreaterThanOrEqual(3);
       expect(calls).toContain("LAppModel.loadAssets:file:///models/:default-doudou.model3.json");
       expect(calls.filter((call) => call.startsWith("LAppModel.loadExpression:")).length).toBe(12);
-      expect(calls.filter((call) => call.startsWith("LAppModel.expressionMap.setValue:")).length).toBe(12);
-      expect(calls).toContain("LAppModel.expressionMap.setValue:兜兜开心发光:兜兜开心发光");
+      expect(calls.filter((call) => call.startsWith("LAppModel.expressionMap.set:")).length).toBe(12);
+      expect(calls.filter((call) => call.startsWith("LAppModel.expressionMap.setValue:")).length).toBe(0);
+      expect(calls).toContain("LAppModel.expressionMap.set:兜兜开心发光:兜兜开心发光");
       expect(calls).toContain("LAppModel.setExpression:兜兜开心发光");
       expect(calls).toContain("LAppModel.expressionUpdateMotion:0.000");
       expect(calls).toContain("LAppModel.expressionUpdateMotion:0.033");
@@ -105,6 +106,65 @@ describe("default doudou official Live2D runtime module builder", () => {
       expect(firstFrameTimeIndex).toBeGreaterThanOrEqual(0);
       expect(firstFrameTimeIndex).toBeLessThan(firstFrameUpdateIndex);
       expect(JSON.stringify(host.evidence())).not.toContain(tempRoot);
+    } finally {
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
+  test("keeps sample mode compatible with csmMap-style expression registration", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-csmmap-success-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir, { expressionMap: "csmMap" });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-csmmap-success-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async () => undefined
+      });
+
+      await host.loadDefaultModel(library);
+
+      expect(host.evidence()).toMatchObject({
+        expressionCount: 12,
+        modelLoaded: true,
+        runtimeLifecycle: {
+          expressionLoadCalls: 12
+        },
+        runtimeModuleProbe: "loaded"
+      });
+      expect(calls.filter((call) => call.startsWith("LAppModel.expressionMap.setValue:")).length).toBe(12);
+      expect(calls).toContain("LAppModel.expressionMap.setValue:兜兜开心发光:兜兜开心发光");
     } finally {
       delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
       await rm(tempRoot, { force: true, recursive: true });
@@ -1105,14 +1165,14 @@ describe("default doudou official Live2D runtime module builder", () => {
 async function writeSyntheticCubismSampleSdk(
   sdkDir: string,
   options: {
-    expressionMap?: "brokenCsmMap" | "brokenNativeMap" | "csmMap" | "missing";
+    expressionMap?: "brokenCsmMap" | "brokenNativeMap" | "csmMap" | "missing" | "nativeMap";
     readiness?: "loadedFlag" | "delayedCompleteSetup" | "textureCallbackCompleteSetup";
     sampleFrameworkFiles?: boolean;
     sampleSupportFiles?: boolean;
     setExpressionResult?: "accepted" | "rejected";
   } = {}
 ): Promise<void> {
-  const expressionMap = options.expressionMap ?? "csmMap";
+  const expressionMap = options.expressionMap ?? "nativeMap";
   const readiness = options.readiness ?? "loadedFlag";
   const sampleFrameworkFiles = options.sampleFrameworkFiles ?? true;
   const sampleSupportFiles = options.sampleSupportFiles ?? true;
@@ -1217,6 +1277,22 @@ export class LAppModel {
         getValue(name) {
           calls().push("LAppModel.expressionMap.getValue:" + name + ":null");
           return null;
+        }
+      };
+    } else if (expressionMap === "nativeMap") {
+      const values = new Map();
+      this._expressions = {
+        set(name, expression) {
+          calls().push("LAppModel.expressionMap.set:" + name + ":" + expression.name);
+          values.set(name, expression);
+        },
+        get(name) {
+          const expression = values.get(name);
+          calls().push("LAppModel.expressionMap.get:" + name + ":" + (expression?.name ?? "null"));
+          return expression;
+        },
+        has(name) {
+          return values.has(name);
         }
       };
     } else if (expressionMap === "brokenNativeMap") {
