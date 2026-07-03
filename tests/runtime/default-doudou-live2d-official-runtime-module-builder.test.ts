@@ -494,6 +494,76 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("rejects framework mode when the created model reports an invalid canvas size", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-runtime-invalid-canvas-"));
+    const originalFetch = globalThis.fetch;
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-official-runtime.mjs");
+      await writeSyntheticCubismFrameworkSdk(sdkDir, { modelCanvas: "zeroWidth" });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "framework",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+        calls.push(`fetch:${String(url).replace(tempRoot, "<temp>")}`);
+        return new Response(new TextEncoder().encode("fixture").buffer);
+      }) as typeof fetch;
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=framework-invalid-canvas-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async (coreScriptUrl) => {
+          calls.push(`loadCore:${coreScriptUrl}`);
+        }
+      });
+
+      await host.loadDefaultModel(library);
+
+      expect(host.evidence()).toMatchObject({
+        expressionCount: 0,
+        modelLoaded: false,
+        runtimeFailureReason: "model_or_expression_load_failed",
+        runtimeLifecycle: {
+          expressionLoadCalls: 0,
+          expressionSetCalls: 0
+        },
+        runtimeModuleProbe: "model_failed"
+      });
+      expect(calls).toContain("CubismModel.getCanvasWidth:0");
+      expect(calls.some((call) => call.startsWith("CubismModelMatrix:"))).toBe(false);
+      expect(calls.some((call) => call === "CubismExpressionMotion.create")).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("waits for the official sample CompleteSetup state before loading expressions", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-ready-"));
     try {
@@ -1385,10 +1455,12 @@ function installFakeImage(options: { result?: "error" | "load" } = {}): () => vo
 async function writeSyntheticCubismFrameworkSdk(
   sdkDir: string,
   options: {
+    modelCanvas?: "valid" | "zeroWidth";
     rendererStartupResult?: "accepted" | "rejected";
     textureMode?: "emptySlot" | "none";
   } = {}
 ): Promise<void> {
+  const modelCanvas = options.modelCanvas ?? "valid";
   const rendererStartupResult = options.rendererStartupResult ?? "accepted";
   const textureMode = options.textureMode ?? "none";
   await mkdir(path.join(sdkDir, "Framework/src/math"), { recursive: true });
@@ -1456,6 +1528,7 @@ export class CubismModelSettingJson {
     path.join(sdkDir, "Framework/src/model/cubismmoc.ts"),
     `
 const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
+const modelCanvas = ${JSON.stringify(modelCanvas)};
 export class CubismMoc {
   static create(_buffer, shouldCheckMocConsistency) {
     calls().push("CubismMoc.create:" + shouldCheckMocConsistency);
@@ -1464,10 +1537,13 @@ export class CubismMoc {
         calls().push("CubismMoc.createModel");
         return {
           getCanvasHeight() {
+            calls().push("CubismModel.getCanvasHeight:2");
             return 2;
           },
           getCanvasWidth() {
-            return 2;
+            const width = modelCanvas === "zeroWidth" ? 0 : 2;
+            calls().push("CubismModel.getCanvasWidth:" + width);
+            return width;
           },
           loadParameters() {
             calls().push("CubismModel.loadParameters");

@@ -642,7 +642,12 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
       throw new Error("Live2D CubismMoc.createModel failed.");
     }
     this.model.saveParameters?.();
-    this.modelMatrix = new CubismModelMatrix(this.model.getCanvasWidth(), this.model.getCanvasHeight());
+    const modelCanvasWidth = this.model.getCanvasWidth?.();
+    const modelCanvasHeight = this.model.getCanvasHeight?.();
+    if (!isPositiveFiniteNumber(modelCanvasWidth) || !isPositiveFiniteNumber(modelCanvasHeight)) {
+      throw new Error("Live2D model reported an invalid canvas size.");
+    }
+    this.modelMatrix = new CubismModelMatrix(modelCanvasWidth, modelCanvasHeight);
     const layout = new Map();
     this.setting.getLayoutMap(layout);
     this.modelMatrix.setupFromLayout(layout);
@@ -755,6 +760,10 @@ function ensureCubismFrameworkStarted() {
 
 function ensureTrailingSlash(value) {
   return value.endsWith("/") ? value : value + "/";
+}
+
+function isPositiveFiniteNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 async function fetchArrayBuffer(url) {
