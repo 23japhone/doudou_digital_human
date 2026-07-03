@@ -251,6 +251,35 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
     }
   });
 
+  test("rejects a configured SDK sample support file path that resolves to a directory", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-directory-sample-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      const sampleSourceFile = path.join(sdkDir, "Samples/TypeScript/Demo/src/lappview.ts");
+      await writeLocalOfficialSdkFixture(sdkDir);
+      await writeDefaultDoudouModelFixture(modelDir);
+      await rm(sampleSourceFile, { force: true, recursive: true });
+      await mkdir(sampleSourceFile, { recursive: true });
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "sdk_sample_runtime_missing"
+        },
+        reason: "sdk_sample_runtime_missing"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("rejects a configured SDK missing official sample Framework dependencies", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-missing-framework-"));
     try {
@@ -258,6 +287,35 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
       const modelDir = path.join(tempRoot, "default-doudou-model");
       await writeLocalOfficialSdkFixture(sdkDir, { sampleFrameworkFiles: false });
       await writeDefaultDoudouModelFixture(modelDir);
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "sdk_framework_missing"
+        },
+        reason: "sdk_framework_missing"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
+  test("rejects a configured SDK Framework dependency file path that resolves to a directory", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-directory-framework-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      const frameworkSourceFile = path.join(sdkDir, "Framework/src/motion/cubismmotion.ts");
+      await writeLocalOfficialSdkFixture(sdkDir);
+      await writeDefaultDoudouModelFixture(modelDir);
+      await rm(frameworkSourceFile, { force: true, recursive: true });
+      await mkdir(frameworkSourceFile, { recursive: true });
 
       const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
 

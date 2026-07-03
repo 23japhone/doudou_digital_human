@@ -220,7 +220,7 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
 
 async function hasRequiredFrameworkSourceFiles(frameworkSourceDir: string): Promise<boolean> {
   for (const relativeFile of REQUIRED_SAMPLE_FRAMEWORK_FILES) {
-    if (!await exists(path.join(frameworkSourceDir, relativeFile))) {
+    if (!await isFile(path.join(frameworkSourceDir, relativeFile))) {
       return false;
     }
   }
@@ -229,7 +229,7 @@ async function hasRequiredFrameworkSourceFiles(frameworkSourceDir: string): Prom
 
 async function hasRequiredSampleSourceFiles(sampleSourceDir: string): Promise<boolean> {
   for (const relativeFile of REQUIRED_SAMPLE_SOURCE_FILES) {
-    if (!await exists(path.join(sampleSourceDir, relativeFile))) {
+    if (!await isFile(path.join(sampleSourceDir, relativeFile))) {
       return false;
     }
   }
