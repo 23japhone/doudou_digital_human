@@ -3,6 +3,7 @@ export interface DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
   canvasLayerVisible: boolean;
   canvasNonTransparentPixel: boolean;
   drawCalls: number;
+  expressionAppliedAfterFrame: boolean;
   expressionCount: number;
   expressionSwitches: number;
   frameLoopAdvanced: boolean;
@@ -64,6 +65,9 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (evidence.expressionSwitches <= 0) {
     failures.push(`${label}.expressionSwitches`);
   }
+  if (!evidence.expressionAppliedAfterFrame) {
+    failures.push(`${label}.expressionAppliedAfterFrame`);
+  }
   if (!evidence.frameLoopAdvanced) {
     failures.push(`${label}.frameLoopAdvanced`);
   }
@@ -102,6 +106,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     typeof officialRuntime.rendererAssetProbe !== "string" ||
     typeof runtimeModule.activeEmotionId !== "string" ||
     typeof runtimeModule.drawCalls !== "number" ||
+    typeof runtimeModule.expressionAppliedAfterFrame !== "boolean" ||
     typeof runtimeModule.expressionCount !== "number" ||
     typeof runtimeModule.expressionSwitches !== "number" ||
     typeof runtimeModule.frameLoopAdvanced !== "boolean" ||
@@ -116,6 +121,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     canvasLayerVisible: officialRuntime.canvasLayerVisible,
     canvasNonTransparentPixel: officialRuntime.canvasNonTransparentPixel,
     drawCalls: runtimeModule.drawCalls,
+    expressionAppliedAfterFrame: runtimeModule.expressionAppliedAfterFrame,
     expressionCount: runtimeModule.expressionCount,
     expressionSwitches: runtimeModule.expressionSwitches,
     frameLoopAdvanced: runtimeModule.frameLoopAdvanced,

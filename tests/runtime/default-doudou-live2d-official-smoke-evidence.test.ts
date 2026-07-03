@@ -42,6 +42,17 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
   });
 
+  test("requires loaded official runtime evidence to apply an expression after a frame", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      expressionAppliedAfterFrame: false
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.expressionAppliedAfterFrame"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
   test("accepts complete loaded official runtime evidence", () => {
     const evidence = createOfficialRuntimeEvidence({
       activeEmotionId: "delighted",
@@ -86,6 +97,7 @@ function createOfficialRuntimeEvidence(
     canvasLayerVisible: true,
     canvasNonTransparentPixel: true,
     drawCalls: 2,
+    expressionAppliedAfterFrame: true,
     expressionCount: 12,
     expressionSwitches: 1,
     frameLoopAdvanced: true,
@@ -107,6 +119,7 @@ function createRuntimeSmokeResult(evidence: DoudouOfficialLive2DRendererRuntimeS
         runtimeModule: {
           activeEmotionId: evidence.activeEmotionId,
           drawCalls: evidence.drawCalls,
+          expressionAppliedAfterFrame: evidence.expressionAppliedAfterFrame,
           expressionCount: evidence.expressionCount,
           expressionSwitches: evidence.expressionSwitches,
           frameLoopAdvanced: evidence.frameLoopAdvanced,

@@ -74,6 +74,7 @@ describe("default doudou official Live2D runtime module builder", () => {
       expect(host.evidence()).toMatchObject({
         activeEmotionId: "delighted",
         drawCalls: 2,
+        expressionAppliedAfterFrame: true,
         expressionCount: 12,
         expressionSwitches: 1,
         frameLoopAdvanced: true,
@@ -163,6 +164,7 @@ describe("default doudou official Live2D runtime module builder", () => {
       expect(host.evidence()).toMatchObject({
         activeEmotionId: "delighted",
         drawCalls: 2,
+        expressionAppliedAfterFrame: true,
         expressionCount: 12,
         expressionSwitches: 1,
         frameLoopAdvanced: true,

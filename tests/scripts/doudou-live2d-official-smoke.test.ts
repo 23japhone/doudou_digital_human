@@ -133,6 +133,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
             canvasLayerVisible: true,
             canvasNonTransparentPixel: true,
             drawCalls: 21,
+            expressionAppliedAfterFrame: true,
             expressionCount: 12,
             expressionSwitches: 13,
             frameLoopAdvanced: true,
@@ -146,6 +147,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
             canvasLayerVisible: true,
             canvasNonTransparentPixel: true,
             drawCalls: 29,
+            expressionAppliedAfterFrame: true,
             expressionCount: 12,
             expressionSwitches: 17,
             frameLoopAdvanced: true,
@@ -268,6 +270,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
       runtimeSmoke: {
         exitCode: 0,
         failedChecks: [
+          "fixtureBundle.expressionAppliedAfterFrame",
           "fixtureBundle.drawCalls",
           "fixtureBundle.updateCalls",
           "fixtureBundle.activeEmotionId",
@@ -290,6 +293,7 @@ function createRuntimeSmokeResult(activeEmotionId: string, expressionSwitches: n
         runtimeModule: {
           activeEmotionId,
           drawCalls: frameCalls,
+          expressionAppliedAfterFrame: activeEmotionId !== "calm_idle" && expressionSwitches > 0 && frameCalls >= 2,
           expressionCount: 12,
           expressionSwitches,
           frameLoopAdvanced: true,

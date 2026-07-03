@@ -1188,6 +1188,7 @@ function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostE
   return {
     activeEmotionId: "calm_idle",
     drawCalls: 0,
+    expressionAppliedAfterFrame: false,
     expressionCount: 0,
     expressionSwitches: 0,
     frameLoopAdvanced: false,

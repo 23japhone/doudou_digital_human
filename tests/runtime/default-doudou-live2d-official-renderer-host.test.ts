@@ -39,12 +39,18 @@ describe("default doudou official Live2D renderer host", () => {
 
     await host.loadDefaultModel(library);
     await host.switchExpression(library, "delighted");
+    expect(host.evidence()).toMatchObject({
+      activeEmotionId: "delighted",
+      expressionAppliedAfterFrame: false,
+      expressionSwitches: 1
+    });
     host.renderFrame(1000);
     host.renderFrame(1033);
 
     expect(host.evidence()).toMatchObject({
       activeEmotionId: "delighted",
       drawCalls: 2,
+      expressionAppliedAfterFrame: true,
       expressionCount: 12,
       expressionSwitches: 1,
       frameLoopAdvanced: true,

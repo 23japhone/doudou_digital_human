@@ -15,6 +15,7 @@ export type DoudouOfficialLive2DRendererRuntimeModuleProbe =
 export interface DoudouOfficialLive2DRendererHostEvidence {
   activeEmotionId: DefaultDoudouEmotionId;
   drawCalls: number;
+  expressionAppliedAfterFrame: boolean;
   expressionCount: number;
   expressionSwitches: number;
   frameLoopAdvanced: boolean;
@@ -79,6 +80,7 @@ export function createDoudouOfficialLive2DRendererHost(
 ): DoudouOfficialLive2DRendererHost {
   let activeEmotionId: DefaultDoudouEmotionId = "calm_idle";
   let drawCalls = 0;
+  let expressionNeedsFrame = false;
   let expressionCount = 0;
   let expressionSwitches = 0;
   let lastFrameAtMs: number | null = null;
@@ -151,6 +153,9 @@ export function createDoudouOfficialLive2DRendererHost(
         updateCalls += 1;
         runtime.draw();
         drawCalls += 1;
+        if (expressionNeedsFrame && activeEmotionId !== "calm_idle") {
+          expressionNeedsFrame = false;
+        }
       } catch {
         runtimeModuleProbe = "model_failed";
       }
@@ -173,6 +178,7 @@ export function createDoudouOfficialLive2DRendererHost(
       }
       activeEmotionId = emotionId;
       expressionSwitches += 1;
+      expressionNeedsFrame = true;
       return true;
     }
   };
@@ -181,6 +187,7 @@ export function createDoudouOfficialLive2DRendererHost(
     return {
       activeEmotionId,
       drawCalls,
+      expressionAppliedAfterFrame: expressionSwitches > 0 && activeEmotionId !== "calm_idle" && !expressionNeedsFrame,
       expressionCount,
       expressionSwitches,
       frameLoopAdvanced: updateCalls >= 2 && drawCalls >= 2,
