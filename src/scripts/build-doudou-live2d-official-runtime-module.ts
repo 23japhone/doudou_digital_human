@@ -648,7 +648,10 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
     this.modelMatrix.setupFromLayout(layout);
     this.renderer = new CubismRenderer_WebGL(this.canvas.width, this.canvas.height);
     this.renderer.initialize(this.model);
-    this.renderer.startUp(this.gl);
+    const rendererStarted = this.renderer.startUp(this.gl);
+    if (rendererStarted === false) {
+      throw new Error("Live2D CubismRenderer_WebGL.startUp failed.");
+    }
     await this.loadTextures();
     this.renderer.loadShaders();
   }
