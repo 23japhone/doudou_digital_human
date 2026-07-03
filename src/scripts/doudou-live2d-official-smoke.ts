@@ -2,6 +2,10 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
+  resolveDoudouOfficialLive2DRendererRuntime,
+  type DoudouOfficialLive2DRendererRuntimeResolution
+} from "../runtime/default-doudou-live2d-official-sdk-resolver.js";
+import {
   buildDoudouOfficialLive2DRendererRuntimeModule,
   type BuildDoudouOfficialLive2DRendererRuntimeModuleInput,
   type DoudouOfficialLive2DRuntimeModuleBuildMode,
@@ -13,6 +17,7 @@ export interface DoudouOfficialLive2DSmokeOptions {
   buildRuntimeModule?: BuildRuntimeModule;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  resolveOfficialRuntime?: ResolveOfficialRuntime;
   runRuntimeSmoke?: RunRuntimeSmoke;
 }
 
@@ -36,6 +41,11 @@ type BuildRuntimeModule = (
 ) => Promise<DoudouOfficialLive2DRuntimeModuleBuildResult>;
 
 type RunRuntimeSmoke = (input: RuntimeSmokeRunInput) => Promise<RuntimeSmokeRunResult>;
+
+type ResolveOfficialRuntime = (input: {
+  modelDir: string;
+  sdkDir: string;
+}) => Promise<DoudouOfficialLive2DRendererRuntimeResolution>;
 
 interface ParsedOfficialSmokeArgs {
   mode: DoudouOfficialLive2DRuntimeModuleBuildMode;
@@ -67,6 +77,19 @@ export async function runDoudouOfficialLive2DSmoke(
   }
   const configuredModelDir = modelDir;
   const configuredSdkDir = sdkDir;
+
+  const resolveOfficialRuntime = options.resolveOfficialRuntime ?? resolveDoudouOfficialLive2DRendererRuntime;
+  const preflight = await resolveOfficialRuntime({
+    modelDir: configuredModelDir,
+    sdkDir: configuredSdkDir
+  });
+  if (!preflight.available) {
+    return jsonResult(1, {
+      ok: false,
+      code: "OFFICIAL_LIVE2D_PREFLIGHT_FAILED",
+      reason: preflight.reason
+    });
+  }
 
   const buildRuntimeModule = options.buildRuntimeModule ?? buildDoudouOfficialLive2DRendererRuntimeModule;
   const buildResult = await buildRuntimeModule({

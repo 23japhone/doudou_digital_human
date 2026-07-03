@@ -26,9 +26,9 @@ describe("runDoudouOfficialLive2DSmoke", () => {
 
   test("builds a sanitized runtime module and runs the renderer smoke with official SDK env", async () => {
     const calls: Array<Record<string, unknown>> = [];
-    const sdkDir = "/private/local/CubismSdkForWeb";
-    const modelDir = "/private/local/default-doudou-model";
-    const outputFile = "/private/local_live2d_runtime/default-doudou-official-runtime.mjs";
+    const sdkDir = "fixture-cubism-sdk";
+    const modelDir = "fixture-default-doudou-model";
+    const outputFile = "fixture-runtime/default-doudou-official-runtime.mjs";
 
     const result = await runDoudouOfficialLive2DSmoke({
       argv: [
@@ -54,8 +54,24 @@ describe("runDoudouOfficialLive2DSmoke", () => {
           }
         };
       },
-      cwd: "/repo",
+      cwd: "repo-root",
       env: {},
+      resolveOfficialRuntime: async (input) => {
+        calls.push({ preflight: input });
+        return {
+          available: true,
+          configured: true,
+          publicEvidence: {
+            available: true,
+            configured: true
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/"
+          }
+        };
+      },
       runRuntimeSmoke: async (input) => {
         calls.push({
           smokeEnv: {
@@ -75,13 +91,19 @@ describe("runDoudouOfficialLive2DSmoke", () => {
 
     expect(result.exitCode).toBe(0);
     expect(calls[0]).toEqual({
+      preflight: {
+        modelDir,
+        sdkDir
+      }
+    });
+    expect(calls[1]).toEqual({
       build: {
         mode: "framework",
         outputFile,
         sdkDir
       }
     });
-    expect(calls[1]).toEqual({
+    expect(calls[2]).toEqual({
       smokeEnv: {
         DOUDOU_CUBISM_WEB_RUNTIME_MODULE: outputFile,
         DOUDOU_CUBISM_WEB_SDK_DIR: sdkDir,
@@ -107,5 +129,53 @@ describe("runDoudouOfficialLive2DSmoke", () => {
     expect(result.output).not.toContain(sdkDir);
     expect(result.output).not.toContain(modelDir);
     expect(result.output).not.toContain(outputFile);
+  });
+
+  test("preflights the local SDK and model layout before building the runtime module", async () => {
+    const sdkDir = "fixture-cubism-sdk";
+    const modelDir = "fixture-default-doudou-model";
+
+    const result = await runDoudouOfficialLive2DSmoke({
+      argv: [
+        "node",
+        "doudou-live2d-official-smoke",
+        "--sdk-dir",
+        sdkDir,
+        "--model-dir",
+        modelDir
+      ],
+      buildRuntimeModule: async () => {
+        throw new Error("build should not run when preflight fails");
+      },
+      env: {},
+      resolveOfficialRuntime: async (input) => {
+        expect(input).toEqual({
+          modelDir,
+          sdkDir
+        });
+        return {
+          available: false,
+          configured: true,
+          publicEvidence: {
+            available: false,
+            configured: true,
+            reason: "model_asset_missing"
+          },
+          reason: "model_asset_missing"
+        };
+      },
+      runRuntimeSmoke: async () => {
+        throw new Error("runtime smoke should not run when preflight fails");
+      }
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.output)).toEqual({
+      ok: false,
+      code: "OFFICIAL_LIVE2D_PREFLIGHT_FAILED",
+      reason: "model_asset_missing"
+    });
+    expect(result.output).not.toContain(sdkDir);
+    expect(result.output).not.toContain(modelDir);
   });
 });
