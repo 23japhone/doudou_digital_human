@@ -417,6 +417,9 @@ function updateSampleFrameTime() {
 function setSampleExpression(expressionMap, expressionName, expression) {
   if (typeof expressionMap?.setValue === "function") {
     expressionMap.setValue(expressionName, expression);
+    if (typeof expressionMap.getValue === "function") {
+      return expressionMap.getValue(expressionName) === expression;
+    }
     return true;
   }
   if (typeof expressionMap?.set === "function") {
