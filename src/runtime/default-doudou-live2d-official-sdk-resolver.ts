@@ -176,7 +176,7 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
   if (!await allModelAssetsExist(modelDir, references)) {
     return unavailable("model_asset_missing", true);
   }
-  if (runtimeModuleFile && !await exists(runtimeModuleFile)) {
+  if (runtimeModuleFile && !await isFile(runtimeModuleFile)) {
     return unavailable("runtime_module_missing", true);
   }
 

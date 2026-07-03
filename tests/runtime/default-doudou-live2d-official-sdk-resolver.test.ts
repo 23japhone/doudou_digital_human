@@ -168,6 +168,34 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
     }
   });
 
+  test("rejects a configured runtime module path that resolves to a directory", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-directory-runtime-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      const runtimeModuleFile = path.join(tempRoot, "default-doudou-official-runtime.mjs");
+      await writeLocalOfficialSdkFixture(sdkDir);
+      await writeDefaultDoudouModelFixture(modelDir);
+      await mkdir(runtimeModuleFile, { recursive: true });
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, runtimeModuleFile, sdkDir });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "runtime_module_missing"
+        },
+        reason: "runtime_module_missing"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("rejects a configured SDK missing official sample support files", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-missing-sample-"));
     try {
