@@ -221,6 +221,53 @@ describe("default doudou official Live2D renderer host", () => {
     expect(JSON.stringify(host.evidence())).not.toContain("/models/");
   });
 
+  test("ignores malformed official runtime lifecycle counters", async () => {
+    const calls: string[] = [];
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => createFakeOfficialRuntimeModule(calls, {
+        lifecycleEvidence: {
+          drawCalls: 2,
+          expressionLoadCalls: 12,
+          expressionSetCalls: 2,
+          modelUpdateCalls: 2,
+          updateMotionCalls: Number.NaN
+        }
+      }),
+      loadCoreScript: async () => undefined
+    });
+
+    await host.loadDefaultModel(library);
+
+    expect(host.evidence()).toMatchObject({
+      runtimeLifecycle: {
+        drawCalls: 0,
+        expressionLoadCalls: 0,
+        expressionSetCalls: 0,
+        modelUpdateCalls: 0,
+        updateMotionCalls: 0
+      },
+      runtimeModuleProbe: "loaded"
+    });
+  });
+
   test("records distinct official runtime expression emotions observed through desktop switches", async () => {
     const calls: string[] = [];
     const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
@@ -440,6 +487,13 @@ describe("default doudou official Live2D renderer host", () => {
 interface FakeOfficialRuntimeModuleOptions {
   drawThrows?: boolean;
   expressionLoadResult?: unknown | ((emotionId: string) => unknown);
+  lifecycleEvidence?: {
+    drawCalls: number;
+    expressionLoadCalls: number;
+    expressionSetCalls: number;
+    modelUpdateCalls: number;
+    updateMotionCalls: number;
+  };
   onDraw?: () => void;
   setExpressionDelay?: Promise<unknown>;
   setExpressionResult?: boolean;
@@ -462,6 +516,9 @@ function createFakeOfficialRuntimeModule(
       calls.push(`create:${runtimeOptions.modelId}:${runtimeOptions.assets.modelRootUrl}`);
       return {
         evidence() {
+          if (fakeOptions.lifecycleEvidence) {
+            return { ...fakeOptions.lifecycleEvidence };
+          }
           return { ...lifecycle };
         },
         async loadModel(input) {

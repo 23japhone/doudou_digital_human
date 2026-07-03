@@ -111,10 +111,10 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (!evidence.canvasNonTransparentPixel) {
     failures.push(`${label}.canvasNonTransparentPixel`);
   }
-  if (evidence.expressionCount !== 12) {
+  if (!isExactly(evidence.expressionCount, 12)) {
     failures.push(`${label}.expressionCount`);
   }
-  if (evidence.expressionSwitches <= 0) {
+  if (!isAtLeast(evidence.expressionSwitches, 1)) {
     failures.push(`${label}.expressionSwitches`);
   }
   if (!evidence.expressionAppliedAfterFrame) {
@@ -123,34 +123,34 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (!evidence.expressionCanvasChangedAfterFrame) {
     failures.push(`${label}.expressionCanvasChangedAfterFrame`);
   }
-  if (evidence.pendingExpressionSwitches > 0) {
+  if (!isExactly(evidence.pendingExpressionSwitches, 0)) {
     failures.push(`${label}.pendingExpressionSwitches`);
   }
   if (new Set(evidence.expressionEmotionIdsObserved.filter((emotionId) => emotionId !== "calm_idle")).size < 2) {
     failures.push(`${label}.expressionEmotionIdsObserved`);
   }
-  if (evidence.runtimeLifecycle.expressionLoadCalls < 12) {
+  if (!isAtLeast(evidence.runtimeLifecycle.expressionLoadCalls, 12)) {
     failures.push(`${label}.runtimeLifecycle.expressionLoadCalls`);
   }
-  if (evidence.runtimeLifecycle.expressionSetCalls < 2) {
+  if (!isAtLeast(evidence.runtimeLifecycle.expressionSetCalls, 2)) {
     failures.push(`${label}.runtimeLifecycle.expressionSetCalls`);
   }
-  if (evidence.runtimeLifecycle.updateMotionCalls < 2) {
+  if (!isAtLeast(evidence.runtimeLifecycle.updateMotionCalls, 2)) {
     failures.push(`${label}.runtimeLifecycle.updateMotionCalls`);
   }
-  if (evidence.runtimeLifecycle.modelUpdateCalls < 2) {
+  if (!isAtLeast(evidence.runtimeLifecycle.modelUpdateCalls, 2)) {
     failures.push(`${label}.runtimeLifecycle.modelUpdateCalls`);
   }
-  if (evidence.runtimeLifecycle.drawCalls < 2) {
+  if (!isAtLeast(evidence.runtimeLifecycle.drawCalls, 2)) {
     failures.push(`${label}.runtimeLifecycle.drawCalls`);
   }
   if (!evidence.frameLoopAdvanced) {
     failures.push(`${label}.frameLoopAdvanced`);
   }
-  if (evidence.drawCalls < 2) {
+  if (!isAtLeast(evidence.drawCalls, 2)) {
     failures.push(`${label}.drawCalls`);
   }
-  if (evidence.updateCalls < 2) {
+  if (!isAtLeast(evidence.updateCalls, 2)) {
     failures.push(`${label}.updateCalls`);
   }
   if (evidence.activeEmotionId.length === 0 || evidence.activeEmotionId === "calm_idle") {
@@ -182,22 +182,22 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     typeof officialRuntime.canvasNonTransparentPixel !== "boolean" ||
     typeof officialRuntime.rendererAssetProbe !== "string" ||
     typeof runtimeModule.activeEmotionId !== "string" ||
-    typeof runtimeModule.drawCalls !== "number" ||
+    !isFiniteNumber(runtimeModule.drawCalls) ||
     typeof runtimeModule.expressionAppliedAfterFrame !== "boolean" ||
     typeof runtimeModule.expressionCanvasChangedAfterFrame !== "boolean" ||
-    typeof runtimeModule.expressionCount !== "number" ||
+    !isFiniteNumber(runtimeModule.expressionCount) ||
     !isStringArray(runtimeModule.expressionEmotionIdsObserved) ||
-    typeof runtimeModule.expressionSwitches !== "number" ||
+    !isFiniteNumber(runtimeModule.expressionSwitches) ||
     typeof runtimeModule.frameLoopAdvanced !== "boolean" ||
     typeof runtimeModule.modelLoaded !== "boolean" ||
-    typeof runtimeModule.pendingExpressionSwitches !== "number" ||
+    !isFiniteNumber(runtimeModule.pendingExpressionSwitches) ||
     typeof runtimeModule.runtimeModuleProbe !== "string" ||
-    typeof runtimeModule.updateCalls !== "number" ||
-    typeof runtimeModule.runtimeLifecycle.drawCalls !== "number" ||
-    typeof runtimeModule.runtimeLifecycle.expressionLoadCalls !== "number" ||
-    typeof runtimeModule.runtimeLifecycle.expressionSetCalls !== "number" ||
-    typeof runtimeModule.runtimeLifecycle.modelUpdateCalls !== "number" ||
-    typeof runtimeModule.runtimeLifecycle.updateMotionCalls !== "number"
+    !isFiniteNumber(runtimeModule.updateCalls) ||
+    !isFiniteNumber(runtimeModule.runtimeLifecycle.drawCalls) ||
+    !isFiniteNumber(runtimeModule.runtimeLifecycle.expressionLoadCalls) ||
+    !isFiniteNumber(runtimeModule.runtimeLifecycle.expressionSetCalls) ||
+    !isFiniteNumber(runtimeModule.runtimeLifecycle.modelUpdateCalls) ||
+    !isFiniteNumber(runtimeModule.runtimeLifecycle.updateMotionCalls)
   ) {
     return undefined;
   }
@@ -251,6 +251,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isAtLeast(value: number, minimum: number): boolean {
+  return Number.isFinite(value) && value >= minimum;
+}
+
+function isExactly(value: number, expected: number): boolean {
+  return Number.isFinite(value) && value === expected;
 }
 
 function sanitizeRuntimeFailureReason(value: unknown): string | null {

@@ -290,11 +290,11 @@ export function createDoudouOfficialLive2DRendererHost(
     try {
       const lifecycle = runtime.evidence();
       if (
-        typeof lifecycle.drawCalls === "number" &&
-        typeof lifecycle.expressionLoadCalls === "number" &&
-        typeof lifecycle.expressionSetCalls === "number" &&
-        typeof lifecycle.modelUpdateCalls === "number" &&
-        typeof lifecycle.updateMotionCalls === "number"
+        isNonNegativeFiniteNumber(lifecycle.drawCalls) &&
+        isNonNegativeFiniteNumber(lifecycle.expressionLoadCalls) &&
+        isNonNegativeFiniteNumber(lifecycle.expressionSetCalls) &&
+        isNonNegativeFiniteNumber(lifecycle.modelUpdateCalls) &&
+        isNonNegativeFiniteNumber(lifecycle.updateMotionCalls)
       ) {
         lastRuntimeLifecycle = {
           drawCalls: lifecycle.drawCalls,
@@ -344,4 +344,8 @@ function initialRuntimeModuleProbe(
     return "not_configured";
   }
   return "load_pending";
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }

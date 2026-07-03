@@ -104,6 +104,23 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
   });
 
+  test("requires loaded official runtime lifecycle counters to be finite numbers", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      runtimeLifecycle: {
+        drawCalls: 2,
+        expressionLoadCalls: 12,
+        expressionSetCalls: 2,
+        modelUpdateCalls: 2,
+        updateMotionCalls: Number.NaN
+      }
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.runtimeLifecycle.updateMotionCalls"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
   test("requires loaded official runtime evidence to load all default expressions inside the module", () => {
     const evidence = createOfficialRuntimeEvidence({
       runtimeLifecycle: {
