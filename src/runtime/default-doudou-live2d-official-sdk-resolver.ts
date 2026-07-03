@@ -263,10 +263,10 @@ function directoryFileUrl(directoryPath: string): string {
 }
 
 async function resolveCoreScript(sdkDir: string): Promise<DoudouOfficialLive2DCoreScript | null> {
-  if (await exists(path.join(sdkDir, CORE_SCRIPT))) {
+  if (await isFile(path.join(sdkDir, CORE_SCRIPT))) {
     return CORE_SCRIPT;
   }
-  if (await exists(path.join(sdkDir, CORE_SCRIPT_MIN))) {
+  if (await isFile(path.join(sdkDir, CORE_SCRIPT_MIN))) {
     return CORE_SCRIPT_MIN;
   }
   return null;
