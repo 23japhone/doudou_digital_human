@@ -1194,6 +1194,7 @@ function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostE
     expressionSwitches: 0,
     frameLoopAdvanced: false,
     modelLoaded: false,
+    pendingExpressionSwitches: 0,
     runtimeLifecycle: {
       drawCalls: 0,
       modelUpdateCalls: 0,
@@ -1268,9 +1269,11 @@ function imageDataHasNonTransparentPixel(data: Uint8ClampedArray | Uint8Array): 
 }
 
 function isLive2DRendererSmokePending(): boolean {
+  const officialRendererHostEvidence = live2DOfficialRendererHostEvidence();
   return (
     live2DOfficialRendererAssetProbe === "model3_fetch_pending" ||
-    live2DOfficialRendererHostEvidence().runtimeModuleProbe === "load_pending"
+    officialRendererHostEvidence.runtimeModuleProbe === "load_pending" ||
+    officialRendererHostEvidence.pendingExpressionSwitches > 0
   );
 }
 

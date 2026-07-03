@@ -21,6 +21,7 @@ export interface DoudouOfficialLive2DRendererHostEvidence {
   expressionSwitches: number;
   frameLoopAdvanced: boolean;
   modelLoaded: boolean;
+  pendingExpressionSwitches: number;
   runtimeLifecycle: DoudouOfficialLive2DRendererRuntimeLifecycleEvidence;
   runtimeModuleProbe: DoudouOfficialLive2DRendererRuntimeModuleProbe;
   updateCalls: number;
@@ -95,6 +96,7 @@ export function createDoudouOfficialLive2DRendererHost(
   let expressionSwitches = 0;
   let lastFrameAtMs: number | null = null;
   let modelLoaded = false;
+  let pendingExpressionSwitches = 0;
   let runtime: DoudouOfficialLive2DRendererRuntime | null = null;
   let runtimeModuleProbe: DoudouOfficialLive2DRendererRuntimeModuleProbe = initialRuntimeModuleProbe(options);
   let updateCalls = 0;
@@ -180,11 +182,14 @@ export function createDoudouOfficialLive2DRendererHost(
       if (!expression) {
         return false;
       }
+      pendingExpressionSwitches += 1;
       try {
         await runtime.setExpression(expression);
       } catch {
         runtimeModuleProbe = "model_failed";
         return false;
+      } finally {
+        pendingExpressionSwitches = Math.max(0, pendingExpressionSwitches - 1);
       }
       activeEmotionId = emotionId;
       expressionSwitches += 1;
@@ -204,6 +209,7 @@ export function createDoudouOfficialLive2DRendererHost(
       expressionSwitches,
       frameLoopAdvanced: updateCalls >= 2 && drawCalls >= 2,
       modelLoaded,
+      pendingExpressionSwitches,
       runtimeLifecycle: runtimeLifecycleEvidence(),
       runtimeModuleProbe,
       updateCalls

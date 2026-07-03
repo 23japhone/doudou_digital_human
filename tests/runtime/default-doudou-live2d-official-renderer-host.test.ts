@@ -167,12 +167,68 @@ describe("default doudou official Live2D renderer host", () => {
     });
     expect(JSON.stringify(host.evidence())).not.toContain("/models/");
   });
+
+  test("reports pending official runtime expression switches until setExpression settles", async () => {
+    const calls: string[] = [];
+    let finishSetExpression: (() => void) | undefined;
+    const setExpressionDelay = new Promise<void>((resolve) => {
+      finishSetExpression = resolve;
+    });
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => createFakeOfficialRuntimeModule(calls, { setExpressionDelay }),
+      loadCoreScript: async () => undefined
+    });
+
+    await host.loadDefaultModel(library);
+    const switchPromise = host.switchExpression(library, "delighted");
+    await Promise.resolve();
+
+    expect(host.evidence()).toMatchObject({
+      activeEmotionId: "calm_idle",
+      expressionSwitches: 0,
+      pendingExpressionSwitches: 1
+    });
+
+    finishSetExpression?.();
+    await switchPromise;
+
+    expect(host.evidence()).toMatchObject({
+      activeEmotionId: "delighted",
+      expressionSwitches: 1,
+      pendingExpressionSwitches: 0
+    });
+  });
 });
 
-function createFakeOfficialRuntimeModule(calls: string[]): DoudouOfficialLive2DRendererRuntimeModule {
+interface FakeOfficialRuntimeModuleOptions {
+  setExpressionDelay?: Promise<unknown>;
+}
+
+function createFakeOfficialRuntimeModule(
+  calls: string[],
+  fakeOptions: FakeOfficialRuntimeModuleOptions = {}
+): DoudouOfficialLive2DRendererRuntimeModule {
   return {
-    async createDoudouOfficialLive2DRendererRuntime(options) {
-      calls.push(`create:${options.modelId}:${options.assets.modelRootUrl}`);
+    async createDoudouOfficialLive2DRendererRuntime(runtimeOptions) {
+      calls.push(`create:${runtimeOptions.modelId}:${runtimeOptions.assets.modelRootUrl}`);
       return {
         async loadModel(input) {
           calls.push(`loadModel:${input.model3Json}:${input.model3JsonUrl}`);
@@ -182,6 +238,7 @@ function createFakeOfficialRuntimeModule(calls: string[]): DoudouOfficialLive2DR
         },
         async setExpression(input) {
           calls.push(`setExpression:${input.emotionId}:${input.expressionFile}`);
+          await fakeOptions.setExpressionDelay;
         },
         update(deltaTimeSeconds) {
           calls.push(`update:${deltaTimeSeconds.toFixed(3)}`);

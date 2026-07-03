@@ -139,6 +139,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
             expressionSwitches: 13,
             frameLoopAdvanced: true,
             modelLoaded: true,
+            pendingExpressionSwitches: 0,
             rendererAssetProbe: "model3_fetched",
             runtimeLifecycle: {
               drawCalls: 21,
@@ -159,6 +160,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
             expressionSwitches: 17,
             frameLoopAdvanced: true,
             modelLoaded: true,
+            pendingExpressionSwitches: 0,
             rendererAssetProbe: "model3_fetched",
             runtimeLifecycle: {
               drawCalls: 29,
@@ -317,6 +319,7 @@ function createRuntimeSmokeResult(activeEmotionId: string, expressionSwitches: n
           expressionSwitches,
           frameLoopAdvanced: true,
           modelLoaded: true,
+          pendingExpressionSwitches: 0,
           runtimeLifecycle: {
             drawCalls: frameCalls,
             modelUpdateCalls: frameCalls,

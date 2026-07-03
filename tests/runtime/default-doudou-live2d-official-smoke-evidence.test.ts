@@ -64,6 +64,17 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
   });
 
+  test("requires loaded official runtime evidence to finish pending expression switches", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      pendingExpressionSwitches: 1
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.pendingExpressionSwitches"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
   test("requires loaded official runtime evidence to prove updateMotion advanced inside the module", () => {
     const evidence = createOfficialRuntimeEvidence({
       runtimeLifecycle: {
@@ -129,6 +140,7 @@ function createOfficialRuntimeEvidence(
     expressionSwitches: 1,
     frameLoopAdvanced: true,
     modelLoaded: true,
+    pendingExpressionSwitches: 0,
     rendererAssetProbe: "model3_fetched",
     runtimeLifecycle: {
       drawCalls: 2,
@@ -157,6 +169,7 @@ function createRuntimeSmokeResult(evidence: DoudouOfficialLive2DRendererRuntimeS
           expressionSwitches: evidence.expressionSwitches,
           frameLoopAdvanced: evidence.frameLoopAdvanced,
           modelLoaded: evidence.modelLoaded,
+          pendingExpressionSwitches: evidence.pendingExpressionSwitches,
           runtimeLifecycle: evidence.runtimeLifecycle,
           runtimeModuleProbe: evidence.runtimeModuleProbe,
           updateCalls: evidence.updateCalls

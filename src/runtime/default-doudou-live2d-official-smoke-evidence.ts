@@ -9,6 +9,7 @@ export interface DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
   expressionSwitches: number;
   frameLoopAdvanced: boolean;
   modelLoaded: boolean;
+  pendingExpressionSwitches: number;
   rendererAssetProbe: string;
   runtimeLifecycle: {
     drawCalls: number;
@@ -74,6 +75,9 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (!evidence.expressionAppliedAfterFrame) {
     failures.push(`${label}.expressionAppliedAfterFrame`);
   }
+  if (evidence.pendingExpressionSwitches > 0) {
+    failures.push(`${label}.pendingExpressionSwitches`);
+  }
   if (new Set(evidence.expressionEmotionIdsObserved.filter((emotionId) => emotionId !== "calm_idle")).size < 2) {
     failures.push(`${label}.expressionEmotionIdsObserved`);
   }
@@ -131,6 +135,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     typeof runtimeModule.expressionSwitches !== "number" ||
     typeof runtimeModule.frameLoopAdvanced !== "boolean" ||
     typeof runtimeModule.modelLoaded !== "boolean" ||
+    typeof runtimeModule.pendingExpressionSwitches !== "number" ||
     typeof runtimeModule.runtimeModuleProbe !== "string" ||
     typeof runtimeModule.updateCalls !== "number" ||
     typeof runtimeModule.runtimeLifecycle.drawCalls !== "number" ||
@@ -150,6 +155,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     expressionSwitches: runtimeModule.expressionSwitches,
     frameLoopAdvanced: runtimeModule.frameLoopAdvanced,
     modelLoaded: runtimeModule.modelLoaded,
+    pendingExpressionSwitches: runtimeModule.pendingExpressionSwitches,
     rendererAssetProbe: officialRuntime.rendererAssetProbe,
     runtimeLifecycle: {
       drawCalls: runtimeModule.runtimeLifecycle.drawCalls,
