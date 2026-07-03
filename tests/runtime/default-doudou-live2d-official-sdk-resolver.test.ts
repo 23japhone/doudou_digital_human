@@ -165,21 +165,85 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
       await rm(tempRoot, { force: true, recursive: true });
     }
   });
+
+  test("rejects a configured SDK missing official sample Framework dependencies", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-missing-framework-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      await writeLocalOfficialSdkFixture(sdkDir, { sampleFrameworkFiles: false });
+      await writeDefaultDoudouModelFixture(modelDir);
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "sdk_framework_missing"
+        },
+        reason: "sdk_framework_missing"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
 });
 
 async function writeLocalOfficialSdkFixture(
   sdkDir: string,
-  options: { sampleSupportFiles?: boolean } = {}
+  options: { sampleFrameworkFiles?: boolean; sampleSupportFiles?: boolean } = {}
 ): Promise<void> {
   await mkdir(path.join(sdkDir, "Core"), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src"), { recursive: true });
   await mkdir(path.join(sdkDir, "Samples/TypeScript/Demo/src"), { recursive: true });
   await writeFile(path.join(sdkDir, "Core/live2dcubismcore.js"), "window.Live2DCubismCore = {};\n", "utf8");
   await writeFile(path.join(sdkDir, "Framework/src/live2dcubismframework.ts"), "export {};\n", "utf8");
+  if (options.sampleFrameworkFiles ?? true) {
+    await writeLocalOfficialSampleFrameworkFiles(sdkDir);
+  }
   await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src/lappmodel.ts"), "export class LAppModel {}\n", "utf8");
   await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src/lapppal.ts"), "export class LAppPal {}\n", "utf8");
   if (options.sampleSupportFiles ?? true) {
     await writeLocalOfficialSampleSupportFiles(sdkDir);
+  }
+}
+
+async function writeLocalOfficialSampleFrameworkFiles(sdkDir: string): Promise<void> {
+  const sampleFrameworkFiles = [
+    "cubismdefaultparameterid.ts",
+    "cubismmodelsettingjson.ts",
+    "effect/cubismbreath.ts",
+    "effect/cubismeyeblink.ts",
+    "effect/cubismlook.ts",
+    "icubismmodelsetting.ts",
+    "id/cubismid.ts",
+    "math/cubismmatrix44.ts",
+    "math/cubismviewmatrix.ts",
+    "model/cubismmoc.ts",
+    "model/cubismusermodel.ts",
+    "motion/acubismmotion.ts",
+    "motion/cubismbreathupdater.ts",
+    "motion/cubismeyeblinkupdater.ts",
+    "motion/cubismexpressionupdater.ts",
+    "motion/cubismlipsyncupdater.ts",
+    "motion/cubismlookupdater.ts",
+    "motion/cubismmotion.ts",
+    "motion/cubismmotionqueuemanager.ts",
+    "motion/cubismphysicsupdater.ts",
+    "motion/cubismposeupdater.ts",
+    "motion/cubismupdatescheduler.ts",
+    "rendering/cubismoffscreenmanager.ts",
+    "type/csmrectf.ts",
+    "utils/cubismdebug.ts"
+  ];
+  for (const sampleFrameworkFile of sampleFrameworkFiles) {
+    const filePath = path.join(sdkDir, "Framework/src", sampleFrameworkFile);
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, "export {};\n", "utf8");
   }
 }
 

@@ -103,6 +103,34 @@ const REQUIRED_SAMPLE_SOURCE_FILES = [
   "lappwavfilehandler.ts",
   "touchmanager.ts"
 ] as const;
+const REQUIRED_SAMPLE_FRAMEWORK_FILES = [
+  "cubismdefaultparameterid.ts",
+  "cubismmodelsettingjson.ts",
+  "effect/cubismbreath.ts",
+  "effect/cubismeyeblink.ts",
+  "effect/cubismlook.ts",
+  "icubismmodelsetting.ts",
+  "id/cubismid.ts",
+  "live2dcubismframework.ts",
+  "math/cubismmatrix44.ts",
+  "math/cubismviewmatrix.ts",
+  "model/cubismmoc.ts",
+  "model/cubismusermodel.ts",
+  "motion/acubismmotion.ts",
+  "motion/cubismbreathupdater.ts",
+  "motion/cubismeyeblinkupdater.ts",
+  "motion/cubismexpressionupdater.ts",
+  "motion/cubismlipsyncupdater.ts",
+  "motion/cubismlookupdater.ts",
+  "motion/cubismmotion.ts",
+  "motion/cubismmotionqueuemanager.ts",
+  "motion/cubismphysicsupdater.ts",
+  "motion/cubismposeupdater.ts",
+  "motion/cubismupdatescheduler.ts",
+  "rendering/cubismoffscreenmanager.ts",
+  "type/csmrectf.ts",
+  "utils/cubismdebug.ts"
+] as const;
 
 export async function resolveDoudouOfficialLive2DRendererRuntime(
   input: ResolveDoudouOfficialLive2DRendererRuntimeInput
@@ -120,6 +148,9 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
     return unavailable("sdk_core_missing", true);
   }
   if (!await isDirectory(path.join(sdkDir, FRAMEWORK_SOURCE))) {
+    return unavailable("sdk_framework_missing", true);
+  }
+  if (!await hasRequiredFrameworkSourceFiles(path.join(sdkDir, FRAMEWORK_SOURCE))) {
     return unavailable("sdk_framework_missing", true);
   }
   if (!await hasRequiredSampleSourceFiles(path.join(sdkDir, SAMPLE_SOURCE))) {
@@ -185,6 +216,15 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
       runtimeModuleUrl: runtimeModuleFile ? pathToFileURL(runtimeModuleFile).href : undefined
     }
   };
+}
+
+async function hasRequiredFrameworkSourceFiles(frameworkSourceDir: string): Promise<boolean> {
+  for (const relativeFile of REQUIRED_SAMPLE_FRAMEWORK_FILES) {
+    if (!await exists(path.join(frameworkSourceDir, relativeFile))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 async function hasRequiredSampleSourceFiles(sampleSourceDir: string): Promise<boolean> {

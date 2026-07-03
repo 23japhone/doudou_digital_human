@@ -49,9 +49,32 @@ const REQUIRED_SAMPLE_SOURCE_FILES = [
   "touchmanager.ts"
 ] as const;
 const REQUIRED_SAMPLE_RUNTIME_FILES = [
+  "cubismdefaultparameterid.ts",
+  "cubismmodelsettingjson.ts",
+  "effect/cubismbreath.ts",
+  "effect/cubismeyeblink.ts",
+  "effect/cubismlook.ts",
+  "icubismmodelsetting.ts",
+  "id/cubismid.ts",
   "live2dcubismframework.ts",
   "math/cubismmatrix44.ts",
-  "motion/cubismexpressionupdater.ts"
+  "math/cubismviewmatrix.ts",
+  "model/cubismmoc.ts",
+  "model/cubismusermodel.ts",
+  "motion/acubismmotion.ts",
+  "motion/cubismbreathupdater.ts",
+  "motion/cubismeyeblinkupdater.ts",
+  "motion/cubismexpressionupdater.ts",
+  "motion/cubismlipsyncupdater.ts",
+  "motion/cubismlookupdater.ts",
+  "motion/cubismmotion.ts",
+  "motion/cubismmotionqueuemanager.ts",
+  "motion/cubismphysicsupdater.ts",
+  "motion/cubismposeupdater.ts",
+  "motion/cubismupdatescheduler.ts",
+  "rendering/cubismoffscreenmanager.ts",
+  "type/csmrectf.ts",
+  "utils/cubismdebug.ts"
 ] as const;
 const REQUIRED_FRAMEWORK_RUNTIME_FILES = [
   "live2dcubismframework.ts",

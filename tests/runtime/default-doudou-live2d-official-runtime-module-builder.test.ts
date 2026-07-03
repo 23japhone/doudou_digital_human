@@ -354,13 +354,40 @@ describe("default doudou official Live2D runtime module builder", () => {
       await rm(tempRoot, { force: true, recursive: true });
     }
   });
+
+  test("rejects sample mode when official sample Framework dependencies are missing", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-framework-missing-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      await writeSyntheticCubismSampleSdk(sdkDir, { sampleFrameworkFiles: false });
+
+      const result = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile: path.join(tempRoot, "runtime.mjs"),
+        sdkDir
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        reason: "sdk_framework_runtime_missing"
+      });
+      expect(JSON.stringify(result)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
 });
 
 async function writeSyntheticCubismSampleSdk(
   sdkDir: string,
-  options: { readiness?: "loadedFlag" | "delayedCompleteSetup"; sampleSupportFiles?: boolean } = {}
+  options: {
+    readiness?: "loadedFlag" | "delayedCompleteSetup";
+    sampleFrameworkFiles?: boolean;
+    sampleSupportFiles?: boolean;
+  } = {}
 ): Promise<void> {
   const readiness = options.readiness ?? "loadedFlag";
+  const sampleFrameworkFiles = options.sampleFrameworkFiles ?? true;
   const sampleSupportFiles = options.sampleSupportFiles ?? true;
   await mkdir(path.join(sdkDir, "Framework/src/live2dcubismframework.ts", ".."), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/math"), { recursive: true });
@@ -412,6 +439,9 @@ export class CubismExpressionUpdater {
 `,
     "utf8"
   );
+  if (sampleFrameworkFiles) {
+    await writeSyntheticCubismSampleFrameworkFiles(sdkDir);
+  }
   await writeFile(
     path.join(sdkDir, "Samples/TypeScript/Demo/src/lapppal.ts"),
     `
@@ -483,6 +513,39 @@ export class LAppModel {
 `,
     "utf8"
   );
+}
+
+async function writeSyntheticCubismSampleFrameworkFiles(sdkDir: string): Promise<void> {
+  const sampleFrameworkFiles = [
+    "cubismdefaultparameterid.ts",
+    "cubismmodelsettingjson.ts",
+    "effect/cubismbreath.ts",
+    "effect/cubismeyeblink.ts",
+    "effect/cubismlook.ts",
+    "icubismmodelsetting.ts",
+    "id/cubismid.ts",
+    "math/cubismviewmatrix.ts",
+    "model/cubismmoc.ts",
+    "model/cubismusermodel.ts",
+    "motion/acubismmotion.ts",
+    "motion/cubismbreathupdater.ts",
+    "motion/cubismeyeblinkupdater.ts",
+    "motion/cubismlipsyncupdater.ts",
+    "motion/cubismlookupdater.ts",
+    "motion/cubismmotion.ts",
+    "motion/cubismmotionqueuemanager.ts",
+    "motion/cubismphysicsupdater.ts",
+    "motion/cubismposeupdater.ts",
+    "motion/cubismupdatescheduler.ts",
+    "rendering/cubismoffscreenmanager.ts",
+    "type/csmrectf.ts",
+    "utils/cubismdebug.ts"
+  ];
+  for (const sampleFrameworkFile of sampleFrameworkFiles) {
+    const filePath = path.join(sdkDir, "Framework/src", sampleFrameworkFile);
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await writeFile(filePath, "export {};\n", "utf8");
+  }
 }
 
 async function writeSyntheticCubismSampleSupportFiles(sdkDir: string): Promise<void> {
