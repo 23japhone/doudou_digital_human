@@ -34,6 +34,8 @@
 
 `smoke:runtime` also opens the 兜兜 emotion trigger panel, clicks the trigger button without consent, and requires sanitized panel status plus evidence that the provider was not called.
 
+Set `DOUDOU_EMOTION_PANEL_SMOKE_CONSENT=1` together with the local emotion-model env vars to run the same panel path with consent enabled against the real provider; this live acceptance path validates provider-called and command-applied evidence for the fixture bundle only, to avoid repeated live calls.
+
 ## Local Official Live2D SDK Setup
 
 - Do not use third-party npm mirrors of `live2dcubismcore` as official renderer proof. The real smoke path expects Live2D's Cubism Core from the official Web SDK download or hosting-use Core package, kept only in local ignored storage.

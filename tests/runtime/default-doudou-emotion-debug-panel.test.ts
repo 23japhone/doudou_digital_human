@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
+  DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT,
   createDoudouEmotionDebugPanelStatus,
+  isDoudouEmotionDebugPanelSmokeStatusSanitized,
   resolveDoudouEmotionDebugPanelEnabled,
+  resolveDoudouEmotionDebugPanelSmokeConsent,
   type DoudouEmotionDebugPanelStatus
 } from "../../src/runtime/default-doudou-emotion-debug-panel.js";
 
@@ -140,11 +143,33 @@ describe("default doudou emotion debug panel", () => {
       optionEnabled: true
     })).toBe(true);
   });
+
+  test("enables consented panel smoke only from an explicit env opt-in", () => {
+    expect(resolveDoudouEmotionDebugPanelSmokeConsent({})).toBe(false);
+    expect(resolveDoudouEmotionDebugPanelSmokeConsent({
+      DOUDOU_EMOTION_PANEL_SMOKE_CONSENT: "1"
+    })).toBe(true);
+    expect(resolveDoudouEmotionDebugPanelSmokeConsent({
+      DOUDOU_EMOTION_PANEL_SMOKE_CONSENT: "true"
+    })).toBe(false);
+  });
+
+  test("rejects smoke status text that leaks live prompt or provider details", () => {
+    expect(isDoudouEmotionDebugPanelSmokeStatusSanitized(
+      "已触发：兜兜轻快微笑调用：是模型：unit-test-model命令：set_expression应用：已应用"
+    )).toBe(true);
+    expect(isDoudouEmotionDebugPanelSmokeStatusSanitized(
+      `已触发：兜兜轻快微笑${DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT}`
+    )).toBe(false);
+    expect(isDoudouEmotionDebugPanelSmokeStatusSanitized("调用：https://model.example.test")).toBe(false);
+    expect(isDoudouEmotionDebugPanelSmokeStatusSanitized("调用：sk-unit-test-token")).toBe(false);
+    expect(isDoudouEmotionDebugPanelSmokeStatusSanitized("choices: []")).toBe(false);
+  });
 });
 
 function expectStatusToBeSanitized(status: DoudouEmotionDebugPanelStatus): void {
   const serialized = JSON.stringify(status);
-  expect(serialized).not.toContain("sk-1234");
+  expect(serialized).not.toContain("sk-unit-test-token");
   expect(serialized).not.toContain("model.example.test");
   expect(serialized).not.toContain("今天有点累");
   expect(serialized).not.toContain("choices");

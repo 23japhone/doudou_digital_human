@@ -64,7 +64,10 @@ import {
   upsertRuntimeMotionTuningPreset
 } from "./tuning-presets.js";
 import { queryDoudouEmotionBehaviorForExplicitRuntimeInput } from "./default-doudou-emotion-trigger.js";
-import { resolveDoudouEmotionDebugPanelEnabled } from "./default-doudou-emotion-debug-panel.js";
+import {
+  resolveDoudouEmotionDebugPanelEnabled,
+  resolveDoudouEmotionDebugPanelSmokeConsent
+} from "./default-doudou-emotion-debug-panel.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
@@ -103,6 +106,7 @@ let smokeMaxEmotionWariness = 0;
 let runtimeMotionTuning = RUNTIME_MOTION_TUNING_DEFAULTS;
 let runtimeMotionTuningEnabled = false;
 let emotionDebugPanelEnabled = false;
+let emotionDebugPanelSmokeConsentEnabled = false;
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = [];
 let live2DRendererSpikeEnabled = false;
 let live2DOfficialRuntimeResolution: DoudouOfficialLive2DRendererRuntimeResolution = {
@@ -145,6 +149,7 @@ async function main(): Promise<void> {
     env: process.env,
     optionEnabled: options.emotionPanel ?? false
   });
+  emotionDebugPanelSmokeConsentEnabled = resolveDoudouEmotionDebugPanelSmokeConsent(process.env);
   runtimeMotionTuning = runtimeMotionTuningFromEnv(process.env);
   if (live2DRendererSpikeEnabled) {
     live2DOfficialRuntimeResolution = await resolveDoudouOfficialLive2DRendererRuntime({
@@ -297,6 +302,7 @@ ipcMain.handle("pet:get-bundle", () => {
     scaleLimits: RUNTIME_SCALE_LIMITS,
     smoke: smokeMode,
     emotionDebugPanelEnabled,
+    emotionDebugPanelSmokeConsentEnabled,
     motionTuning: runtimeMotionTuning,
     motionTuningEnabled: runtimeMotionTuningEnabled,
     motionTuningPresets: runtimeMotionTuningPresets

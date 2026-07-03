@@ -64,7 +64,9 @@ import {
   type DoudouRuntimeEmotionBehaviorTriggerResult
 } from "./default-doudou-emotion-trigger.js";
 import {
+  DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT,
   createDoudouEmotionDebugPanelStatus,
+  isDoudouEmotionDebugPanelSmokeStatusSanitized,
   type DoudouEmotionDebugPanelStatus
 } from "./default-doudou-emotion-debug-panel.js";
 import {
@@ -148,6 +150,9 @@ let smokeEmotionModelTriggerCommandApplied: boolean | null = null;
 let smokeEmotionModelTriggerExplicitConsentGate = false;
 let smokeEmotionModelTriggerProviderCalledWithoutConsent = false;
 let smokeEmotionModelPanelButtonSubmitted = false;
+let smokeEmotionModelPanelCommandApplied: boolean | null = null;
+let smokeEmotionModelPanelConsented = false;
+let smokeEmotionModelPanelProviderCalled: boolean | null = null;
 let smokeEmotionModelPanelStatusSanitized = false;
 let smokeEmotionModelPanelStatusText = "";
 let smokeEmotionModelPanelVisible = false;
@@ -185,6 +190,10 @@ let emotionDebugConsent: HTMLInputElement | null = null;
 let emotionDebugSubmit: HTMLButtonElement | null = null;
 let emotionDebugStatus: HTMLElement | null = null;
 let emotionDebugPanelSubmitPromise: Promise<void> | null = null;
+let emotionDebugPanelLastInteraction: {
+  applyResult: DoudouRuntimeEmotionBehaviorApplyResult | null;
+  result: DoudouRuntimeEmotionBehaviorTriggerResult;
+} | null = null;
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
@@ -640,7 +649,10 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     },
     emotionModelPanel: {
       buttonSubmitted: smokeEmotionModelPanelButtonSubmitted,
+      commandApplied: smokeEmotionModelPanelCommandApplied,
+      consented: smokeEmotionModelPanelConsented,
       panelVisible: smokeEmotionModelPanelVisible,
+      providerCalled: smokeEmotionModelPanelProviderCalled,
       statusSanitized: smokeEmotionModelPanelStatusSanitized,
       statusText: smokeEmotionModelPanelStatusText
     }
@@ -670,18 +682,17 @@ async function exerciseEmotionModelPanelForSmoke(): Promise<void> {
   if (!bundle.emotionDebugPanelEnabled || !emotionDebugInput || !emotionDebugConsent || !emotionDebugSubmit) {
     return;
   }
-  emotionDebugInput.value = "烟测显式输入，但本次不授权调用情绪模型。";
-  emotionDebugConsent.checked = false;
+  smokeEmotionModelPanelConsented = bundle.emotionDebugPanelSmokeConsentEnabled;
+  emotionDebugInput.value = DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT;
+  emotionDebugConsent.checked = smokeEmotionModelPanelConsented;
   emotionDebugSubmit.click();
   await emotionDebugPanelSubmitPromise;
   smokeEmotionModelPanelButtonSubmitted = true;
+  smokeEmotionModelPanelProviderCalled = emotionDebugPanelLastInteraction?.result.provider.called ?? null;
+  smokeEmotionModelPanelCommandApplied = emotionDebugPanelLastInteraction?.applyResult?.applied ?? null;
   smokeEmotionModelPanelStatusText = emotionDebugStatus?.textContent ?? "";
   smokeEmotionModelPanelStatusSanitized =
-    smokeEmotionModelPanelStatusText.includes("未授权") &&
-    !smokeEmotionModelPanelStatusText.includes("烟测显式输入") &&
-    !smokeEmotionModelPanelStatusText.includes("sk-") &&
-    !smokeEmotionModelPanelStatusText.includes("http") &&
-    !smokeEmotionModelPanelStatusText.includes("choices");
+    isDoudouEmotionDebugPanelSmokeStatusSanitized(smokeEmotionModelPanelStatusText);
 }
 
 async function requestRuntimeEmotionBehaviorForExplicitUserInput(
@@ -826,6 +837,7 @@ async function submitEmotionDebugPanel(): Promise<void> {
       currentEmotionId: live2DRendererSpikeActiveEmotionId,
       text: emotionDebugInput.value
     });
+    emotionDebugPanelLastInteraction = interaction;
     updateEmotionDebugPanelStatus(createDoudouEmotionDebugPanelStatus(interaction));
   } finally {
     emotionDebugSubmit.disabled = false;

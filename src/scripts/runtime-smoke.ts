@@ -9,6 +9,10 @@ import {
   hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence,
   sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence
 } from "../runtime/default-doudou-live2d-official-smoke-evidence.js";
+import {
+  hasRuntimeEmotionModelPanelSmokeEvidence,
+  hasRuntimeLiveEmotionPanelSmokeEvidence
+} from "./runtime-smoke-evidence.js";
 
 const repoRoot = process.cwd();
 const electronBin = path.join(repoRoot, "node_modules/.bin/electron");
@@ -41,6 +45,9 @@ async function main(): Promise<void> {
     }, "UNSUPPORTED_SCHEMA_VERSION");
 
     await assertValidRuntimeLoads("fixture bundle", validBundle);
+    if (isLiveEmotionPanelSmoke()) {
+      return;
+    }
 
     const generatedSource = path.join(tempRoot, "source.png");
     const generatedBundle = path.join(tempRoot, "generated-bundle");
@@ -62,6 +69,13 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     throw new Error(`${label} runtime smoke exited ${validResult.code}\n${validResult.output}`);
   }
   const smokeResult = parseSmokeResult(validResult.output);
+  if (isLiveEmotionPanelSmoke()) {
+    if (!hasRuntimeLiveEmotionPanelSmokeEvidence(smokeResult)) {
+      throw new Error(`${label} live emotion panel smoke returned incomplete result\n${validResult.output}`);
+    }
+    console.log(`runtime smoke ${label}: ${JSON.stringify(smokeResult)}`);
+    return;
+  }
   if (
     !smokeResult.bundleLoaded ||
     !smokeResult.atlasLoaded ||
@@ -126,18 +140,18 @@ function hasEmotionModelTriggerGate(trigger: {
 
 function hasEmotionModelPanel(panel: {
   buttonSubmitted: boolean;
+  commandApplied: boolean | null;
+  consented: boolean;
   panelVisible: boolean;
+  providerCalled: boolean | null;
   statusSanitized: boolean;
   statusText: string;
 } | undefined): boolean {
-  return Boolean(
-    panel &&
-    panel.panelVisible &&
-    panel.buttonSubmitted &&
-    panel.statusSanitized &&
-    panel.statusText.includes("未授权") &&
-    !panel.statusText.includes("烟测显式输入")
-  );
+  return hasRuntimeEmotionModelPanelSmokeEvidence(panel, { expectConsented: false });
+}
+
+function isLiveEmotionPanelSmoke(): boolean {
+  return process.env.DOUDOU_EMOTION_PANEL_SMOKE_CONSENT === "1";
 }
 
 function hasAllEmotionMotionPhases(phases: string[]): boolean {
@@ -423,7 +437,10 @@ function parseSmokeResult(output: string) {
     };
     emotionModelPanel?: {
       buttonSubmitted: boolean;
+      commandApplied: boolean | null;
+      consented: boolean;
       panelVisible: boolean;
+      providerCalled: boolean | null;
       statusSanitized: boolean;
       statusText: string;
     };

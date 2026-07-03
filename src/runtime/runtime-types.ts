@@ -44,6 +44,7 @@ export interface RuntimeBundle {
   scaleLimits: RuntimeScaleLimits;
   smoke: boolean;
   emotionDebugPanelEnabled: boolean;
+  emotionDebugPanelSmokeConsentEnabled: boolean;
   motionTuning: RuntimeMotionTuning;
   motionTuningEnabled: boolean;
   motionTuningPresets: RuntimeMotionTuningPreset[];
@@ -152,7 +153,10 @@ export interface RuntimeEmotionModelTriggerSmokeResult {
 
 export interface RuntimeEmotionModelPanelSmokeResult {
   buttonSubmitted: boolean;
+  commandApplied: boolean | null;
+  consented: boolean;
   panelVisible: boolean;
+  providerCalled: boolean | null;
   statusSanitized: boolean;
   statusText: string;
 }

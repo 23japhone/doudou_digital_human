@@ -21,11 +21,30 @@ export interface CreateDoudouEmotionDebugPanelStatusInput {
   result?: DoudouRuntimeEmotionBehaviorTriggerResult | null;
 }
 
+export const DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT =
+  "我刚刚把兜兜的情绪调试面板跑通了，请给一个轻快但不打扰的反馈。";
+
 export function resolveDoudouEmotionDebugPanelEnabled(input: {
   env: Partial<Record<string, string | undefined>>;
   optionEnabled: boolean;
 }): boolean {
   return input.optionEnabled || input.env.DOUDOU_EMOTION_TRIGGER_PANEL === "1";
+}
+
+export function resolveDoudouEmotionDebugPanelSmokeConsent(
+  env: Partial<Record<string, string | undefined>>
+): boolean {
+  return env.DOUDOU_EMOTION_PANEL_SMOKE_CONSENT === "1";
+}
+
+export function isDoudouEmotionDebugPanelSmokeStatusSanitized(statusText: string): boolean {
+  return ![
+    DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT,
+    "choices",
+    "http",
+    "sk-",
+    "user_positive_text"
+  ].some((blockedFragment) => statusText.includes(blockedFragment));
 }
 
 export function createDoudouEmotionDebugPanelStatus(
