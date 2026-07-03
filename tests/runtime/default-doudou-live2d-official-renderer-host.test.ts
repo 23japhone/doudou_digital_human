@@ -170,6 +170,57 @@ describe("default doudou official Live2D renderer host", () => {
     expect(JSON.stringify(host.evidence())).not.toContain("/models/");
   });
 
+  test("preserves partial lifecycle evidence when expression loading fails after earlier successes", async () => {
+    const calls: string[] = [];
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => createFakeOfficialRuntimeModule(calls, {
+        expressionLoadResult: (emotionId: string) => emotionId === "delighted" ? null : { expressionName: emotionId }
+      }),
+      loadCoreScript: async () => undefined
+    });
+
+    await host.loadDefaultModel(library);
+
+    expect(host.evidence()).toMatchObject({
+      expressionCount: 0,
+      modelLoaded: false,
+      runtimeFailureReason: "model_or_expression_load_failed",
+      runtimeLifecycle: {
+        expressionLoadCalls: 2,
+        expressionSetCalls: 0,
+        modelUpdateCalls: 0,
+        updateMotionCalls: 0
+      },
+      runtimeModuleProbe: "model_failed"
+    });
+    expect(calls).toEqual([
+      "create:default-doudou:file:///models/",
+      "loadModel:default-doudou.model3.json:file:///models/default-doudou.model3.json",
+      "loadExpression:calm_idle:expressions/doudou_calm_idle.exp3.json",
+      "loadExpression:happy_smile:expressions/doudou_happy_smile.exp3.json",
+      "loadExpression:delighted:expressions/doudou_delighted.exp3.json"
+    ]);
+    expect(JSON.stringify(host.evidence())).not.toContain("/models/");
+  });
+
   test("records distinct official runtime expression emotions observed through desktop switches", async () => {
     const calls: string[] = [];
     const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
@@ -388,7 +439,7 @@ describe("default doudou official Live2D renderer host", () => {
 
 interface FakeOfficialRuntimeModuleOptions {
   drawThrows?: boolean;
-  expressionLoadResult?: unknown;
+  expressionLoadResult?: unknown | ((emotionId: string) => unknown);
   onDraw?: () => void;
   setExpressionDelay?: Promise<unknown>;
   setExpressionResult?: boolean;
@@ -399,36 +450,60 @@ function createFakeOfficialRuntimeModule(
   calls: string[],
   fakeOptions: FakeOfficialRuntimeModuleOptions = {}
 ): DoudouOfficialLive2DRendererRuntimeModule {
+  const lifecycle = {
+    drawCalls: 0,
+    expressionLoadCalls: 0,
+    expressionSetCalls: 0,
+    modelUpdateCalls: 0,
+    updateMotionCalls: 0
+  };
   return {
     async createDoudouOfficialLive2DRendererRuntime(runtimeOptions) {
       calls.push(`create:${runtimeOptions.modelId}:${runtimeOptions.assets.modelRootUrl}`);
       return {
+        evidence() {
+          return { ...lifecycle };
+        },
         async loadModel(input) {
           calls.push(`loadModel:${input.model3Json}:${input.model3JsonUrl}`);
         },
         async loadExpression(input) {
           calls.push(`loadExpression:${input.emotionId}:${input.expressionFile}`);
           if ("expressionLoadResult" in fakeOptions) {
-            return fakeOptions.expressionLoadResult;
+            const result = typeof fakeOptions.expressionLoadResult === "function"
+              ? fakeOptions.expressionLoadResult(input.emotionId)
+              : fakeOptions.expressionLoadResult;
+            if (result) {
+              lifecycle.expressionLoadCalls += 1;
+            }
+            return result;
           }
+          lifecycle.expressionLoadCalls += 1;
           return { expressionName: input.expressionName };
         },
         async setExpression(input) {
           calls.push(`setExpression:${input.emotionId}:${input.expressionFile}`);
           await fakeOptions.setExpressionDelay;
-          return fakeOptions.setExpressionResult ?? true;
+          const accepted = fakeOptions.setExpressionResult ?? true;
+          if (accepted) {
+            lifecycle.expressionSetCalls += 1;
+          }
+          return accepted;
         },
         update(deltaTimeSeconds) {
           calls.push(`update:${deltaTimeSeconds.toFixed(3)}`);
           if (fakeOptions.updateThrows) {
             throw new Error("synthetic update failure");
           }
+          lifecycle.updateMotionCalls += 1;
+          lifecycle.modelUpdateCalls += 1;
         },
         draw() {
           calls.push("draw");
           if (fakeOptions.drawThrows) {
             throw new Error("synthetic draw failure");
           }
+          lifecycle.drawCalls += 1;
           fakeOptions.onDraw?.();
         }
       };

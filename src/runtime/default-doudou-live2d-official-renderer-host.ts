@@ -109,6 +109,7 @@ export function createDoudouOfficialLive2DRendererHost(
   const expressionEmotionIdsObserved: DefaultDoudouEmotionId[] = [];
   let expressionSwitches = 0;
   let lastFrameAtMs: number | null = null;
+  let lastRuntimeLifecycle = emptyRuntimeLifecycleEvidence();
   let modelLoaded = false;
   let pendingExpressionSwitches = 0;
   let runtime: DoudouOfficialLive2DRendererRuntime | null = null;
@@ -122,11 +123,13 @@ export function createDoudouOfficialLive2DRendererHost(
     async loadDefaultModel(library) {
       const assets = options.config.rendererAssets;
       if (!assets?.runtimeModuleUrl) {
+        lastRuntimeLifecycle = emptyRuntimeLifecycleEvidence();
         runtimeFailureReason = null;
         runtimeModuleProbe = "not_configured";
         return evidence();
       }
 
+      lastRuntimeLifecycle = emptyRuntimeLifecycleEvidence();
       runtimeFailureReason = null;
       runtimeModuleProbe = "load_pending";
       let module: DoudouOfficialLive2DRendererRuntimeModule;
@@ -160,6 +163,7 @@ export function createDoudouOfficialLive2DRendererHost(
         });
         await loadAllExpressions(runtime, library);
       } catch {
+        lastRuntimeLifecycle = runtimeLifecycleEvidence();
         runtime = null;
         runtimeFailureReason = "model_or_expression_load_failed";
         runtimeModuleProbe = "model_failed";
@@ -281,7 +285,7 @@ export function createDoudouOfficialLive2DRendererHost(
 
   function runtimeLifecycleEvidence(): DoudouOfficialLive2DRendererRuntimeLifecycleEvidence {
     if (!runtime?.evidence) {
-      return emptyRuntimeLifecycleEvidence();
+      return lastRuntimeLifecycle;
     }
     try {
       const lifecycle = runtime.evidence();
@@ -292,18 +296,19 @@ export function createDoudouOfficialLive2DRendererHost(
         typeof lifecycle.modelUpdateCalls === "number" &&
         typeof lifecycle.updateMotionCalls === "number"
       ) {
-        return {
+        lastRuntimeLifecycle = {
           drawCalls: lifecycle.drawCalls,
           expressionLoadCalls: lifecycle.expressionLoadCalls,
           expressionSetCalls: lifecycle.expressionSetCalls,
           modelUpdateCalls: lifecycle.modelUpdateCalls,
           updateMotionCalls: lifecycle.updateMotionCalls
         };
+        return lastRuntimeLifecycle;
       }
     } catch {
-      return emptyRuntimeLifecycleEvidence();
+      return lastRuntimeLifecycle;
     }
-    return emptyRuntimeLifecycleEvidence();
+    return lastRuntimeLifecycle;
   }
 }
 
