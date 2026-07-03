@@ -251,6 +251,72 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("rewrites sample shader path to copied module-relative files", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-shaders-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir, { shaderPathProbe: true });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const outputSource = await readFile(outputFile, "utf8");
+      expect(outputSource).not.toContain("../../Framework/Shaders/WebGL/");
+      expect(outputSource).toMatch(
+        /new URL\("\.\/default-doudou-sample-runtime-shaders\/", (?:"" \+ )?import\.meta\.url\)\.href/
+      );
+      await expect(readFile(path.join(
+        tempRoot,
+        "local_live2d_runtime",
+        "default-doudou-sample-runtime-shaders",
+        "vertshadersrc.vert"
+      ), "utf8")).resolves.toBe("synthetic shader vertshadersrc.vert");
+
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-shaders-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async () => undefined
+      });
+
+      await host.loadDefaultModel(library);
+      host.renderFrame(1000);
+
+      expect(calls.some((call) =>
+        call.startsWith("LAppModel.shaderPath:file://") &&
+        call.includes("/default-doudou-sample-runtime-shaders/")
+      )).toBe(true);
+      expect(JSON.stringify(host.evidence())).not.toContain(tempRoot);
+    } finally {
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("rejects sample mode expression switches when LAppModel refuses setExpression", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-expression-rejected-"));
     try {
@@ -1251,6 +1317,7 @@ async function writeSyntheticCubismSampleSdk(
     sampleFrameworkFiles?: boolean;
     sampleSupportFiles?: boolean;
     setExpressionResult?: "accepted" | "rejected";
+    shaderPathProbe?: boolean;
   } = {}
 ): Promise<void> {
   const bundledExpressionUpdater = options.bundledExpressionUpdater ?? false;
@@ -1259,10 +1326,12 @@ async function writeSyntheticCubismSampleSdk(
   const sampleFrameworkFiles = options.sampleFrameworkFiles ?? true;
   const sampleSupportFiles = options.sampleSupportFiles ?? true;
   const setExpressionResult = options.setExpressionResult ?? "accepted";
+  const shaderPathProbe = options.shaderPathProbe ?? false;
   await mkdir(path.join(sdkDir, "Framework/src/live2dcubismframework.ts", ".."), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/math"), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/motion"), { recursive: true });
   await mkdir(path.join(sdkDir, "Samples/TypeScript/Demo/src"), { recursive: true });
+  await writeSyntheticCubismShaderFiles(sdkDir);
   await writeFile(
     path.join(sdkDir, "Framework/src/live2dcubismframework.ts"),
     `
@@ -1329,12 +1398,13 @@ export class LAppPal {
     "utf8"
   );
   if (sampleSupportFiles) {
-    await writeSyntheticCubismSampleSupportFiles(sdkDir);
+    await writeSyntheticCubismSampleSupportFiles(sdkDir, { shaderPathProbe });
   }
   await writeFile(
     path.join(sdkDir, "Samples/TypeScript/Demo/src/lappmodel.ts"),
     `
 import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
+${shaderPathProbe ? 'import * as LAppDefine from "./lappdefine";' : ""}
 const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
 const bundledExpressionUpdater = ${JSON.stringify(bundledExpressionUpdater)};
 const expressionMap = ${JSON.stringify(expressionMap)};
@@ -1498,6 +1568,7 @@ export class LAppModel {
   }
   draw(matrix) {
     calls().push("LAppModel.draw:" + (matrix instanceof CubismMatrix44));
+    ${shaderPathProbe ? 'calls().push("LAppModel.shaderPath:" + LAppDefine.ShaderPath);' : ""}
   }
 }
 `,
@@ -1538,7 +1609,33 @@ async function writeSyntheticCubismSampleFrameworkFiles(sdkDir: string): Promise
   }
 }
 
-async function writeSyntheticCubismSampleSupportFiles(sdkDir: string): Promise<void> {
+async function writeSyntheticCubismShaderFiles(sdkDir: string): Promise<void> {
+  const shaderFiles = [
+    "fragshadersrcalphablend.frag",
+    "fragshadersrccolorblend.frag",
+    "fragshadersrccopy.frag",
+    "fragshadersrcmaskinvertedpremultipliedalpha.frag",
+    "fragshadersrcmaskpremultipliedalpha.frag",
+    "fragshadersrcpremultipliedalpha.frag",
+    "fragshadersrcpremultipliedalphablend.frag",
+    "fragshadersrcsetupmask.frag",
+    "vertshadersrc.vert",
+    "vertshadersrcblend.vert",
+    "vertshadersrccopy.vert",
+    "vertshadersrcmasked.vert",
+    "vertshadersrcsetupmask.vert"
+  ];
+  const shaderDir = path.join(sdkDir, "Framework/Shaders/WebGL");
+  await mkdir(shaderDir, { recursive: true });
+  for (const shaderFile of shaderFiles) {
+    await writeFile(path.join(shaderDir, shaderFile), `synthetic shader ${shaderFile}`, "utf8");
+  }
+}
+
+async function writeSyntheticCubismSampleSupportFiles(
+  sdkDir: string,
+  options: { shaderPathProbe?: boolean } = {}
+): Promise<void> {
   const sampleSupportFiles = [
     "lappdefine.ts",
     "lappdelegate.ts",
@@ -1552,7 +1649,10 @@ async function writeSyntheticCubismSampleSupportFiles(sdkDir: string): Promise<v
     "touchmanager.ts"
   ];
   for (const sampleSupportFile of sampleSupportFiles) {
-    await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src", sampleSupportFile), "export {};\n", "utf8");
+    const source = sampleSupportFile === "lappdefine.ts" && options.shaderPathProbe
+      ? 'export const ShaderPath = "../../Framework/Shaders/WebGL/";\n'
+      : "export {};\n";
+    await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src", sampleSupportFile), source, "utf8");
   }
 }
 

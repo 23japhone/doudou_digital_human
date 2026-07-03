@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { build, type InlineConfig } from "vite";
@@ -32,6 +32,7 @@ export interface BuildDoudouOfficialLive2DRendererRuntimeModuleInput {
 }
 
 const FRAMEWORK_SOURCE = "Framework/src";
+const FRAMEWORK_SHADER_SOURCE = "Framework/Shaders/WebGL";
 const SAMPLE_LAPP_MODEL = "Samples/TypeScript/Demo/src/lappmodel.ts";
 const SAMPLE_SOURCE = "Samples/TypeScript/Demo/src";
 const REQUIRED_SAMPLE_SOURCE_FILES = [
@@ -86,6 +87,21 @@ const REQUIRED_FRAMEWORK_RUNTIME_FILES = [
   "motion/cubismmotionmanager.ts",
   "rendering/cubismrenderer_webgl.ts"
 ] as const;
+const REQUIRED_FRAMEWORK_SHADER_FILES = [
+  "fragshadersrcalphablend.frag",
+  "fragshadersrccolorblend.frag",
+  "fragshadersrccopy.frag",
+  "fragshadersrcmaskinvertedpremultipliedalpha.frag",
+  "fragshadersrcmaskpremultipliedalpha.frag",
+  "fragshadersrcpremultipliedalpha.frag",
+  "fragshadersrcpremultipliedalphablend.frag",
+  "fragshadersrcsetupmask.frag",
+  "vertshadersrc.vert",
+  "vertshadersrcblend.vert",
+  "vertshadersrccopy.vert",
+  "vertshadersrcmasked.vert",
+  "vertshadersrcsetupmask.vert"
+] as const;
 
 export async function buildDoudouOfficialLive2DRendererRuntimeModule(
   input: BuildDoudouOfficialLive2DRendererRuntimeModuleInput
@@ -94,8 +110,10 @@ export async function buildDoudouOfficialLive2DRendererRuntimeModule(
   const sdkDir = path.resolve(input.sdkDir);
   const outputFile = path.resolve(input.outputFile);
   const frameworkSourceDir = path.join(sdkDir, FRAMEWORK_SOURCE);
+  const frameworkShaderDir = path.join(sdkDir, FRAMEWORK_SHADER_SOURCE);
   const sampleSourceDir = path.join(sdkDir, SAMPLE_SOURCE);
   const missingRuntimeReason = await missingRuntimeReasonForMode({
+    frameworkShaderDir,
     frameworkSourceDir,
     mode,
     sampleSourceDir,
@@ -115,9 +133,17 @@ export async function buildDoudouOfficialLive2DRendererRuntimeModule(
       mode,
       outputDir: path.dirname(outputFile),
       outputFileName: path.basename(outputFile),
+      sampleShaderOutputDirectoryName: sampleShaderOutputDirectoryName(path.basename(outputFile)),
       sampleSourceDir
     }));
     await stripBundlerPathComments(outputFile);
+    if (mode === "sample") {
+      await copySampleShaderFiles({
+        outputDir: path.dirname(outputFile),
+        outputShaderDirectoryName: sampleShaderOutputDirectoryName(path.basename(outputFile)),
+        sourceShaderDir: frameworkShaderDir
+      });
+    }
   } catch {
     return {
       ok: false,
@@ -170,6 +196,7 @@ function createRuntimeModuleBuildConfig(options: {
   mode: DoudouOfficialLive2DRuntimeModuleBuildMode;
   outputDir: string;
   outputFileName: string;
+  sampleShaderOutputDirectoryName: string;
   sampleSourceDir: string;
 }): InlineConfig {
   const entrySource = options.mode === "sample"
@@ -208,6 +235,13 @@ function createRuntimeModuleBuildConfig(options: {
     },
     configFile: false,
     logLevel: "silent",
+    plugins: [
+      createSampleShaderPathPlugin({
+        mode: options.mode,
+        sampleShaderOutputDirectoryName: options.sampleShaderOutputDirectoryName,
+        sampleSourceDir: options.sampleSourceDir
+      })
+    ],
     publicDir: false,
     resolve: {
       alias: [
@@ -224,7 +258,33 @@ function createRuntimeModuleBuildConfig(options: {
   };
 }
 
+function createSampleShaderPathPlugin(options: {
+  mode: DoudouOfficialLive2DRuntimeModuleBuildMode;
+  sampleShaderOutputDirectoryName: string;
+  sampleSourceDir: string;
+}) {
+  return {
+    name: "doudou-official-sample-shader-path",
+    transform(code: string, id: string) {
+      if (options.mode !== "sample") {
+        return null;
+      }
+      const cleanId = path.normalize(id.split("?")[0] ?? id);
+      const expectedId = path.join(options.sampleSourceDir, "lappdefine.ts");
+      const expectedSuffix = path.join(SAMPLE_SOURCE, "lappdefine.ts");
+      if (cleanId !== expectedId && !cleanId.endsWith(expectedSuffix)) {
+        return null;
+      }
+      return code.replace(
+        /export const ShaderPath = ['"]\.\.\/\.\.\/Framework\/Shaders\/WebGL\/['"];/,
+        `export const ShaderPath = new URL("./${options.sampleShaderOutputDirectoryName}/", import.meta.url).href;`
+      );
+    }
+  };
+}
+
 async function missingRuntimeReasonForMode(options: {
+  frameworkShaderDir: string;
   frameworkSourceDir: string;
   mode: DoudouOfficialLive2DRuntimeModuleBuildMode;
   sampleSourceDir: string;
@@ -237,6 +297,9 @@ async function missingRuntimeReasonForMode(options: {
     ? REQUIRED_SAMPLE_RUNTIME_FILES
     : REQUIRED_FRAMEWORK_RUNTIME_FILES;
   if (!await hasRequiredFrameworkRuntimeFiles(options.frameworkSourceDir, requiredFrameworkFiles)) {
+    return "sdk_framework_runtime_missing";
+  }
+  if (options.mode === "sample" && !await hasRequiredFrameworkShaderFiles(options.frameworkShaderDir)) {
     return "sdk_framework_runtime_missing";
   }
   return null;
@@ -263,6 +326,15 @@ async function hasRequiredFrameworkRuntimeFiles(
   return true;
 }
 
+async function hasRequiredFrameworkShaderFiles(frameworkShaderDir: string): Promise<boolean> {
+  for (const relativeFile of REQUIRED_FRAMEWORK_SHADER_FILES) {
+    if (!await isFile(path.join(frameworkShaderDir, relativeFile))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 async function isFile(filePath: string): Promise<boolean> {
   try {
     return (await stat(filePath)).isFile();
@@ -275,6 +347,22 @@ async function stripBundlerPathComments(outputFile: string): Promise<void> {
   const generated = await readFile(outputFile, "utf8");
   const sanitized = generated.replace(/^\/\/#(?:end)?region.*(?:\r?\n)?/gm, "");
   await writeFile(outputFile, sanitized, "utf8");
+}
+
+async function copySampleShaderFiles(options: {
+  outputDir: string;
+  outputShaderDirectoryName: string;
+  sourceShaderDir: string;
+}): Promise<void> {
+  const outputShaderDir = path.join(options.outputDir, options.outputShaderDirectoryName);
+  await mkdir(outputShaderDir, { recursive: true });
+  for (const shaderFile of REQUIRED_FRAMEWORK_SHADER_FILES) {
+    await copyFile(path.join(options.sourceShaderDir, shaderFile), path.join(outputShaderDir, shaderFile));
+  }
+}
+
+function sampleShaderOutputDirectoryName(outputFileName: string): string {
+  return `${path.parse(outputFileName).name}-shaders`;
 }
 
 function parseArgs(args: string[]): Partial<BuildDoudouOfficialLive2DRendererRuntimeModuleInput> {
