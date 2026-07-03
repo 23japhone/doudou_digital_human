@@ -1171,6 +1171,7 @@ function live2DRendererSpikeSmokeResult(): RuntimeLive2DRendererSpikeSmokeResult
     enabled: true,
     officialRuntime: {
       ...config.officialRuntime.publicEvidence,
+      canvasLayerVisible: live2DOfficialCanvasLayerVisible(),
       rendererAssetProbe: live2DOfficialRendererAssetProbe,
       runtimeModule: live2DOfficialRendererHostEvidence()
     },
@@ -1195,6 +1196,19 @@ function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostE
       : "not_configured",
     updateCalls: 0
   };
+}
+
+function live2DOfficialCanvasLayerVisible(): boolean {
+  if (petFrame.dataset.live2dOfficialRuntime !== "loaded") {
+    return false;
+  }
+  const live2DRect = live2DCanvas.getBoundingClientRect();
+  if (live2DRect.width <= 0 || live2DRect.height <= 0) {
+    return false;
+  }
+  const petOpacity = Number.parseFloat(getComputedStyle(petCanvas).opacity);
+  const live2DOpacity = Number.parseFloat(getComputedStyle(live2DCanvas).opacity);
+  return live2DOpacity > 0.5 && petOpacity < 0.5;
 }
 
 function isLive2DRendererSmokePending(): boolean {

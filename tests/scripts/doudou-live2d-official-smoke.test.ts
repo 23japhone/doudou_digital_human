@@ -130,6 +130,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
         officialRenderer: {
           fixtureBundle: {
             activeEmotionId: "delighted",
+            canvasLayerVisible: true,
             drawCalls: 21,
             expressionCount: 12,
             expressionSwitches: 13,
@@ -141,6 +142,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
           },
           generatedBundle: {
             activeEmotionId: "focused_working",
+            canvasLayerVisible: true,
             drawCalls: 29,
             expressionCount: 12,
             expressionSwitches: 17,
@@ -280,6 +282,7 @@ function createRuntimeSmokeResult(activeEmotionId: string, expressionSwitches: n
   return {
     live2DRendererSpike: {
       officialRuntime: {
+        canvasLayerVisible: true,
         rendererAssetProbe: "model3_fetched",
         runtimeModule: {
           activeEmotionId,
