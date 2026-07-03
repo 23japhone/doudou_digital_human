@@ -12,6 +12,7 @@ export interface DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
   modelLoaded: boolean;
   pendingExpressionSwitches: number;
   rendererAssetProbe: string;
+  runtimeFailureReason: string | null;
   runtimeLifecycle: {
     drawCalls: number;
     expressionLoadCalls: number;
@@ -159,6 +160,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
   ) {
     return undefined;
   }
+  const runtimeFailureReason = sanitizeRuntimeFailureReason(runtimeModule.runtimeFailureReason);
   return {
     activeEmotionId: runtimeModule.activeEmotionId,
     canvasLayerVisible: officialRuntime.canvasLayerVisible,
@@ -173,6 +175,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     modelLoaded: runtimeModule.modelLoaded,
     pendingExpressionSwitches: runtimeModule.pendingExpressionSwitches,
     rendererAssetProbe: officialRuntime.rendererAssetProbe,
+    runtimeFailureReason,
     runtimeLifecycle: {
       drawCalls: runtimeModule.runtimeLifecycle.drawCalls,
       expressionLoadCalls: runtimeModule.runtimeLifecycle.expressionLoadCalls,
@@ -207,4 +210,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function sanitizeRuntimeFailureReason(value: unknown): string | null {
+  if (
+    value === "core_or_module_load_failed" ||
+    value === "model_or_expression_load_failed" ||
+    value === "expression_switch_rejected" ||
+    value === "frame_failed"
+  ) {
+    return value;
+  }
+  return null;
 }

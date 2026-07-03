@@ -12,6 +12,12 @@ export type DoudouOfficialLive2DRendererRuntimeModuleProbe =
   | "load_failed"
   | "model_failed";
 
+export type DoudouOfficialLive2DRendererRuntimeFailureReason =
+  | "core_or_module_load_failed"
+  | "model_or_expression_load_failed"
+  | "expression_switch_rejected"
+  | "frame_failed";
+
 export interface DoudouOfficialLive2DRendererHostEvidence {
   activeEmotionId: DefaultDoudouEmotionId;
   drawCalls: number;
@@ -23,6 +29,7 @@ export interface DoudouOfficialLive2DRendererHostEvidence {
   frameLoopAdvanced: boolean;
   modelLoaded: boolean;
   pendingExpressionSwitches: number;
+  runtimeFailureReason: DoudouOfficialLive2DRendererRuntimeFailureReason | null;
   runtimeLifecycle: DoudouOfficialLive2DRendererRuntimeLifecycleEvidence;
   runtimeModuleProbe: DoudouOfficialLive2DRendererRuntimeModuleProbe;
   updateCalls: number;
@@ -105,6 +112,7 @@ export function createDoudouOfficialLive2DRendererHost(
   let modelLoaded = false;
   let pendingExpressionSwitches = 0;
   let runtime: DoudouOfficialLive2DRendererRuntime | null = null;
+  let runtimeFailureReason: DoudouOfficialLive2DRendererRuntimeFailureReason | null = null;
   let runtimeModuleProbe: DoudouOfficialLive2DRendererRuntimeModuleProbe = initialRuntimeModuleProbe(options);
   let updateCalls = 0;
 
@@ -114,16 +122,19 @@ export function createDoudouOfficialLive2DRendererHost(
     async loadDefaultModel(library) {
       const assets = options.config.rendererAssets;
       if (!assets?.runtimeModuleUrl) {
+        runtimeFailureReason = null;
         runtimeModuleProbe = "not_configured";
         return evidence();
       }
 
+      runtimeFailureReason = null;
       runtimeModuleProbe = "load_pending";
       let module: DoudouOfficialLive2DRendererRuntimeModule;
       try {
         await options.loadCoreScript(assets.coreScriptUrl);
         module = await options.importRuntimeModule(assets.runtimeModuleUrl);
         if (typeof module.createDoudouOfficialLive2DRendererRuntime !== "function") {
+          runtimeFailureReason = "core_or_module_load_failed";
           runtimeModuleProbe = "load_failed";
           return evidence();
         }
@@ -135,6 +146,7 @@ export function createDoudouOfficialLive2DRendererHost(
           modelId: "default-doudou"
         });
       } catch {
+        runtimeFailureReason = "core_or_module_load_failed";
         runtimeModuleProbe = "load_failed";
         return evidence();
       }
@@ -149,12 +161,14 @@ export function createDoudouOfficialLive2DRendererHost(
         await loadAllExpressions(runtime, library);
       } catch {
         runtime = null;
+        runtimeFailureReason = "model_or_expression_load_failed";
         runtimeModuleProbe = "model_failed";
         return evidence();
       }
 
       expressionCount = library.expressionCount;
       modelLoaded = true;
+      runtimeFailureReason = null;
       runtimeModuleProbe = "loaded";
       return evidence();
     },
@@ -175,6 +189,7 @@ export function createDoudouOfficialLive2DRendererHost(
           expressionNeedsFrame = false;
         }
       } catch {
+        runtimeFailureReason = "frame_failed";
         runtimeModuleProbe = "model_failed";
       }
       return evidence();
@@ -196,6 +211,7 @@ export function createDoudouOfficialLive2DRendererHost(
           throw new Error("Official Live2D runtime rejected expression switch.");
         }
       } catch {
+        runtimeFailureReason = "expression_switch_rejected";
         runtimeModuleProbe = "model_failed";
         return false;
       } finally {
@@ -224,6 +240,7 @@ export function createDoudouOfficialLive2DRendererHost(
       frameLoopAdvanced: updateCalls >= 2 && drawCalls >= 2,
       modelLoaded,
       pendingExpressionSwitches,
+      runtimeFailureReason,
       runtimeLifecycle: runtimeLifecycleEvidence(),
       runtimeModuleProbe,
       updateCalls

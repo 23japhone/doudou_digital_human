@@ -1222,6 +1222,7 @@ function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostE
     frameLoopAdvanced: false,
     modelLoaded: false,
     pendingExpressionSwitches: 0,
+    runtimeFailureReason: null,
     runtimeLifecycle: {
       drawCalls: 0,
       expressionLoadCalls: 0,

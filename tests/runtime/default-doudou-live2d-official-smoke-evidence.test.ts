@@ -147,6 +147,20 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(true);
   });
 
+  test("preserves sanitized official runtime failure reason for diagnosis", () => {
+    const parsed = parseDoudouOfficialLive2DRendererSmokeEvidence(`runtime smoke fixture bundle: ${JSON.stringify(
+      createRuntimeSmokeResult(createOfficialRuntimeEvidence({
+        runtimeFailureReason: "expression_switch_rejected",
+        runtimeModuleProbe: "model_failed"
+      }))
+    )}`);
+
+    expect(parsed.fixtureBundle).toMatchObject({
+      runtimeFailureReason: "expression_switch_rejected",
+      runtimeModuleProbe: "model_failed"
+    });
+  });
+
   test("parses fixture and generated bundle official runtime smoke output", () => {
     const fixtureBundle = createRuntimeSmokeResult(createOfficialRuntimeEvidence({
       activeEmotionId: "delighted",
@@ -190,6 +204,7 @@ function createOfficialRuntimeEvidence(
     modelLoaded: true,
     pendingExpressionSwitches: 0,
     rendererAssetProbe: "model3_fetched",
+    runtimeFailureReason: null,
     runtimeLifecycle: {
       drawCalls: 2,
       expressionLoadCalls: 12,
@@ -221,6 +236,7 @@ function createRuntimeSmokeResult(evidence: DoudouOfficialLive2DRendererRuntimeS
           frameLoopAdvanced: evidence.frameLoopAdvanced,
           modelLoaded: evidence.modelLoaded,
           pendingExpressionSwitches: evidence.pendingExpressionSwitches,
+          runtimeFailureReason: evidence.runtimeFailureReason,
           runtimeLifecycle: evidence.runtimeLifecycle,
           runtimeModuleProbe: evidence.runtimeModuleProbe,
           updateCalls: evidence.updateCalls

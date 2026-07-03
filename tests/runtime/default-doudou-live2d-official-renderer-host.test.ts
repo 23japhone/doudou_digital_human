@@ -55,6 +55,7 @@ describe("default doudou official Live2D renderer host", () => {
       expressionSwitches: 1,
       frameLoopAdvanced: true,
       modelLoaded: true,
+      runtimeFailureReason: null,
       runtimeModuleProbe: "loaded",
       updateCalls: 2
     });
@@ -121,6 +122,7 @@ describe("default doudou official Live2D renderer host", () => {
       drawCalls: 0,
       expressionCount: 0,
       modelLoaded: false,
+      runtimeFailureReason: null,
       runtimeModuleProbe: "not_configured",
       updateCalls: 0
     });
@@ -157,6 +159,7 @@ describe("default doudou official Live2D renderer host", () => {
     expect(host.evidence()).toMatchObject({
       expressionCount: 0,
       modelLoaded: false,
+      runtimeFailureReason: "model_or_expression_load_failed",
       runtimeModuleProbe: "model_failed"
     });
     expect(calls).toEqual([
@@ -290,9 +293,49 @@ describe("default doudou official Live2D renderer host", () => {
       activeEmotionId: "calm_idle",
       expressionSwitches: 0,
       pendingExpressionSwitches: 0,
+      runtimeFailureReason: "expression_switch_rejected",
       runtimeModuleProbe: "model_failed"
     });
     expect(calls).toContain("setExpression:delighted:expressions/doudou_delighted.exp3.json");
+    expect(JSON.stringify(host.evidence())).not.toContain("/models/");
+  });
+
+  test("records frame failures when the official runtime update or draw throws", async () => {
+    const calls: string[] = [];
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => createFakeOfficialRuntimeModule(calls, { updateThrows: true }),
+      loadCoreScript: async () => undefined
+    });
+
+    await host.loadDefaultModel(library);
+    host.renderFrame(1000);
+
+    expect(host.evidence()).toMatchObject({
+      drawCalls: 0,
+      frameLoopAdvanced: false,
+      runtimeFailureReason: "frame_failed",
+      runtimeModuleProbe: "model_failed",
+      updateCalls: 0
+    });
+    expect(calls).toContain("update:0.000");
     expect(JSON.stringify(host.evidence())).not.toContain("/models/");
   });
 
@@ -344,10 +387,12 @@ describe("default doudou official Live2D renderer host", () => {
 });
 
 interface FakeOfficialRuntimeModuleOptions {
+  drawThrows?: boolean;
   expressionLoadResult?: unknown;
   onDraw?: () => void;
   setExpressionDelay?: Promise<unknown>;
   setExpressionResult?: boolean;
+  updateThrows?: boolean;
 }
 
 function createFakeOfficialRuntimeModule(
@@ -375,9 +420,15 @@ function createFakeOfficialRuntimeModule(
         },
         update(deltaTimeSeconds) {
           calls.push(`update:${deltaTimeSeconds.toFixed(3)}`);
+          if (fakeOptions.updateThrows) {
+            throw new Error("synthetic update failure");
+          }
         },
         draw() {
           calls.push("draw");
+          if (fakeOptions.drawThrows) {
+            throw new Error("synthetic draw failure");
+          }
           fakeOptions.onDraw?.();
         }
       };
