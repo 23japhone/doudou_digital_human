@@ -64,6 +64,21 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
   });
 
+  test("requires loaded official runtime evidence to prove updateMotion advanced inside the module", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      runtimeLifecycle: {
+        drawCalls: 2,
+        modelUpdateCalls: 2,
+        updateMotionCalls: 0
+      }
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.runtimeLifecycle.updateMotionCalls"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
   test("accepts complete loaded official runtime evidence", () => {
     const evidence = createOfficialRuntimeEvidence({
       activeEmotionId: "delighted",
@@ -115,6 +130,11 @@ function createOfficialRuntimeEvidence(
     frameLoopAdvanced: true,
     modelLoaded: true,
     rendererAssetProbe: "model3_fetched",
+    runtimeLifecycle: {
+      drawCalls: 2,
+      modelUpdateCalls: 2,
+      updateMotionCalls: 2
+    },
     runtimeModuleProbe: "loaded",
     updateCalls: 2,
     ...patch
@@ -137,6 +157,7 @@ function createRuntimeSmokeResult(evidence: DoudouOfficialLive2DRendererRuntimeS
           expressionSwitches: evidence.expressionSwitches,
           frameLoopAdvanced: evidence.frameLoopAdvanced,
           modelLoaded: evidence.modelLoaded,
+          runtimeLifecycle: evidence.runtimeLifecycle,
           runtimeModuleProbe: evidence.runtimeModuleProbe,
           updateCalls: evidence.updateCalls
         }

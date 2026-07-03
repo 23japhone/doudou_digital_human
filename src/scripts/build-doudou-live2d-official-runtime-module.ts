@@ -265,9 +265,19 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
     this.canvas = options.canvas;
     this.expressions = new Map();
     this.gl = requireWebGlContext(options.canvas);
+    this.lifecycle = {
+      drawCalls: 0,
+      modelUpdateCalls: 0,
+      updateMotionCalls: 0
+    };
     this.model = new LAppModel();
     this.model.setSubdelegate(createSampleSubdelegate(this.canvas, this.gl));
+    this.instrumentExpressionManager();
     ensureCubismFrameworkStarted();
+  }
+
+  evidence() {
+    return { ...this.lifecycle };
   }
 
   async loadModel(input) {
@@ -290,6 +300,7 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
       expressionMap.set(input.expressionName, expression);
     }
     ensureSampleExpressionUpdater(this.model);
+    this.instrumentExpressionManager();
     return expression;
   }
 
@@ -301,10 +312,12 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
   }
 
   update(deltaTimeSeconds) {
+    this.instrumentExpressionManager();
     if (!this.model.__doudouExpressionUpdaterAttached && !this.model._updateScheduler?.onLateUpdate) {
       this.model._expressionManager?.updateMotion?.(this.model._model, deltaTimeSeconds);
     }
     this.model.update();
+    this.lifecycle.modelUpdateCalls += 1;
   }
 
   draw() {
@@ -315,6 +328,25 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
       projection.scale(1, this.canvas.width / this.canvas.height);
     }
     this.model.draw(projection);
+    this.lifecycle.drawCalls += 1;
+  }
+
+  instrumentExpressionManager() {
+    const expressionManager = this.model._expressionManager;
+    if (
+      !expressionManager ||
+      expressionManager.__doudouUpdateMotionInstrumented ||
+      typeof expressionManager.updateMotion !== "function"
+    ) {
+      return;
+    }
+    const lifecycle = this.lifecycle;
+    const updateMotion = expressionManager.updateMotion.bind(expressionManager);
+    expressionManager.updateMotion = (...args) => {
+      lifecycle.updateMotionCalls += 1;
+      return updateMotion(...args);
+    };
+    expressionManager.__doudouUpdateMotionInstrumented = true;
   }
 }
 
@@ -467,12 +499,21 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
     this.expressionManager = new CubismMotionManager();
     this.expressions = new Map();
     this.gl = requireWebGlContext(options.canvas);
+    this.lifecycle = {
+      drawCalls: 0,
+      modelUpdateCalls: 0,
+      updateMotionCalls: 0
+    };
     this.model = null;
     this.modelMatrix = null;
     this.modelRootUrl = "";
     this.renderer = null;
     this.setting = null;
     ensureCubismFrameworkStarted();
+  }
+
+  evidence() {
+    return { ...this.lifecycle };
   }
 
   async loadModel(input) {
@@ -531,8 +572,10 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
     }
     this.model.loadParameters?.();
     this.expressionManager.updateMotion(this.model, deltaTimeSeconds);
+    this.lifecycle.updateMotionCalls += 1;
     this.model.saveParameters?.();
     this.model.update();
+    this.lifecycle.modelUpdateCalls += 1;
   }
 
   draw() {
@@ -552,6 +595,7 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
     this.renderer.setMvpMatrix(projection);
     this.renderer.setRenderState(null, [0, 0, this.canvas.width, this.canvas.height]);
     this.renderer.doDrawModel();
+    this.lifecycle.drawCalls += 1;
   }
 
   async loadTextures() {

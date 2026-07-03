@@ -178,6 +178,11 @@ function hasLive2DRendererSpike(spike: {
       expressionSwitches: number;
       frameLoopAdvanced: boolean;
       modelLoaded: boolean;
+      runtimeLifecycle: {
+        drawCalls: number;
+        modelUpdateCalls: number;
+        updateMotionCalls: number;
+      };
       runtimeModuleProbe: string;
       updateCalls: number;
     };
@@ -220,6 +225,11 @@ function hasOfficialLive2DRendererRuntimeEvidence(officialRuntime: {
     frameLoopAdvanced: boolean;
     modelLoaded: boolean;
     expressionEmotionIdsObserved: string[];
+    runtimeLifecycle: {
+      drawCalls: number;
+      modelUpdateCalls: number;
+      updateMotionCalls: number;
+    };
     runtimeModuleProbe: string;
     updateCalls: number;
   };
@@ -393,6 +403,11 @@ function parseSmokeResult(output: string) {
           expressionSwitches: number;
           frameLoopAdvanced: boolean;
           modelLoaded: boolean;
+          runtimeLifecycle: {
+            drawCalls: number;
+            modelUpdateCalls: number;
+            updateMotionCalls: number;
+          };
           runtimeModuleProbe: string;
           updateCalls: number;
         };

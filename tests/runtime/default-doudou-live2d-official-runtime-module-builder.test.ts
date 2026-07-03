@@ -79,6 +79,11 @@ describe("default doudou official Live2D runtime module builder", () => {
         expressionSwitches: 1,
         frameLoopAdvanced: true,
         modelLoaded: true,
+        runtimeLifecycle: {
+          drawCalls: 2,
+          modelUpdateCalls: 2,
+          updateMotionCalls: 2
+        },
         runtimeModuleProbe: "loaded",
         updateCalls: 2
       });
@@ -169,6 +174,11 @@ describe("default doudou official Live2D runtime module builder", () => {
         expressionSwitches: 1,
         frameLoopAdvanced: true,
         modelLoaded: true,
+        runtimeLifecycle: {
+          drawCalls: 2,
+          modelUpdateCalls: 2,
+          updateMotionCalls: 2
+        },
         runtimeModuleProbe: "loaded",
         updateCalls: 2
       });

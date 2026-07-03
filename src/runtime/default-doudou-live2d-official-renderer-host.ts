@@ -21,8 +21,15 @@ export interface DoudouOfficialLive2DRendererHostEvidence {
   expressionSwitches: number;
   frameLoopAdvanced: boolean;
   modelLoaded: boolean;
+  runtimeLifecycle: DoudouOfficialLive2DRendererRuntimeLifecycleEvidence;
   runtimeModuleProbe: DoudouOfficialLive2DRendererRuntimeModuleProbe;
   updateCalls: number;
+}
+
+export interface DoudouOfficialLive2DRendererRuntimeLifecycleEvidence {
+  drawCalls: number;
+  modelUpdateCalls: number;
+  updateMotionCalls: number;
 }
 
 export interface DoudouOfficialLive2DRendererRuntimeCreateOptions {
@@ -44,6 +51,7 @@ export interface DoudouOfficialLive2DRendererRuntimeExpressionInput extends Doud
 
 export interface DoudouOfficialLive2DRendererRuntime {
   draw: () => unknown;
+  evidence?: () => DoudouOfficialLive2DRendererRuntimeLifecycleEvidence;
   loadExpression?: (input: DoudouOfficialLive2DRendererRuntimeExpressionInput) => Promise<unknown> | unknown;
   loadModel: (input: DoudouOfficialLive2DRendererRuntimeLoadModelInput) => Promise<unknown> | unknown;
   setExpression: (input: DoudouOfficialLive2DRendererRuntimeExpressionInput) => Promise<unknown> | unknown;
@@ -196,6 +204,7 @@ export function createDoudouOfficialLive2DRendererHost(
       expressionSwitches,
       frameLoopAdvanced: updateCalls >= 2 && drawCalls >= 2,
       modelLoaded,
+      runtimeLifecycle: runtimeLifecycleEvidence(),
       runtimeModuleProbe,
       updateCalls
     };
@@ -207,6 +216,37 @@ export function createDoudouOfficialLive2DRendererHost(
     }
     expressionEmotionIdsObserved.push(emotionId);
   }
+
+  function runtimeLifecycleEvidence(): DoudouOfficialLive2DRendererRuntimeLifecycleEvidence {
+    if (!runtime?.evidence) {
+      return emptyRuntimeLifecycleEvidence();
+    }
+    try {
+      const lifecycle = runtime.evidence();
+      if (
+        typeof lifecycle.drawCalls === "number" &&
+        typeof lifecycle.modelUpdateCalls === "number" &&
+        typeof lifecycle.updateMotionCalls === "number"
+      ) {
+        return {
+          drawCalls: lifecycle.drawCalls,
+          modelUpdateCalls: lifecycle.modelUpdateCalls,
+          updateMotionCalls: lifecycle.updateMotionCalls
+        };
+      }
+    } catch {
+      return emptyRuntimeLifecycleEvidence();
+    }
+    return emptyRuntimeLifecycleEvidence();
+  }
+}
+
+function emptyRuntimeLifecycleEvidence(): DoudouOfficialLive2DRendererRuntimeLifecycleEvidence {
+  return {
+    drawCalls: 0,
+    modelUpdateCalls: 0,
+    updateMotionCalls: 0
+  };
 }
 
 function initialRuntimeModuleProbe(

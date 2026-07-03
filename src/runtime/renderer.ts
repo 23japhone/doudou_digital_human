@@ -1194,6 +1194,11 @@ function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostE
     expressionSwitches: 0,
     frameLoopAdvanced: false,
     modelLoaded: false,
+    runtimeLifecycle: {
+      drawCalls: 0,
+      modelUpdateCalls: 0,
+      updateMotionCalls: 0
+    },
     runtimeModuleProbe: config?.officialRuntime.publicEvidence.runtimeModule?.configured
       ? "load_pending"
       : "not_configured",

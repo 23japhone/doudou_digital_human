@@ -10,6 +10,11 @@ export interface DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
   frameLoopAdvanced: boolean;
   modelLoaded: boolean;
   rendererAssetProbe: string;
+  runtimeLifecycle: {
+    drawCalls: number;
+    modelUpdateCalls: number;
+    updateMotionCalls: number;
+  };
   runtimeModuleProbe: string;
   updateCalls: number;
 }
@@ -72,6 +77,15 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (new Set(evidence.expressionEmotionIdsObserved.filter((emotionId) => emotionId !== "calm_idle")).size < 2) {
     failures.push(`${label}.expressionEmotionIdsObserved`);
   }
+  if (evidence.runtimeLifecycle.updateMotionCalls < 2) {
+    failures.push(`${label}.runtimeLifecycle.updateMotionCalls`);
+  }
+  if (evidence.runtimeLifecycle.modelUpdateCalls < 2) {
+    failures.push(`${label}.runtimeLifecycle.modelUpdateCalls`);
+  }
+  if (evidence.runtimeLifecycle.drawCalls < 2) {
+    failures.push(`${label}.runtimeLifecycle.drawCalls`);
+  }
   if (!evidence.frameLoopAdvanced) {
     failures.push(`${label}.frameLoopAdvanced`);
   }
@@ -105,6 +119,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
   }
   const runtimeModule = officialRuntime.runtimeModule;
   if (
+    !isRecord(runtimeModule.runtimeLifecycle) ||
     typeof officialRuntime.canvasLayerVisible !== "boolean" ||
     typeof officialRuntime.canvasNonTransparentPixel !== "boolean" ||
     typeof officialRuntime.rendererAssetProbe !== "string" ||
@@ -117,7 +132,10 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     typeof runtimeModule.frameLoopAdvanced !== "boolean" ||
     typeof runtimeModule.modelLoaded !== "boolean" ||
     typeof runtimeModule.runtimeModuleProbe !== "string" ||
-    typeof runtimeModule.updateCalls !== "number"
+    typeof runtimeModule.updateCalls !== "number" ||
+    typeof runtimeModule.runtimeLifecycle.drawCalls !== "number" ||
+    typeof runtimeModule.runtimeLifecycle.modelUpdateCalls !== "number" ||
+    typeof runtimeModule.runtimeLifecycle.updateMotionCalls !== "number"
   ) {
     return undefined;
   }
@@ -133,6 +151,11 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     frameLoopAdvanced: runtimeModule.frameLoopAdvanced,
     modelLoaded: runtimeModule.modelLoaded,
     rendererAssetProbe: officialRuntime.rendererAssetProbe,
+    runtimeLifecycle: {
+      drawCalls: runtimeModule.runtimeLifecycle.drawCalls,
+      modelUpdateCalls: runtimeModule.runtimeLifecycle.modelUpdateCalls,
+      updateMotionCalls: runtimeModule.runtimeLifecycle.updateMotionCalls
+    },
     runtimeModuleProbe: runtimeModule.runtimeModuleProbe,
     updateCalls: runtimeModule.updateCalls
   };
