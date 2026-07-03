@@ -359,7 +359,7 @@ function isSafeRelativeModelReference(reference: string): boolean {
 
 async function allModelAssetsExist(modelDir: string, references: string[]): Promise<boolean> {
   for (const reference of references) {
-    if (!await exists(path.join(modelDir, reference))) {
+    if (!await isFile(path.join(modelDir, reference))) {
       return false;
     }
   }
@@ -378,6 +378,14 @@ async function exists(candidatePath: string): Promise<boolean> {
 async function isDirectory(candidatePath: string): Promise<boolean> {
   try {
     return (await stat(candidatePath)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function isFile(candidatePath: string): Promise<boolean> {
+  try {
+    return (await stat(candidatePath)).isFile();
   } catch {
     return false;
   }
