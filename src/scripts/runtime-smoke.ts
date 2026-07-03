@@ -93,6 +93,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.idleAdvanced ||
     !smokeResult.frameHiddenByDefault ||
     !smokeResult.frameVisibleOnResizeEdge ||
+    !hasEmotionModelTriggerGate(smokeResult.emotionModelTrigger) ||
     !hasLive2DRendererSpike(smokeResult.live2DRendererSpike) ||
     !smokeResult.renderLoopAdvanced ||
     smokeResult.scale <= 1 ||
@@ -106,6 +107,19 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
 function hasAllRuntimeStates(states: string[]): boolean {
   return ["approaching", "dodging", "poked", "retreating", "stopped", "waiting", "watching", "working"].every((state) =>
     states.includes(state)
+  );
+}
+
+function hasEmotionModelTriggerGate(trigger: {
+  commandApplied: boolean | null;
+  explicitConsentGate: boolean;
+  providerCalledWithoutConsent: boolean;
+} | undefined): boolean {
+  return Boolean(
+    trigger &&
+    trigger.commandApplied === null &&
+    trigger.explicitConsentGate &&
+    !trigger.providerCalledWithoutConsent
   );
 }
 
@@ -384,6 +398,11 @@ function parseSmokeResult(output: string) {
     currentFrameIndex: number;
     frameHiddenByDefault: boolean;
     frameVisibleOnResizeEdge: boolean;
+    emotionModelTrigger?: {
+      commandApplied: boolean | null;
+      explicitConsentGate: boolean;
+      providerCalledWithoutConsent: boolean;
+    };
     live2DRendererSpike: {
       activeEmotionId: string;
       drawModelCalls: number;

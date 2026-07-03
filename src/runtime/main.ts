@@ -63,6 +63,7 @@ import {
   saveRuntimeMotionTuningPresets,
   upsertRuntimeMotionTuningPreset
 } from "./tuning-presets.js";
+import { queryDoudouEmotionBehaviorForExplicitRuntimeInput } from "./default-doudou-emotion-trigger.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
@@ -374,6 +375,13 @@ ipcMain.handle("pet:copy-motion-tuning-preset", (_event, text: unknown) => {
   clipboard.writeText(presetText);
   return true;
 });
+
+ipcMain.handle("pet:request-emotion-behavior", async (_event, input: unknown) =>
+  await queryDoudouEmotionBehaviorForExplicitRuntimeInput({
+    env: process.env,
+    input
+  })
+);
 
 ipcMain.on("pet:start-window-drag", (_event, pointer: ScreenPoint) => {
   if (!mainWindow || !isFiniteScreenPoint(pointer)) {

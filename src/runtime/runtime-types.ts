@@ -6,6 +6,10 @@ import type {
 } from "./default-doudou-live2d-official-sdk-resolver.js";
 import type { DoudouOfficialLive2DRendererHostEvidence } from "./default-doudou-live2d-official-renderer-host.js";
 import type { DoudouLive2DPreviewLibrary } from "./default-doudou-live2d-preview.js";
+import type {
+  DoudouRuntimeEmotionBehaviorTriggerInput,
+  DoudouRuntimeEmotionBehaviorTriggerResult
+} from "./default-doudou-emotion-trigger.js";
 import type { DoudouWebCubismRendererSpikeEvidence } from "./default-doudou-live2d-web-renderer-spike.js";
 import type { ScreenPoint } from "./drag.js";
 import type { RuntimeScaleLimits } from "./scale.js";
@@ -88,6 +92,7 @@ export interface PetRuntimeBridge {
   quit(): void;
   recordPoke(point?: ScreenPoint): void;
   reportSmokeResult(result: RuntimeSmokeResult): void;
+  requestEmotionBehavior(input: DoudouRuntimeEmotionBehaviorTriggerInput): Promise<DoudouRuntimeEmotionBehaviorTriggerResult>;
   saveMotionTuningPreset(name: string, tuning: Partial<RuntimeMotionTuning>): Promise<RuntimeMotionTuningPreset[]>;
   setMotionTuning(patch: Partial<RuntimeMotionTuning>): Promise<RuntimeMotionTuning>;
   setIgnoreMouseEvents(ignore: boolean): void;
@@ -134,4 +139,11 @@ export interface RuntimeSmokeResult {
   frameHiddenByDefault: boolean;
   frameVisibleOnResizeEdge: boolean;
   live2DRendererSpike: RuntimeLive2DRendererSpikeSmokeResult | null;
+  emotionModelTrigger?: RuntimeEmotionModelTriggerSmokeResult;
+}
+
+export interface RuntimeEmotionModelTriggerSmokeResult {
+  commandApplied: boolean | null;
+  explicitConsentGate: boolean;
+  providerCalledWithoutConsent: boolean;
 }

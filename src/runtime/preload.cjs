@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld("petRuntime", {
   quit: () => ipcRenderer.send("pet:quit"),
   recordPoke: (point) => ipcRenderer.send("pet:record-poke", sanitizeOptionalPoint(point)),
   reportSmokeResult: (result) => ipcRenderer.send("pet:smoke-result", result),
+  requestEmotionBehavior: (input) =>
+    ipcRenderer.invoke("pet:request-emotion-behavior", sanitizeEmotionBehaviorRequest(input)),
   saveMotionTuningPreset: (name, tuning) => ipcRenderer.invoke("pet:save-motion-tuning-preset", {
     name: sanitizePresetName(name),
     tuning: sanitizeMotionTuningPatch(tuning)
@@ -47,6 +49,21 @@ contextBridge.exposeInMainWorld("petRuntime", {
   startWindowDrag: (point) => ipcRenderer.send("pet:start-window-drag", sanitizePoint(point)),
   rendererReady: () => ipcRenderer.send("pet:renderer-ready")
 });
+
+const DEFAULT_DOUDOU_EMOTION_IDS = [
+  "calm_idle",
+  "happy_smile",
+  "delighted",
+  "shy_blush",
+  "curious_tilt",
+  "comfort_soft",
+  "sad_soft",
+  "teary",
+  "surprised",
+  "annoyed_pout",
+  "sleepy",
+  "focused_working"
+];
 
 function sanitizePoint(point) {
   return {
@@ -81,6 +98,26 @@ function sanitizeClipboardText(text) {
     return "";
   }
   return text.slice(0, 512);
+}
+
+function sanitizeEmotionBehaviorRequest(input) {
+  const candidate = input && typeof input === "object" ? input : {};
+  return {
+    consent: candidate?.consent === true,
+    currentEmotionId: sanitizeEmotionId(candidate?.currentEmotionId),
+    text: sanitizeEmotionInputText(candidate?.text)
+  };
+}
+
+function sanitizeEmotionId(value) {
+  return typeof value === "string" && DEFAULT_DOUDOU_EMOTION_IDS.includes(value) ? value : undefined;
+}
+
+function sanitizeEmotionInputText(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().replace(/\s+/g, " ").slice(0, 240);
 }
 
 function sanitizePresetName(name) {

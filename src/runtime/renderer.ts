@@ -58,11 +58,18 @@ import {
   type DoudouOfficialLive2DRendererRuntimeModule
 } from "./default-doudou-live2d-official-renderer-host.js";
 import {
+  applyDoudouEmotionBehaviorTriggerResultToLive2D,
+  type DoudouRuntimeEmotionBehaviorApplyResult,
+  type DoudouRuntimeEmotionBehaviorTriggerInput,
+  type DoudouRuntimeEmotionBehaviorTriggerResult
+} from "./default-doudou-emotion-trigger.js";
+import {
   DOUDOU_LIVE2D_RENDERER_SMOKE_SETTLE_POLL_MS,
   DOUDOU_LIVE2D_RENDERER_SMOKE_SETTLE_TIMEOUT_MS,
   isDoudouLive2DRendererSmokePending,
   isDoudouLive2DRendererSmokeSettledAfterInteractions
 } from "./default-doudou-live2d-official-smoke-settle.js";
+import type { DoudouLive2DExpressionSpec } from "./default-doudou-live2d.js";
 import "./styles.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
@@ -133,6 +140,9 @@ let smokeMotionTuningPresetCopied = false;
 let smokeMotionTuningPresetNames: string[] = [];
 let smokeMotionTuningPresetSaved = false;
 let smokeMotionTuningPresetText = "";
+let smokeEmotionModelTriggerCommandApplied: boolean | null = null;
+let smokeEmotionModelTriggerExplicitConsentGate = false;
+let smokeEmotionModelTriggerProviderCalledWithoutConsent = false;
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = bundle.motionTuningPresets;
 const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
@@ -176,6 +186,17 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     window.petRuntime.quit();
   }
+});
+
+window.addEventListener("doudou:emotion-behavior-request", (event) => {
+  if (!(event instanceof CustomEvent)) {
+    return;
+  }
+  void requestRuntimeEmotionBehaviorForExplicitUserInput({
+    consent: event.detail?.consent === true,
+    currentEmotionId: live2DRendererSpikeActiveEmotionId,
+    text: typeof event.detail?.text === "string" ? event.detail.text : ""
+  }).catch(logRuntimeError);
 });
 
 window.addEventListener("contextmenu", (event) => {
@@ -518,6 +539,7 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
     return;
   }
   smokeInteractionsExercised = true;
+  await exerciseEmotionModelTriggerForSmoke();
   await exerciseRuntimeMotionTuningForSmoke();
   applyRuntimeMotionCue({
     direction: "right",
@@ -595,12 +617,95 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     currentFrameIndex,
     frameHiddenByDefault: isRuntimeFrameHiddenByDefault(),
     frameVisibleOnResizeEdge: isRuntimeFrameVisibleOnResizeEdge(),
-    live2DRendererSpike: live2DRendererSpikeSmokeResult()
+    live2DRendererSpike: live2DRendererSpikeSmokeResult(),
+    emotionModelTrigger: {
+      commandApplied: smokeEmotionModelTriggerCommandApplied,
+      explicitConsentGate: smokeEmotionModelTriggerExplicitConsentGate,
+      providerCalledWithoutConsent: smokeEmotionModelTriggerProviderCalledWithoutConsent
+    }
   };
 }
 
 function applyRuntimeMotionCue(cue: RuntimePetMotionCue): void {
   applyRuntimePetState(stateMachine.motion(cue, performance.now()));
+}
+
+async function exerciseEmotionModelTriggerForSmoke(): Promise<void> {
+  const interaction = await requestRuntimeEmotionBehaviorForExplicitUserInput({
+    consent: false,
+    currentEmotionId: live2DRendererSpikeActiveEmotionId,
+    text: "烟测显式输入，但本次不授权调用情绪模型。"
+  });
+  smokeEmotionModelTriggerProviderCalledWithoutConsent = interaction.result.provider.called;
+  smokeEmotionModelTriggerExplicitConsentGate =
+    interaction.result.ok &&
+    interaction.result.skipped &&
+    interaction.result.reason === "user_consent_required" &&
+    !interaction.result.provider.called;
+}
+
+async function requestRuntimeEmotionBehaviorForExplicitUserInput(
+  input: DoudouRuntimeEmotionBehaviorTriggerInput
+): Promise<{
+  applyResult: DoudouRuntimeEmotionBehaviorApplyResult | null;
+  result: DoudouRuntimeEmotionBehaviorTriggerResult;
+}> {
+  const result = await window.petRuntime.requestEmotionBehavior(input);
+  const applyResult = await applyRuntimeEmotionBehaviorResultToLive2D(result);
+  return {
+    applyResult,
+    result
+  };
+}
+
+async function applyRuntimeEmotionBehaviorResultToLive2D(
+  result: DoudouRuntimeEmotionBehaviorTriggerResult
+): Promise<DoudouRuntimeEmotionBehaviorApplyResult | null> {
+  if (!result.ok || result.skipped) {
+    return null;
+  }
+  const config = bundle.live2DRendererSpike;
+  if (!config || !live2DRendererSpike) {
+    smokeEmotionModelTriggerCommandApplied = false;
+    return null;
+  }
+  const applyResult = await applyDoudouEmotionBehaviorTriggerResultToLive2D({
+    applyMotionCue: applyRuntimeEmotionModelMotionCue,
+    library: config.library,
+    nowMs: performance.now(),
+    result,
+    switchExpression: (_library, emotionId) => switchLive2DRendererSpikeExpression(emotionId)
+  });
+  smokeEmotionModelTriggerCommandApplied = applyResult.applied;
+  return applyResult;
+}
+
+function applyRuntimeEmotionModelMotionCue(
+  motionCue: DoudouLive2DExpressionSpec["motionCue"],
+  _emotionId: DefaultDoudouEmotionId
+): boolean {
+  if (motionCue === "none") {
+    return false;
+  }
+  if (motionCue === "small_pop") {
+    markRuntimePoked();
+    player.tap();
+    return true;
+  }
+  if (motionCue === "short_retreat") {
+    applyRuntimeMotionCue({
+      direction: "left",
+      motionIntensity: 0.72,
+      state: "retreating"
+    });
+    return true;
+  }
+  applyRuntimeMotionCue({
+    direction: "none",
+    motionIntensity: motionCue === "sleepy_sway" ? 0.34 : 0.18,
+    state: "watching"
+  });
+  return true;
 }
 
 function exerciseQuietRecoveryForSmoke(): void {
@@ -1161,10 +1266,13 @@ function drawLive2DRendererSpikeFrame(timestamp: number): void {
   }
 }
 
-function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmotionId): void {
+function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmotionId): boolean {
   const config = bundle.live2DRendererSpike;
-  if (!config || !live2DRendererSpike || targetEmotionId === live2DRendererSpikeActiveEmotionId) {
-    return;
+  if (!config || !live2DRendererSpike) {
+    return false;
+  }
+  if (targetEmotionId === live2DRendererSpikeActiveEmotionId) {
+    return true;
   }
   const playback = live2DRendererSpike.switchExpression(
     config.library,
@@ -1181,6 +1289,7 @@ function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmoti
       .then(() => updateOfficialLive2DCanvasRuntimeState())
       .catch(() => updateOfficialLive2DCanvasRuntimeState());
   }
+  return playback.ok;
 }
 
 function live2DRendererSpikeSmokeResult(): RuntimeLive2DRendererSpikeSmokeResult | null {
