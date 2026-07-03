@@ -16,12 +16,18 @@ import {
   type DoudouOfficialLive2DRuntimeModuleBuildMode,
   type DoudouOfficialLive2DRuntimeModuleBuildResult
 } from "./build-doudou-live2d-official-runtime-module.js";
+import {
+  prepareDoudouLive2DSampleModel,
+  type PrepareDoudouLive2DSampleModelInput,
+  type PrepareDoudouLive2DSampleModelResult
+} from "./prepare-doudou-live2d-sample-model.js";
 
 export interface DoudouOfficialLive2DSmokeOptions {
   argv?: string[];
   buildRuntimeModule?: BuildRuntimeModule;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  prepareSampleModel?: PrepareSampleModel;
   resolveOfficialRuntime?: ResolveOfficialRuntime;
   runRuntimeSmoke?: RunRuntimeSmoke;
 }
@@ -47,6 +53,10 @@ type BuildRuntimeModule = (
 
 type RunRuntimeSmoke = (input: RuntimeSmokeRunInput) => Promise<RuntimeSmokeRunResult>;
 
+type PrepareSampleModel = (
+  input: PrepareDoudouLive2DSampleModelInput
+) => Promise<PrepareDoudouLive2DSampleModelResult>;
+
 type ResolveOfficialRuntime = (input: {
   modelDir: string;
   sdkDir: string;
@@ -56,6 +66,8 @@ interface ParsedOfficialSmokeArgs {
   mode: DoudouOfficialLive2DRuntimeModuleBuildMode;
   modelDir?: string;
   outputFile?: string;
+  sampleModelName?: string;
+  sampleOutputDir?: string;
   sdkDir?: string;
 }
 
@@ -67,10 +79,39 @@ export async function runDoudouOfficialLive2DSmoke(
   const env = options.env ?? process.env;
   const args = parseArgs(argv.slice(2));
   const sdkDir = args.sdkDir ?? env.DOUDOU_CUBISM_WEB_SDK_DIR;
-  const modelDir = args.modelDir ?? env.DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR;
+  let modelDir = args.modelDir ?? (args.sampleModelName ? undefined : env.DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR);
   const outputFile = args.outputFile
     ?? env.DOUDOU_CUBISM_WEB_RUNTIME_MODULE
     ?? path.join(cwd, "local_live2d_runtime", "default-doudou-official-runtime.mjs");
+
+  if (!modelDir && args.sampleModelName) {
+    if (!sdkDir) {
+      return jsonResult(1, {
+        ok: false,
+        code: "OFFICIAL_LIVE2D_SMOKE_NOT_CONFIGURED",
+        missing: requiredMissingEnv({
+          modelDir: "prepared_from_official_sample",
+          sdkDir
+        })
+      });
+    }
+    const sampleOutputDir = args.sampleOutputDir
+      ?? path.join(cwd, "local_live2d_models", "default-doudou-sample");
+    const prepareSampleModel = options.prepareSampleModel ?? prepareDoudouLive2DSampleModel;
+    const sampleModel = await prepareSampleModel({
+      outputDir: sampleOutputDir,
+      sampleName: args.sampleModelName,
+      sdkDir
+    });
+    if (!sampleModel.ok) {
+      return jsonResult(1, {
+        ok: false,
+        code: "OFFICIAL_LIVE2D_SAMPLE_MODEL_PREP_FAILED",
+        reason: sampleModel.reason
+      });
+    }
+    modelDir = sampleOutputDir;
+  }
 
   const missing = requiredMissingEnv({ modelDir, sdkDir });
   if (!sdkDir || !modelDir) {
@@ -222,6 +263,12 @@ function parseArgs(args: string[]): ParsedOfficialSmokeArgs {
       index += 1;
     } else if (arg === "--out") {
       parsed.outputFile = args[index + 1];
+      index += 1;
+    } else if (arg === "--sample-model") {
+      parsed.sampleModelName = args[index + 1];
+      index += 1;
+    } else if (arg === "--sample-out" || arg === "--sample-output-dir") {
+      parsed.sampleOutputDir = args[index + 1];
       index += 1;
     } else if (arg === "--mode") {
       parsed.mode = args[index + 1] === "framework" ? "framework" : "sample";

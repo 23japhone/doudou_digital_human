@@ -24,6 +24,181 @@ describe("runDoudouOfficialLive2DSmoke", () => {
     });
   });
 
+  test("prepares official Sample Data before running the real official smoke", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const sdkDir = "fixture-cubism-sdk";
+    const sampleOutputDir = "fixture-models/default-doudou-sample";
+    const outputFile = "fixture-runtime/default-doudou-official-runtime.mjs";
+
+    const result = await runDoudouOfficialLive2DSmoke({
+      argv: [
+        "node",
+        "doudou-live2d-official-smoke",
+        "--sdk-dir",
+        sdkDir,
+        "--sample-model",
+        "Mao",
+        "--sample-out",
+        sampleOutputDir,
+        "--out",
+        outputFile,
+        "--mode",
+        "sample"
+      ],
+      buildRuntimeModule: async (input) => {
+        calls.push({ build: input });
+        return {
+          ok: true,
+          moduleFormat: "external_es_module",
+          outputFileName: "default-doudou-official-runtime.mjs",
+          sdk: {
+            frameworkSource: "Framework/src",
+            sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
+          }
+        };
+      },
+      cwd: "repo-root",
+      env: {},
+      prepareSampleModel: async (input) => {
+        calls.push({ prepare: input });
+        return {
+          ok: true,
+          expressionCount: 12,
+          files: ["expressions/doudou-calm-idle.exp3.json"],
+          model3Json: "default-doudou.model3.json",
+          sampleName: "Mao",
+          sourceModel3Json: "Mao.model3.json"
+        };
+      },
+      resolveOfficialRuntime: async (input) => {
+        calls.push({ preflight: input });
+        return {
+          available: true,
+          configured: true,
+          publicEvidence: {
+            available: true,
+            configured: true
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/"
+          }
+        };
+      },
+      runRuntimeSmoke: async (input) => {
+        calls.push({
+          smokeEnv: {
+            DOUDOU_CUBISM_WEB_RUNTIME_MODULE: input.env.DOUDOU_CUBISM_WEB_RUNTIME_MODULE,
+            DOUDOU_CUBISM_WEB_SDK_DIR: input.env.DOUDOU_CUBISM_WEB_SDK_DIR,
+            DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR: input.env.DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR,
+            DOUDOU_LIVE2D_RENDERER_SPIKE: input.env.DOUDOU_LIVE2D_RENDERER_SPIKE,
+            NODE_OPTIONS: input.env.NODE_OPTIONS
+          }
+        });
+        return {
+          exitCode: 0,
+          output: [
+            `runtime smoke fixture bundle: ${JSON.stringify(createRuntimeSmokeResult("delighted", 13, 21))}`,
+            `runtime smoke generated bundle: ${JSON.stringify(createRuntimeSmokeResult("focused_working", 17, 29))}`
+          ].join("\n")
+        };
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(calls).toEqual([
+      {
+        prepare: {
+          outputDir: sampleOutputDir,
+          sampleName: "Mao",
+          sdkDir
+        }
+      },
+      {
+        preflight: {
+          modelDir: sampleOutputDir,
+          sdkDir
+        }
+      },
+      {
+        build: {
+          mode: "sample",
+          outputFile,
+          sdkDir
+        }
+      },
+      {
+        smokeEnv: {
+          DOUDOU_CUBISM_WEB_RUNTIME_MODULE: outputFile,
+          DOUDOU_CUBISM_WEB_SDK_DIR: sdkDir,
+          DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR: sampleOutputDir,
+          DOUDOU_LIVE2D_RENDERER_SPIKE: "1",
+          NODE_OPTIONS: ""
+        }
+      }
+    ]);
+    expect(JSON.parse(result.output)).toMatchObject({
+      ok: true,
+      mode: "sample",
+      runtimeSmoke: {
+        exitCode: 0
+      }
+    });
+    expect(result.output).not.toContain(sdkDir);
+    expect(result.output).not.toContain(sampleOutputDir);
+    expect(result.output).not.toContain(outputFile);
+  });
+
+  test("stops with sanitized JSON when official Sample Data preparation fails", async () => {
+    const sdkDir = "fixture-cubism-sdk";
+    const sampleOutputDir = "fixture-models/default-doudou-sample";
+
+    const result = await runDoudouOfficialLive2DSmoke({
+      argv: [
+        "node",
+        "doudou-live2d-official-smoke",
+        "--sdk-dir",
+        sdkDir,
+        "--sample-model",
+        "MissingSample",
+        "--sample-out",
+        sampleOutputDir
+      ],
+      buildRuntimeModule: async () => {
+        throw new Error("build should not run when sample preparation fails");
+      },
+      env: {},
+      prepareSampleModel: async (input) => {
+        expect(input).toEqual({
+          outputDir: sampleOutputDir,
+          sampleName: "MissingSample",
+          sdkDir
+        });
+        return {
+          ok: false,
+          reason: "sample_model_missing"
+        };
+      },
+      resolveOfficialRuntime: async () => {
+        throw new Error("preflight should not run when sample preparation fails");
+      },
+      runRuntimeSmoke: async () => {
+        throw new Error("runtime smoke should not run when sample preparation fails");
+      }
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.output)).toEqual({
+      ok: false,
+      code: "OFFICIAL_LIVE2D_SAMPLE_MODEL_PREP_FAILED",
+      reason: "sample_model_missing"
+    });
+    expect(result.output).not.toContain(sdkDir);
+    expect(result.output).not.toContain(sampleOutputDir);
+    expect(result.output).not.toContain("MissingSample");
+  });
+
   test("builds a sanitized runtime module and runs the renderer smoke with official SDK env", async () => {
     const calls: Array<Record<string, unknown>> = [];
     const sdkDir = "fixture-cubism-sdk";
