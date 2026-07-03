@@ -33,7 +33,8 @@
     "smoke:app": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-smoke.js",
     "smoke:app:live": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-live-smoke.js",
     "qa:app:visual": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-visual-qa.js",
-    "probe:openai-image": "npm run build:main && NODE_OPTIONS= node dist/src/scripts/openai-image-probe.js"
+    "probe:openai-image": "npm run build:main && NODE_OPTIONS= node dist/src/scripts/openai-image-probe.js",
+    "probe:doudou-emotion-model": "npm run build:main && NODE_OPTIONS= node dist/src/scripts/doudou-emotion-model-probe.js"
   },
   "dependencies": {
     "jpeg-js": "0.4.4",
