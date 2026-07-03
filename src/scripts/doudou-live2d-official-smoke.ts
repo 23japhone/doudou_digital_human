@@ -6,6 +6,10 @@ import {
   type DoudouOfficialLive2DRendererRuntimeResolution
 } from "../runtime/default-doudou-live2d-official-sdk-resolver.js";
 import {
+  doudouOfficialLive2DRendererSmokeEvidenceFailures,
+  parseDoudouOfficialLive2DRendererSmokeEvidence
+} from "../runtime/default-doudou-live2d-official-smoke-evidence.js";
+import {
   buildDoudouOfficialLive2DRendererRuntimeModule,
   type BuildDoudouOfficialLive2DRendererRuntimeModuleInput,
   type DoudouOfficialLive2DRuntimeModuleBuildMode,
@@ -52,18 +56,6 @@ interface ParsedOfficialSmokeArgs {
   modelDir?: string;
   outputFile?: string;
   sdkDir?: string;
-}
-
-interface SanitizedOfficialRuntimeSmokeEvidence {
-  activeEmotionId: string;
-  drawCalls: number;
-  expressionCount: number;
-  expressionSwitches: number;
-  frameLoopAdvanced: boolean;
-  modelLoaded: boolean;
-  rendererAssetProbe: string;
-  runtimeModuleProbe: string;
-  updateCalls: number;
 }
 
 export async function runDoudouOfficialLive2DSmoke(
@@ -142,8 +134,8 @@ export async function runDoudouOfficialLive2DSmoke(
     });
   }
 
-  const officialRenderer = parseOfficialRendererSmokeEvidence(runtimeSmoke.output);
-  const failedChecks = officialRendererEvidenceFailures(officialRenderer);
+  const officialRenderer = parseDoudouOfficialLive2DRendererSmokeEvidence(runtimeSmoke.output);
+  const failedChecks = doudouOfficialLive2DRendererSmokeEvidenceFailures(officialRenderer);
   if (failedChecks.length > 0) {
     return jsonResult(1, {
       ok: false,
@@ -188,119 +180,6 @@ function sanitizeBuildResult(result: Extract<DoudouOfficialLive2DRuntimeModuleBu
     outputFileName: result.outputFileName,
     sdk: result.sdk
   };
-}
-
-function parseOfficialRendererSmokeEvidence(output: string): {
-  fixtureBundle?: SanitizedOfficialRuntimeSmokeEvidence;
-  generatedBundle?: SanitizedOfficialRuntimeSmokeEvidence;
-} {
-  return {
-    fixtureBundle: parseOfficialRendererSmokeLine(output, "runtime smoke fixture bundle: "),
-    generatedBundle: parseOfficialRendererSmokeLine(output, "runtime smoke generated bundle: ")
-  };
-}
-
-function officialRendererEvidenceFailures(evidence: {
-  fixtureBundle?: SanitizedOfficialRuntimeSmokeEvidence;
-  generatedBundle?: SanitizedOfficialRuntimeSmokeEvidence;
-}): string[] {
-  return [
-    ...officialRendererBundleEvidenceFailures("fixtureBundle", evidence.fixtureBundle),
-    ...officialRendererBundleEvidenceFailures("generatedBundle", evidence.generatedBundle)
-  ];
-}
-
-function officialRendererBundleEvidenceFailures(
-  label: "fixtureBundle" | "generatedBundle",
-  evidence: SanitizedOfficialRuntimeSmokeEvidence | undefined
-): string[] {
-  if (!evidence) {
-    return [`${label}.missing`];
-  }
-  const failures: string[] = [];
-  if (evidence.rendererAssetProbe !== "model3_fetched") {
-    failures.push(`${label}.rendererAssetProbe`);
-  }
-  if (evidence.runtimeModuleProbe !== "loaded") {
-    failures.push(`${label}.runtimeModuleProbe`);
-  }
-  if (!evidence.modelLoaded) {
-    failures.push(`${label}.modelLoaded`);
-  }
-  if (evidence.expressionCount !== 12) {
-    failures.push(`${label}.expressionCount`);
-  }
-  if (evidence.expressionSwitches <= 0) {
-    failures.push(`${label}.expressionSwitches`);
-  }
-  if (!evidence.frameLoopAdvanced) {
-    failures.push(`${label}.frameLoopAdvanced`);
-  }
-  if (evidence.drawCalls < 2) {
-    failures.push(`${label}.drawCalls`);
-  }
-  if (evidence.updateCalls < 2) {
-    failures.push(`${label}.updateCalls`);
-  }
-  if (evidence.activeEmotionId.length === 0 || evidence.activeEmotionId === "calm_idle") {
-    failures.push(`${label}.activeEmotionId`);
-  }
-  return failures;
-}
-
-function parseOfficialRendererSmokeLine(
-  output: string,
-  prefix: string
-): SanitizedOfficialRuntimeSmokeEvidence | undefined {
-  const line = output.split(/\r?\n/).find((candidate) => candidate.startsWith(prefix));
-  if (!line) {
-    return undefined;
-  }
-  try {
-    const parsed = JSON.parse(line.slice(prefix.length)) as unknown;
-    return sanitizeOfficialRuntimeSmokeEvidence(parsed);
-  } catch {
-    return undefined;
-  }
-}
-
-function sanitizeOfficialRuntimeSmokeEvidence(value: unknown): SanitizedOfficialRuntimeSmokeEvidence | undefined {
-  if (!isRecord(value) || !isRecord(value.live2DRendererSpike)) {
-    return undefined;
-  }
-  const officialRuntime = value.live2DRendererSpike.officialRuntime;
-  if (!isRecord(officialRuntime) || !isRecord(officialRuntime.runtimeModule)) {
-    return undefined;
-  }
-  const runtimeModule = officialRuntime.runtimeModule;
-  if (
-    typeof officialRuntime.rendererAssetProbe !== "string" ||
-    typeof runtimeModule.activeEmotionId !== "string" ||
-    typeof runtimeModule.drawCalls !== "number" ||
-    typeof runtimeModule.expressionCount !== "number" ||
-    typeof runtimeModule.expressionSwitches !== "number" ||
-    typeof runtimeModule.frameLoopAdvanced !== "boolean" ||
-    typeof runtimeModule.modelLoaded !== "boolean" ||
-    typeof runtimeModule.runtimeModuleProbe !== "string" ||
-    typeof runtimeModule.updateCalls !== "number"
-  ) {
-    return undefined;
-  }
-  return {
-    activeEmotionId: runtimeModule.activeEmotionId,
-    drawCalls: runtimeModule.drawCalls,
-    expressionCount: runtimeModule.expressionCount,
-    expressionSwitches: runtimeModule.expressionSwitches,
-    frameLoopAdvanced: runtimeModule.frameLoopAdvanced,
-    modelLoaded: runtimeModule.modelLoaded,
-    rendererAssetProbe: officialRuntime.rendererAssetProbe,
-    runtimeModuleProbe: runtimeModule.runtimeModuleProbe,
-    updateCalls: runtimeModule.updateCalls
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
 
 function parseArgs(args: string[]): ParsedOfficialSmokeArgs {

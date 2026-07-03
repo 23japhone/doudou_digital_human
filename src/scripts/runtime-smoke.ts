@@ -5,6 +5,10 @@ import { pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import { PNG } from "pngjs";
 import { generatePetBundleFromSource } from "../generation/generate-pet.js";
+import {
+  hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence,
+  sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence
+} from "../runtime/default-doudou-live2d-official-smoke-evidence.js";
 
 const repoRoot = process.cwd();
 const electronBin = path.join(repoRoot, "node_modules/.bin/electron");
@@ -164,7 +168,10 @@ function hasLive2DRendererSpike(spike: {
     reason?: string;
     rendererAssetProbe: string;
     runtimeModule: {
+      activeEmotionId: string;
       drawCalls: number;
+      expressionCount: number;
+      expressionSwitches: number;
       frameLoopAdvanced: boolean;
       modelLoaded: boolean;
       runtimeModuleProbe: string;
@@ -223,12 +230,13 @@ function hasOfficialLive2DRendererRuntimeEvidence(officialRuntime: {
   }
   return (
     officialRuntime.available &&
-    officialRuntime.rendererAssetProbe === "model3_fetched" &&
-    officialRuntime.runtimeModule.runtimeModuleProbe === "loaded" &&
-    officialRuntime.runtimeModule.modelLoaded &&
-    officialRuntime.runtimeModule.frameLoopAdvanced &&
-    officialRuntime.runtimeModule.updateCalls >= 2 &&
-    officialRuntime.runtimeModule.drawCalls >= 2
+    hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(
+      sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence({
+        live2DRendererSpike: {
+          officialRuntime
+        }
+      })
+    )
   );
 }
 
@@ -369,7 +377,10 @@ function parseSmokeResult(output: string) {
         reason?: string;
         rendererAssetProbe: string;
         runtimeModule: {
+          activeEmotionId: string;
           drawCalls: number;
+          expressionCount: number;
+          expressionSwitches: number;
           frameLoopAdvanced: boolean;
           modelLoaded: boolean;
           runtimeModuleProbe: string;

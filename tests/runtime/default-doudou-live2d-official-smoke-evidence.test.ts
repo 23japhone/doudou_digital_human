@@ -1,0 +1,94 @@
+import { describe, expect, test } from "vitest";
+import {
+  doudouOfficialLive2DRendererRuntimeEvidenceFailures,
+  hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence,
+  parseDoudouOfficialLive2DRendererSmokeEvidence,
+  type DoudouOfficialLive2DRendererRuntimeSmokeEvidence
+} from "../../src/runtime/default-doudou-live2d-official-smoke-evidence.js";
+
+describe("default doudou official Live2D smoke evidence", () => {
+  test("requires loaded official runtime evidence to prove expression switching in the renderer", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      activeEmotionId: "calm_idle",
+      expressionSwitches: 0
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.expressionSwitches",
+      "officialRuntime.activeEmotionId"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
+  test("accepts complete loaded official runtime evidence", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      activeEmotionId: "delighted",
+      expressionSwitches: 1
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(true);
+  });
+
+  test("parses fixture and generated bundle official runtime smoke output", () => {
+    const fixtureBundle = createRuntimeSmokeResult(createOfficialRuntimeEvidence({
+      activeEmotionId: "delighted",
+      expressionSwitches: 1
+    }));
+    const generatedBundle = createRuntimeSmokeResult(createOfficialRuntimeEvidence({
+      activeEmotionId: "focused_working",
+      expressionSwitches: 2
+    }));
+
+    expect(parseDoudouOfficialLive2DRendererSmokeEvidence([
+      `runtime smoke fixture bundle: ${JSON.stringify(fixtureBundle)}`,
+      `runtime smoke generated bundle: ${JSON.stringify(generatedBundle)}`
+    ].join("\n"))).toEqual({
+      fixtureBundle: createOfficialRuntimeEvidence({
+        activeEmotionId: "delighted",
+        expressionSwitches: 1
+      }),
+      generatedBundle: createOfficialRuntimeEvidence({
+        activeEmotionId: "focused_working",
+        expressionSwitches: 2
+      })
+    });
+  });
+});
+
+function createOfficialRuntimeEvidence(
+  patch: Partial<DoudouOfficialLive2DRendererRuntimeSmokeEvidence> = {}
+): DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
+  return {
+    activeEmotionId: "delighted",
+    drawCalls: 2,
+    expressionCount: 12,
+    expressionSwitches: 1,
+    frameLoopAdvanced: true,
+    modelLoaded: true,
+    rendererAssetProbe: "model3_fetched",
+    runtimeModuleProbe: "loaded",
+    updateCalls: 2,
+    ...patch
+  };
+}
+
+function createRuntimeSmokeResult(evidence: DoudouOfficialLive2DRendererRuntimeSmokeEvidence) {
+  return {
+    live2DRendererSpike: {
+      officialRuntime: {
+        rendererAssetProbe: evidence.rendererAssetProbe,
+        runtimeModule: {
+          activeEmotionId: evidence.activeEmotionId,
+          drawCalls: evidence.drawCalls,
+          expressionCount: evidence.expressionCount,
+          expressionSwitches: evidence.expressionSwitches,
+          frameLoopAdvanced: evidence.frameLoopAdvanced,
+          modelLoaded: evidence.modelLoaded,
+          runtimeModuleProbe: evidence.runtimeModuleProbe,
+          updateCalls: evidence.updateCalls
+        }
+      }
+    }
+  };
+}
