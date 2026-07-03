@@ -64,6 +64,10 @@ import {
   type DoudouRuntimeEmotionBehaviorTriggerResult
 } from "./default-doudou-emotion-trigger.js";
 import {
+  createDoudouEmotionDebugPanelStatus,
+  type DoudouEmotionDebugPanelStatus
+} from "./default-doudou-emotion-debug-panel.js";
+import {
   DOUDOU_LIVE2D_RENDERER_SMOKE_SETTLE_POLL_MS,
   DOUDOU_LIVE2D_RENDERER_SMOKE_SETTLE_TIMEOUT_MS,
   isDoudouLive2DRendererSmokePending,
@@ -143,6 +147,10 @@ let smokeMotionTuningPresetText = "";
 let smokeEmotionModelTriggerCommandApplied: boolean | null = null;
 let smokeEmotionModelTriggerExplicitConsentGate = false;
 let smokeEmotionModelTriggerProviderCalledWithoutConsent = false;
+let smokeEmotionModelPanelButtonSubmitted = false;
+let smokeEmotionModelPanelStatusSanitized = false;
+let smokeEmotionModelPanelStatusText = "";
+let smokeEmotionModelPanelVisible = false;
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = bundle.motionTuningPresets;
 const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
@@ -172,6 +180,11 @@ const tuningPanelInputs = new Map<RuntimeMotionTuningKey, HTMLInputElement>();
 let tuningPresetNameInput: HTMLInputElement | null = null;
 let tuningPresetSelect: HTMLSelectElement | null = null;
 let tuningPresetStatus: HTMLElement | null = null;
+let emotionDebugInput: HTMLTextAreaElement | null = null;
+let emotionDebugConsent: HTMLInputElement | null = null;
+let emotionDebugSubmit: HTMLButtonElement | null = null;
+let emotionDebugStatus: HTMLElement | null = null;
+let emotionDebugPanelSubmitPromise: Promise<void> | null = null;
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
@@ -181,6 +194,7 @@ petFrame.style.setProperty("--runtime-frame-padding", `${RUNTIME_FRAME_PADDING}p
 setupLive2DRendererSpike();
 applyRuntimePetState(visualState);
 setupRuntimeTuningPanel();
+setupEmotionDebugPanel();
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
@@ -540,6 +554,7 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
   }
   smokeInteractionsExercised = true;
   await exerciseEmotionModelTriggerForSmoke();
+  await exerciseEmotionModelPanelForSmoke();
   await exerciseRuntimeMotionTuningForSmoke();
   applyRuntimeMotionCue({
     direction: "right",
@@ -622,6 +637,12 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
       commandApplied: smokeEmotionModelTriggerCommandApplied,
       explicitConsentGate: smokeEmotionModelTriggerExplicitConsentGate,
       providerCalledWithoutConsent: smokeEmotionModelTriggerProviderCalledWithoutConsent
+    },
+    emotionModelPanel: {
+      buttonSubmitted: smokeEmotionModelPanelButtonSubmitted,
+      panelVisible: smokeEmotionModelPanelVisible,
+      statusSanitized: smokeEmotionModelPanelStatusSanitized,
+      statusText: smokeEmotionModelPanelStatusText
     }
   };
 }
@@ -642,6 +663,25 @@ async function exerciseEmotionModelTriggerForSmoke(): Promise<void> {
     interaction.result.skipped &&
     interaction.result.reason === "user_consent_required" &&
     !interaction.result.provider.called;
+}
+
+async function exerciseEmotionModelPanelForSmoke(): Promise<void> {
+  smokeEmotionModelPanelVisible = Boolean(document.querySelector("#runtime-emotion-debug-panel"));
+  if (!bundle.emotionDebugPanelEnabled || !emotionDebugInput || !emotionDebugConsent || !emotionDebugSubmit) {
+    return;
+  }
+  emotionDebugInput.value = "烟测显式输入，但本次不授权调用情绪模型。";
+  emotionDebugConsent.checked = false;
+  emotionDebugSubmit.click();
+  await emotionDebugPanelSubmitPromise;
+  smokeEmotionModelPanelButtonSubmitted = true;
+  smokeEmotionModelPanelStatusText = emotionDebugStatus?.textContent ?? "";
+  smokeEmotionModelPanelStatusSanitized =
+    smokeEmotionModelPanelStatusText.includes("未授权") &&
+    !smokeEmotionModelPanelStatusText.includes("烟测显式输入") &&
+    !smokeEmotionModelPanelStatusText.includes("sk-") &&
+    !smokeEmotionModelPanelStatusText.includes("http") &&
+    !smokeEmotionModelPanelStatusText.includes("choices");
 }
 
 async function requestRuntimeEmotionBehaviorForExplicitUserInput(
@@ -706,6 +746,108 @@ function applyRuntimeEmotionModelMotionCue(
     state: "watching"
   });
   return true;
+}
+
+function setupEmotionDebugPanel(): void {
+  if (!bundle.emotionDebugPanelEnabled) {
+    return;
+  }
+
+  const panel = document.createElement("section");
+  panel.id = "runtime-emotion-debug-panel";
+  panel.setAttribute("aria-label", "情绪调试");
+  panel.className = "runtime-emotion-debug-panel";
+
+  const title = document.createElement("h2");
+  title.textContent = "情绪调试";
+  panel.append(title);
+
+  emotionDebugInput = document.createElement("textarea");
+  emotionDebugInput.id = "runtime-emotion-debug-input";
+  emotionDebugInput.maxLength = 240;
+  emotionDebugInput.placeholder = "输入一句想让兜兜感知的话";
+  emotionDebugInput.setAttribute("aria-label", "情绪输入");
+  panel.append(emotionDebugInput);
+
+  const controlRow = document.createElement("div");
+  controlRow.className = "runtime-emotion-debug-actions";
+
+  const consentLabel = document.createElement("label");
+  consentLabel.className = "runtime-emotion-debug-consent";
+  emotionDebugConsent = document.createElement("input");
+  emotionDebugConsent.id = "runtime-emotion-debug-consent";
+  emotionDebugConsent.type = "checkbox";
+  const consentText = document.createElement("span");
+  consentText.textContent = "授权本次调用";
+  consentLabel.append(emotionDebugConsent, consentText);
+
+  emotionDebugSubmit = document.createElement("button");
+  emotionDebugSubmit.id = "runtime-emotion-debug-submit";
+  emotionDebugSubmit.type = "button";
+  emotionDebugSubmit.textContent = "触发";
+  emotionDebugSubmit.addEventListener("click", () => {
+    emotionDebugPanelSubmitPromise = submitEmotionDebugPanel().catch((error: unknown) => {
+      logRuntimeError(error);
+      updateEmotionDebugPanelStatus({
+        details: ["调用：否", "错误：面板提交失败"],
+        heading: "未应用表情",
+        tone: "error"
+      });
+    });
+    void emotionDebugPanelSubmitPromise;
+  });
+
+  controlRow.append(consentLabel, emotionDebugSubmit);
+  panel.append(controlRow);
+
+  emotionDebugStatus = document.createElement("div");
+  emotionDebugStatus.id = "runtime-emotion-debug-status";
+  emotionDebugStatus.className = "runtime-emotion-debug-status";
+  emotionDebugStatus.setAttribute("aria-live", "polite");
+  panel.append(emotionDebugStatus);
+
+  panel.addEventListener("pointerdown", (event) => event.stopPropagation());
+  panel.addEventListener("pointermove", (event) => event.stopPropagation());
+  panel.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
+  petFrame.append(panel);
+  smokeEmotionModelPanelVisible = true;
+  updateEmotionDebugPanelStatus(createDoudouEmotionDebugPanelStatus());
+}
+
+async function submitEmotionDebugPanel(): Promise<void> {
+  if (!emotionDebugInput || !emotionDebugConsent || !emotionDebugSubmit) {
+    return;
+  }
+  emotionDebugSubmit.disabled = true;
+  updateEmotionDebugPanelStatus(createDoudouEmotionDebugPanelStatus({ pending: true }));
+  try {
+    const interaction = await requestRuntimeEmotionBehaviorForExplicitUserInput({
+      consent: emotionDebugConsent.checked,
+      currentEmotionId: live2DRendererSpikeActiveEmotionId,
+      text: emotionDebugInput.value
+    });
+    updateEmotionDebugPanelStatus(createDoudouEmotionDebugPanelStatus(interaction));
+  } finally {
+    emotionDebugSubmit.disabled = false;
+  }
+}
+
+function updateEmotionDebugPanelStatus(status: DoudouEmotionDebugPanelStatus): void {
+  if (!emotionDebugStatus) {
+    return;
+  }
+  emotionDebugStatus.dataset.tone = status.tone;
+  emotionDebugStatus.replaceChildren();
+
+  const heading = document.createElement("strong");
+  heading.textContent = status.heading;
+  emotionDebugStatus.append(heading);
+
+  for (const detail of status.details) {
+    const line = document.createElement("span");
+    line.textContent = detail;
+    emotionDebugStatus.append(line);
+  }
 }
 
 function exerciseQuietRecoveryForSmoke(): void {

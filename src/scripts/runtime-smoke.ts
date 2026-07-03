@@ -94,6 +94,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.frameHiddenByDefault ||
     !smokeResult.frameVisibleOnResizeEdge ||
     !hasEmotionModelTriggerGate(smokeResult.emotionModelTrigger) ||
+    !hasEmotionModelPanel(smokeResult.emotionModelPanel) ||
     !hasLive2DRendererSpike(smokeResult.live2DRendererSpike) ||
     !smokeResult.renderLoopAdvanced ||
     smokeResult.scale <= 1 ||
@@ -120,6 +121,22 @@ function hasEmotionModelTriggerGate(trigger: {
     trigger.commandApplied === null &&
     trigger.explicitConsentGate &&
     !trigger.providerCalledWithoutConsent
+  );
+}
+
+function hasEmotionModelPanel(panel: {
+  buttonSubmitted: boolean;
+  panelVisible: boolean;
+  statusSanitized: boolean;
+  statusText: string;
+} | undefined): boolean {
+  return Boolean(
+    panel &&
+    panel.panelVisible &&
+    panel.buttonSubmitted &&
+    panel.statusSanitized &&
+    panel.statusText.includes("未授权") &&
+    !panel.statusText.includes("烟测显式输入")
   );
 }
 
@@ -324,6 +341,7 @@ function runRuntime(bundleDir: string): Promise<SpawnResult> {
       "--bundle",
       bundleDir,
       "--smoke",
+      "--emotion-panel",
       "--tuning",
       "--live2d-renderer-spike"
     ], {
@@ -402,6 +420,12 @@ function parseSmokeResult(output: string) {
       commandApplied: boolean | null;
       explicitConsentGate: boolean;
       providerCalledWithoutConsent: boolean;
+    };
+    emotionModelPanel?: {
+      buttonSubmitted: boolean;
+      panelVisible: boolean;
+      statusSanitized: boolean;
+      statusText: string;
     };
     live2DRendererSpike: {
       activeEmotionId: string;

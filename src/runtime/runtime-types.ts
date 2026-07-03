@@ -43,6 +43,7 @@ export interface RuntimeBundle {
   scale: number;
   scaleLimits: RuntimeScaleLimits;
   smoke: boolean;
+  emotionDebugPanelEnabled: boolean;
   motionTuning: RuntimeMotionTuning;
   motionTuningEnabled: boolean;
   motionTuningPresets: RuntimeMotionTuningPreset[];
@@ -140,10 +141,18 @@ export interface RuntimeSmokeResult {
   frameVisibleOnResizeEdge: boolean;
   live2DRendererSpike: RuntimeLive2DRendererSpikeSmokeResult | null;
   emotionModelTrigger?: RuntimeEmotionModelTriggerSmokeResult;
+  emotionModelPanel?: RuntimeEmotionModelPanelSmokeResult;
 }
 
 export interface RuntimeEmotionModelTriggerSmokeResult {
   commandApplied: boolean | null;
   explicitConsentGate: boolean;
   providerCalledWithoutConsent: boolean;
+}
+
+export interface RuntimeEmotionModelPanelSmokeResult {
+  buttonSubmitted: boolean;
+  panelVisible: boolean;
+  statusSanitized: boolean;
+  statusText: string;
 }

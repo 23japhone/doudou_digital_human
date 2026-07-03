@@ -64,6 +64,7 @@ import {
   upsertRuntimeMotionTuningPreset
 } from "./tuning-presets.js";
 import { queryDoudouEmotionBehaviorForExplicitRuntimeInput } from "./default-doudou-emotion-trigger.js";
+import { resolveDoudouEmotionDebugPanelEnabled } from "./default-doudou-emotion-debug-panel.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
@@ -74,6 +75,7 @@ const RUNTIME_CLIPBOARD_TEXT_MAX_LENGTH = 512;
 
 interface RuntimeOptions {
   bundleDir: string;
+  emotionPanel: boolean;
   live2dModelDir?: string;
   live2dRendererSpike: boolean;
   live2dRuntimeModule?: string;
@@ -100,6 +102,7 @@ let smokeEmotionMotionPhasesObserved = new Set<RuntimeEmotionMotionPhase>();
 let smokeMaxEmotionWariness = 0;
 let runtimeMotionTuning = RUNTIME_MOTION_TUNING_DEFAULTS;
 let runtimeMotionTuningEnabled = false;
+let emotionDebugPanelEnabled = false;
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = [];
 let live2DRendererSpikeEnabled = false;
 let live2DOfficialRuntimeResolution: DoudouOfficialLive2DRendererRuntimeResolution = {
@@ -129,7 +132,7 @@ async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   if (!options.bundleDir) {
     console.error(
-      "Usage: electron dist/src/runtime/main.js --bundle <bundle-dir> [--smoke] [--live2d-renderer-spike] [--live2d-sdk-dir <sdk-dir>] [--live2d-model-dir <model-dir>] [--live2d-runtime-module <module-file>]"
+      "Usage: electron dist/src/runtime/main.js --bundle <bundle-dir> [--smoke] [--emotion-panel] [--live2d-renderer-spike] [--live2d-sdk-dir <sdk-dir>] [--live2d-model-dir <model-dir>] [--live2d-runtime-module <module-file>]"
     );
     process.exit(2);
   }
@@ -138,6 +141,10 @@ async function main(): Promise<void> {
   readySignalMode = options.readySignal ?? false;
   live2DRendererSpikeEnabled = Boolean(options.live2dRendererSpike || process.env.DOUDOU_LIVE2D_RENDERER_SPIKE === "1");
   runtimeMotionTuningEnabled = Boolean(options.tuning || process.env.DOUDOU_RUNTIME_TUNING === "1");
+  emotionDebugPanelEnabled = resolveDoudouEmotionDebugPanelEnabled({
+    env: process.env,
+    optionEnabled: options.emotionPanel ?? false
+  });
   runtimeMotionTuning = runtimeMotionTuningFromEnv(process.env);
   if (live2DRendererSpikeEnabled) {
     live2DOfficialRuntimeResolution = await resolveDoudouOfficialLive2DRendererRuntime({
@@ -170,6 +177,7 @@ async function main(): Promise<void> {
 
 function parseArgs(args: string[]): Partial<RuntimeOptions> {
   const options: Partial<RuntimeOptions> = {
+    emotionPanel: false,
     live2dRendererSpike: false,
     readySignal: false,
     smoke: false,
@@ -186,6 +194,8 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
       options.readySignal = true;
     } else if (arg === "--tuning") {
       options.tuning = true;
+    } else if (arg === "--emotion-panel") {
+      options.emotionPanel = true;
     } else if (arg === "--live2d-renderer-spike") {
       options.live2dRendererSpike = true;
     } else if (arg === "--live2d-sdk-dir") {
@@ -286,6 +296,7 @@ ipcMain.handle("pet:get-bundle", () => {
     scale: runtimeScale,
     scaleLimits: RUNTIME_SCALE_LIMITS,
     smoke: smokeMode,
+    emotionDebugPanelEnabled,
     motionTuning: runtimeMotionTuning,
     motionTuningEnabled: runtimeMotionTuningEnabled,
     motionTuningPresets: runtimeMotionTuningPresets

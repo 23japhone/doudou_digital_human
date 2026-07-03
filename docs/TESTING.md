@@ -32,6 +32,8 @@
 - Fixture validation: `npm run validate:fixture`
 - Runtime smoke: `npm run smoke:runtime`
 
+`smoke:runtime` also opens the 兜兜 emotion trigger panel, clicks the trigger button without consent, and requires sanitized panel status plus evidence that the provider was not called.
+
 ## Local Official Live2D SDK Setup
 
 - Do not use third-party npm mirrors of `live2dcubismcore` as official renderer proof. The real smoke path expects Live2D's Cubism Core from the official Web SDK download or hosting-use Core package, kept only in local ignored storage.
