@@ -92,6 +92,8 @@ describe("default doudou official Live2D runtime module builder", () => {
       expect(calls).toContain("LAppModel.setSubdelegate:true");
       expect(calls).toContain("LAppModel.loadAssets:file:///models/:default-doudou.model3.json");
       expect(calls.filter((call) => call.startsWith("LAppModel.loadExpression:")).length).toBe(12);
+      expect(calls.filter((call) => call.startsWith("LAppModel.expressionMap.setValue:")).length).toBe(12);
+      expect(calls).toContain("LAppModel.expressionMap.setValue:兜兜开心发光:兜兜开心发光");
       expect(calls).toContain("LAppModel.setExpression:兜兜开心发光");
       expect(calls).toContain("LAppModel.expressionUpdateMotion:0.000");
       expect(calls).toContain("LAppModel.expressionUpdateMotion:0.033");
@@ -326,6 +328,11 @@ const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
 export class LAppModel {
   constructor() {
     this._model = {};
+    this._expressions = {
+      setValue(name, expression) {
+        calls().push("LAppModel.expressionMap.setValue:" + name + ":" + expression.name);
+      }
+    };
     this._expressionManager = {
       updateMotion(_model, deltaTimeSeconds) {
         calls().push("LAppModel.expressionUpdateMotion:" + deltaTimeSeconds.toFixed(3));

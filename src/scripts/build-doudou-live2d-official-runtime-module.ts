@@ -301,10 +301,7 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
     this.lifecycle.expressionLoadCalls += 1;
     this.expressions.set(input.emotionId, input.expressionName);
     this.expressions.set(input.expressionName, input.expressionName);
-    const expressionMap = this.model._expressions;
-    if (expressionMap?.set) {
-      expressionMap.set(input.expressionName, expression);
-    }
+    setSampleExpression(this.model._expressions, input.expressionName, expression);
     ensureSampleExpressionUpdater(this.model);
     this.instrumentExpressionManager();
     return expression;
@@ -354,6 +351,16 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
       return updateMotion(...args);
     };
     expressionManager.__doudouUpdateMotionInstrumented = true;
+  }
+}
+
+function setSampleExpression(expressionMap, expressionName, expression) {
+  if (typeof expressionMap?.setValue === "function") {
+    expressionMap.setValue(expressionName, expression);
+    return;
+  }
+  if (typeof expressionMap?.set === "function") {
+    expressionMap.set(expressionName, expression);
   }
 }
 
