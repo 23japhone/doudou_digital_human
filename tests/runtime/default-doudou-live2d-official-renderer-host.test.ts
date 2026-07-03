@@ -216,9 +216,56 @@ describe("default doudou official Live2D renderer host", () => {
       pendingExpressionSwitches: 0
     });
   });
+
+  test("detects official canvas signature changes after a switched expression draws a frame", async () => {
+    const calls: string[] = [];
+    let canvasSignature = "idle-frame";
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => createFakeOfficialRuntimeModule(calls, {
+        onDraw: () => {
+          canvasSignature = "delighted-frame";
+        }
+      }),
+      loadCoreScript: async () => undefined,
+      sampleCanvasSignature: () => canvasSignature
+    });
+
+    await host.loadDefaultModel(library);
+    await host.switchExpression(library, "delighted");
+    expect(host.evidence()).toMatchObject({
+      expressionAppliedAfterFrame: false,
+      expressionCanvasChangedAfterFrame: false
+    });
+
+    host.renderFrame(1000);
+
+    expect(host.evidence()).toMatchObject({
+      expressionAppliedAfterFrame: true,
+      expressionCanvasChangedAfterFrame: true
+    });
+  });
 });
 
 interface FakeOfficialRuntimeModuleOptions {
+  onDraw?: () => void;
   setExpressionDelay?: Promise<unknown>;
 }
 
@@ -245,6 +292,7 @@ function createFakeOfficialRuntimeModule(
         },
         draw() {
           calls.push("draw");
+          fakeOptions.onDraw?.();
         }
       };
     }

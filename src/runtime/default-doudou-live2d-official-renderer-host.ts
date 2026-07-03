@@ -16,6 +16,7 @@ export interface DoudouOfficialLive2DRendererHostEvidence {
   activeEmotionId: DefaultDoudouEmotionId;
   drawCalls: number;
   expressionAppliedAfterFrame: boolean;
+  expressionCanvasChangedAfterFrame: boolean;
   expressionCount: number;
   expressionEmotionIdsObserved: DefaultDoudouEmotionId[];
   expressionSwitches: number;
@@ -73,6 +74,7 @@ export interface DoudouOfficialLive2DRendererHostOptions {
   };
   importRuntimeModule: (moduleUrl: string) => Promise<DoudouOfficialLive2DRendererRuntimeModule>;
   loadCoreScript: (coreScriptUrl: string) => Promise<void>;
+  sampleCanvasSignature?: (canvas: HTMLCanvasElement) => string | null;
 }
 
 export interface DoudouOfficialLive2DRendererHost {
@@ -90,6 +92,9 @@ export function createDoudouOfficialLive2DRendererHost(
 ): DoudouOfficialLive2DRendererHost {
   let activeEmotionId: DefaultDoudouEmotionId = "calm_idle";
   let drawCalls = 0;
+  let expressionCanvasChangedAfterFrame = false;
+  let expressionCanvasComparisonFramesRemaining = 0;
+  let expressionCanvasSignatureBeforeSwitch: string | null = null;
   let expressionNeedsFrame = false;
   let expressionCount = 0;
   const expressionEmotionIdsObserved: DefaultDoudouEmotionId[] = [];
@@ -165,6 +170,7 @@ export function createDoudouOfficialLive2DRendererHost(
         updateCalls += 1;
         runtime.draw();
         drawCalls += 1;
+        updateExpressionCanvasChangeEvidence();
         if (expressionNeedsFrame && activeEmotionId !== "calm_idle") {
           expressionNeedsFrame = false;
         }
@@ -183,6 +189,7 @@ export function createDoudouOfficialLive2DRendererHost(
         return false;
       }
       pendingExpressionSwitches += 1;
+      const canvasSignatureBeforeSwitch = sampleCanvasSignature();
       try {
         await runtime.setExpression(expression);
       } catch {
@@ -193,6 +200,9 @@ export function createDoudouOfficialLive2DRendererHost(
       }
       activeEmotionId = emotionId;
       expressionSwitches += 1;
+      expressionCanvasChangedAfterFrame = false;
+      expressionCanvasSignatureBeforeSwitch = canvasSignatureBeforeSwitch;
+      expressionCanvasComparisonFramesRemaining = canvasSignatureBeforeSwitch === null ? 0 : 12;
       expressionNeedsFrame = true;
       recordObservedExpressionEmotion(emotionId);
       return true;
@@ -204,6 +214,7 @@ export function createDoudouOfficialLive2DRendererHost(
       activeEmotionId,
       drawCalls,
       expressionAppliedAfterFrame: expressionSwitches > 0 && activeEmotionId !== "calm_idle" && !expressionNeedsFrame,
+      expressionCanvasChangedAfterFrame,
       expressionCount,
       expressionEmotionIdsObserved: expressionEmotionIdsObserved.slice(),
       expressionSwitches,
@@ -221,6 +232,31 @@ export function createDoudouOfficialLive2DRendererHost(
       return;
     }
     expressionEmotionIdsObserved.push(emotionId);
+  }
+
+  function sampleCanvasSignature(): string | null {
+    try {
+      return options.sampleCanvasSignature?.(options.canvas) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  function updateExpressionCanvasChangeEvidence(): void {
+    if (
+      expressionCanvasChangedAfterFrame ||
+      expressionCanvasSignatureBeforeSwitch === null ||
+      expressionCanvasComparisonFramesRemaining <= 0 ||
+      activeEmotionId === "calm_idle"
+    ) {
+      return;
+    }
+    expressionCanvasComparisonFramesRemaining -= 1;
+    const canvasSignatureAfterFrame = sampleCanvasSignature();
+    if (canvasSignatureAfterFrame !== null && canvasSignatureAfterFrame !== expressionCanvasSignatureBeforeSwitch) {
+      expressionCanvasChangedAfterFrame = true;
+      expressionCanvasComparisonFramesRemaining = 0;
+    }
   }
 
   function runtimeLifecycleEvidence(): DoudouOfficialLive2DRendererRuntimeLifecycleEvidence {

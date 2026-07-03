@@ -173,6 +173,7 @@ function hasLive2DRendererSpike(spike: {
       activeEmotionId: string;
       drawCalls: number;
       expressionAppliedAfterFrame: boolean;
+      expressionCanvasChangedAfterFrame: boolean;
       expressionCount: number;
       expressionEmotionIdsObserved: string[];
       expressionSwitches: number;
@@ -223,6 +224,7 @@ function hasOfficialLive2DRendererRuntimeEvidence(officialRuntime: {
   runtimeModule: {
     drawCalls: number;
     expressionAppliedAfterFrame: boolean;
+    expressionCanvasChangedAfterFrame: boolean;
     frameLoopAdvanced: boolean;
     modelLoaded: boolean;
     expressionEmotionIdsObserved: string[];
@@ -400,6 +402,7 @@ function parseSmokeResult(output: string) {
           activeEmotionId: string;
           drawCalls: number;
           expressionAppliedAfterFrame: boolean;
+          expressionCanvasChangedAfterFrame: boolean;
           expressionCount: number;
           expressionEmotionIdsObserved: string[];
           expressionSwitches: number;

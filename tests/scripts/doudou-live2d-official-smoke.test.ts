@@ -134,6 +134,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
             canvasNonTransparentPixel: true,
             drawCalls: 21,
             expressionAppliedAfterFrame: true,
+            expressionCanvasChangedAfterFrame: true,
             expressionCount: 12,
             expressionEmotionIdsObserved: ["delighted", "focused_working"],
             expressionSwitches: 13,
@@ -155,6 +156,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
             canvasNonTransparentPixel: true,
             drawCalls: 29,
             expressionAppliedAfterFrame: true,
+            expressionCanvasChangedAfterFrame: true,
             expressionCount: 12,
             expressionEmotionIdsObserved: ["focused_working", "delighted"],
             expressionSwitches: 17,
@@ -285,6 +287,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
         exitCode: 0,
         failedChecks: [
           "fixtureBundle.expressionAppliedAfterFrame",
+          "fixtureBundle.expressionCanvasChangedAfterFrame",
           "fixtureBundle.expressionEmotionIdsObserved",
           "fixtureBundle.runtimeLifecycle.updateMotionCalls",
           "fixtureBundle.runtimeLifecycle.modelUpdateCalls",
@@ -312,6 +315,7 @@ function createRuntimeSmokeResult(activeEmotionId: string, expressionSwitches: n
           activeEmotionId,
           drawCalls: frameCalls,
           expressionAppliedAfterFrame: activeEmotionId !== "calm_idle" && expressionSwitches > 0 && frameCalls >= 2,
+          expressionCanvasChangedAfterFrame: activeEmotionId !== "calm_idle" && expressionSwitches > 0 && frameCalls >= 2,
           expressionCount: 12,
           expressionEmotionIdsObserved: activeEmotionId === "calm_idle"
             ? ["delighted"]

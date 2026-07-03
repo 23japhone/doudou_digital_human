@@ -499,6 +499,7 @@ function reportSmokeResultIfReady(): void {
 async function reportSmokeResultAfterInteractions(renderLoopAdvanced: boolean): Promise<void> {
   try {
     await exerciseSmokeInteractionsIfNeeded();
+    await waitForLive2DRendererSmokeEvidenceAfterInteractions();
   } catch (error) {
     logRuntimeError(error);
   }
@@ -949,6 +950,30 @@ function waitForSmokeMotion(durationMs: number): Promise<void> {
   });
 }
 
+async function waitForLive2DRendererSmokeEvidenceAfterInteractions(): Promise<void> {
+  const deadlineMs = performance.now() + 900;
+  while (!isLive2DRendererSmokeSettledAfterInteractions() && performance.now() < deadlineMs) {
+    await waitForSmokeMotion(50);
+  }
+}
+
+function isLive2DRendererSmokeSettledAfterInteractions(): boolean {
+  if (isLive2DRendererSmokePending()) {
+    return false;
+  }
+  const officialRendererHostEvidence = live2DOfficialRendererHostEvidence();
+  if (officialRendererHostEvidence.runtimeModuleProbe !== "loaded") {
+    return true;
+  }
+  if (officialRendererHostEvidence.expressionSwitches <= 0) {
+    return true;
+  }
+  return (
+    officialRendererHostEvidence.expressionAppliedAfterFrame &&
+    officialRendererHostEvidence.expressionCanvasChangedAfterFrame
+  );
+}
+
 function isRuntimeFrameHiddenByDefault(): boolean {
   setFrameResizeAffordanceVisible(false);
   return !isRuntimeFrameAffordanceVisible();
@@ -996,7 +1021,8 @@ function setupLive2DRendererSpike(): void {
     canvas: live2DCanvas,
     config: config.officialRuntime,
     importRuntimeModule: importOfficialLive2DRendererRuntimeModule,
-    loadCoreScript: loadOfficialLive2DCoreScript
+    loadCoreScript: loadOfficialLive2DCoreScript,
+    sampleCanvasSignature: live2DOfficialCanvasPixelSignature
   });
   void live2DOfficialRendererHost.loadDefaultModel(config.library)
     .then(updateOfficialLive2DCanvasRuntimeState)
@@ -1189,6 +1215,7 @@ function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostE
     activeEmotionId: "calm_idle",
     drawCalls: 0,
     expressionAppliedAfterFrame: false,
+    expressionCanvasChangedAfterFrame: false,
     expressionCount: 0,
     expressionEmotionIdsObserved: [],
     expressionSwitches: 0,
@@ -1227,6 +1254,13 @@ function live2DOfficialCanvasHasNonTransparentPixel(): boolean {
   return live2DCanvasWebGLHasNonTransparentPixel() || live2DCanvas2DHasNonTransparentPixel();
 }
 
+function live2DOfficialCanvasPixelSignature(): string | null {
+  if (!live2DOfficialCanvasLayerVisible()) {
+    return null;
+  }
+  return live2DCanvasWebGLPixelSignature() ?? live2DCanvas2DPixelSignature();
+}
+
 function live2DCanvas2DHasNonTransparentPixel(): boolean {
   const context2d = live2DCanvas.getContext("2d", { willReadFrequently: true });
   if (!context2d) {
@@ -1237,6 +1271,19 @@ function live2DCanvas2DHasNonTransparentPixel(): boolean {
     return imageDataHasNonTransparentPixel(imageData.data);
   } catch {
     return false;
+  }
+}
+
+function live2DCanvas2DPixelSignature(): string | null {
+  const context2d = live2DCanvas.getContext("2d", { willReadFrequently: true });
+  if (!context2d) {
+    return null;
+  }
+  try {
+    const imageData = context2d.getImageData(0, 0, live2DCanvas.width, live2DCanvas.height);
+    return pixelDataSignature(imageData.data, live2DCanvas.width, live2DCanvas.height);
+  } catch {
+    return null;
   }
 }
 
@@ -1259,6 +1306,25 @@ function live2DCanvasWebGLHasNonTransparentPixel(): boolean {
   }
 }
 
+function live2DCanvasWebGLPixelSignature(): string | null {
+  const gl = live2DCanvas.getContext("webgl2") ?? live2DCanvas.getContext("webgl");
+  if (!gl) {
+    return null;
+  }
+  try {
+    const width = gl.drawingBufferWidth;
+    const height = gl.drawingBufferHeight;
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    return pixelDataSignature(pixels, width, height);
+  } catch {
+    return null;
+  }
+}
+
 function imageDataHasNonTransparentPixel(data: Uint8ClampedArray | Uint8Array): boolean {
   for (let index = 3; index < data.length; index += 4) {
     if (data[index] > 0) {
@@ -1266,6 +1332,15 @@ function imageDataHasNonTransparentPixel(data: Uint8ClampedArray | Uint8Array): 
     }
   }
   return false;
+}
+
+function pixelDataSignature(data: Uint8ClampedArray | Uint8Array, width: number, height: number): string {
+  let hash = 2166136261;
+  for (let index = 0; index < data.length; index += 1) {
+    hash ^= data[index] ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${width}x${height}:${(hash >>> 0).toString(16)}`;
 }
 
 function isLive2DRendererSmokePending(): boolean {

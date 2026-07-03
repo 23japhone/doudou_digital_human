@@ -4,6 +4,7 @@ export interface DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
   canvasNonTransparentPixel: boolean;
   drawCalls: number;
   expressionAppliedAfterFrame: boolean;
+  expressionCanvasChangedAfterFrame: boolean;
   expressionCount: number;
   expressionEmotionIdsObserved: string[];
   expressionSwitches: number;
@@ -75,6 +76,9 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (!evidence.expressionAppliedAfterFrame) {
     failures.push(`${label}.expressionAppliedAfterFrame`);
   }
+  if (!evidence.expressionCanvasChangedAfterFrame) {
+    failures.push(`${label}.expressionCanvasChangedAfterFrame`);
+  }
   if (evidence.pendingExpressionSwitches > 0) {
     failures.push(`${label}.pendingExpressionSwitches`);
   }
@@ -130,6 +134,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     typeof runtimeModule.activeEmotionId !== "string" ||
     typeof runtimeModule.drawCalls !== "number" ||
     typeof runtimeModule.expressionAppliedAfterFrame !== "boolean" ||
+    typeof runtimeModule.expressionCanvasChangedAfterFrame !== "boolean" ||
     typeof runtimeModule.expressionCount !== "number" ||
     !isStringArray(runtimeModule.expressionEmotionIdsObserved) ||
     typeof runtimeModule.expressionSwitches !== "number" ||
@@ -150,6 +155,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     canvasNonTransparentPixel: officialRuntime.canvasNonTransparentPixel,
     drawCalls: runtimeModule.drawCalls,
     expressionAppliedAfterFrame: runtimeModule.expressionAppliedAfterFrame,
+    expressionCanvasChangedAfterFrame: runtimeModule.expressionCanvasChangedAfterFrame,
     expressionCount: runtimeModule.expressionCount,
     expressionEmotionIdsObserved: runtimeModule.expressionEmotionIdsObserved,
     expressionSwitches: runtimeModule.expressionSwitches,
