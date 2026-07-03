@@ -167,6 +167,46 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
     }
   });
 
+  test("rejects model3.json without textures because the renderer cannot prove visible pixels", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-empty-textures-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      await writeLocalOfficialSdkFixture(sdkDir);
+      await mkdir(modelDir, { recursive: true });
+      await writeFile(path.join(modelDir, "default-doudou.moc3"), "moc3", "utf8");
+      await writeFile(
+        path.join(modelDir, "default-doudou.model3.json"),
+        JSON.stringify({
+          Version: 3,
+          FileReferences: {
+            Moc: "default-doudou.moc3",
+            Textures: [],
+            Expressions: [],
+            Motions: {}
+          }
+        }),
+        "utf8"
+      );
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "model3_invalid"
+        },
+        reason: "model3_invalid"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("rejects a configured runtime module path that is missing", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-missing-runtime-"));
     try {

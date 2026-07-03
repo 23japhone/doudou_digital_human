@@ -289,6 +289,7 @@ function isDoudouModel3Json(value: unknown): value is DoudouModel3Json {
   return (
     typeof fileReferences.Moc === "string" &&
     Array.isArray(fileReferences.Textures) &&
+    fileReferences.Textures.length > 0 &&
     fileReferences.Textures.every((texture) => typeof texture === "string") &&
     isOptionalModelExpressionArray(fileReferences.Expressions) &&
     isOptionalModelMotionRecord(fileReferences.Motions) &&
