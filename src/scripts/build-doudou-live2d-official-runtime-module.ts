@@ -422,6 +422,9 @@ function setSampleExpression(expressionMap, expressionName, expression) {
   }
   if (typeof expressionMap?.set === "function") {
     expressionMap.set(expressionName, expression);
+    if (typeof expressionMap.get === "function") {
+      return expressionMap.get(expressionName) === expression;
+    }
     return true;
   }
   return false;
