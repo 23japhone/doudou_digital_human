@@ -257,6 +257,45 @@ describe("default doudou official Live2D renderer host", () => {
     });
   });
 
+  test("rejects an official expression switch when runtime does not accept setExpression", async () => {
+    const calls: string[] = [];
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => createFakeOfficialRuntimeModule(calls, { setExpressionResult: false }),
+      loadCoreScript: async () => undefined
+    });
+
+    await host.loadDefaultModel(library);
+    const switched = await host.switchExpression(library, "delighted");
+
+    expect(switched).toBe(false);
+    expect(host.evidence()).toMatchObject({
+      activeEmotionId: "calm_idle",
+      expressionSwitches: 0,
+      pendingExpressionSwitches: 0,
+      runtimeModuleProbe: "model_failed"
+    });
+    expect(calls).toContain("setExpression:delighted:expressions/doudou_delighted.exp3.json");
+    expect(JSON.stringify(host.evidence())).not.toContain("/models/");
+  });
+
   test("detects official canvas signature changes after a switched expression draws a frame", async () => {
     const calls: string[] = [];
     let canvasSignature = "idle-frame";
@@ -308,6 +347,7 @@ interface FakeOfficialRuntimeModuleOptions {
   expressionLoadResult?: unknown;
   onDraw?: () => void;
   setExpressionDelay?: Promise<unknown>;
+  setExpressionResult?: boolean;
 }
 
 function createFakeOfficialRuntimeModule(
@@ -331,6 +371,7 @@ function createFakeOfficialRuntimeModule(
         async setExpression(input) {
           calls.push(`setExpression:${input.emotionId}:${input.expressionFile}`);
           await fakeOptions.setExpressionDelay;
+          return fakeOptions.setExpressionResult ?? true;
         },
         update(deltaTimeSeconds) {
           calls.push(`update:${deltaTimeSeconds.toFixed(3)}`);

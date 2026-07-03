@@ -366,6 +366,7 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
     }
     this.model.setExpression(input.expressionName);
     this.lifecycle.expressionSetCalls += 1;
+    return true;
   }
 
   update(deltaTimeSeconds) {
@@ -658,8 +659,12 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
     if (!expression) {
       expression = await this.loadExpression(input);
     }
-    this.expressionManager.startMotionPriority(expression, false, DOUDOU_EXPRESSION_PRIORITY_FORCE);
+    const motionQueueEntry = this.expressionManager.startMotionPriority(expression, false, DOUDOU_EXPRESSION_PRIORITY_FORCE);
+    if (motionQueueEntry === null || motionQueueEntry === undefined || motionQueueEntry === -1) {
+      throw new Error("Live2D CubismMotionManager rejected expression playback.");
+    }
     this.lifecycle.expressionSetCalls += 1;
+    return true;
   }
 
   update(deltaTimeSeconds) {

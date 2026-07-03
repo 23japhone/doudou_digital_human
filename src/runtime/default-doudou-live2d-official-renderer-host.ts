@@ -58,7 +58,7 @@ export interface DoudouOfficialLive2DRendererRuntime {
   evidence?: () => DoudouOfficialLive2DRendererRuntimeLifecycleEvidence;
   loadExpression?: (input: DoudouOfficialLive2DRendererRuntimeExpressionInput) => Promise<unknown> | unknown;
   loadModel: (input: DoudouOfficialLive2DRendererRuntimeLoadModelInput) => Promise<unknown> | unknown;
-  setExpression: (input: DoudouOfficialLive2DRendererRuntimeExpressionInput) => Promise<unknown> | unknown;
+  setExpression: (input: DoudouOfficialLive2DRendererRuntimeExpressionInput) => Promise<boolean> | boolean;
   update: (deltaTimeSeconds: number) => unknown;
 }
 
@@ -191,7 +191,10 @@ export function createDoudouOfficialLive2DRendererHost(
       pendingExpressionSwitches += 1;
       const canvasSignatureBeforeSwitch = sampleCanvasSignature();
       try {
-        await runtime.setExpression(expression);
+        const switchAccepted = await runtime.setExpression(expression);
+        if (!switchAccepted) {
+          throw new Error("Official Live2D runtime rejected expression switch.");
+        }
       } catch {
         runtimeModuleProbe = "model_failed";
         return false;
