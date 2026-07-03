@@ -332,13 +332,36 @@ describe("default doudou official Live2D runtime module builder", () => {
       await rm(tempRoot, { force: true, recursive: true });
     }
   });
+
+  test("rejects sample mode when official sample support files are missing", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-runtime-missing-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      await writeSyntheticCubismSampleSdk(sdkDir, { sampleSupportFiles: false });
+
+      const result = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile: path.join(tempRoot, "runtime.mjs"),
+        sdkDir
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        reason: "sdk_sample_runtime_missing"
+      });
+      expect(JSON.stringify(result)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
 });
 
 async function writeSyntheticCubismSampleSdk(
   sdkDir: string,
-  options: { readiness?: "loadedFlag" | "delayedCompleteSetup" } = {}
+  options: { readiness?: "loadedFlag" | "delayedCompleteSetup"; sampleSupportFiles?: boolean } = {}
 ): Promise<void> {
   const readiness = options.readiness ?? "loadedFlag";
+  const sampleSupportFiles = options.sampleSupportFiles ?? true;
   await mkdir(path.join(sdkDir, "Framework/src/live2dcubismframework.ts", ".."), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/math"), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/motion"), { recursive: true });
@@ -401,6 +424,9 @@ export class LAppPal {
 `,
     "utf8"
   );
+  if (sampleSupportFiles) {
+    await writeSyntheticCubismSampleSupportFiles(sdkDir);
+  }
   await writeFile(
     path.join(sdkDir, "Samples/TypeScript/Demo/src/lappmodel.ts"),
     `
@@ -457,6 +483,24 @@ export class LAppModel {
 `,
     "utf8"
   );
+}
+
+async function writeSyntheticCubismSampleSupportFiles(sdkDir: string): Promise<void> {
+  const sampleSupportFiles = [
+    "lappdefine.ts",
+    "lappdelegate.ts",
+    "lappglmanager.ts",
+    "lapplive2dmanager.ts",
+    "lappsprite.ts",
+    "lappsubdelegate.ts",
+    "lapptexturemanager.ts",
+    "lappview.ts",
+    "lappwavfilehandler.ts",
+    "touchmanager.ts"
+  ];
+  for (const sampleSupportFile of sampleSupportFiles) {
+    await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src", sampleSupportFile), "export {};\n", "utf8");
+  }
 }
 
 function createFakeCanvas(): HTMLCanvasElement {

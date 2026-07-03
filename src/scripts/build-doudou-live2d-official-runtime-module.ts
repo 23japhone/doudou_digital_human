@@ -33,8 +33,21 @@ export interface BuildDoudouOfficialLive2DRendererRuntimeModuleInput {
 
 const FRAMEWORK_SOURCE = "Framework/src";
 const SAMPLE_LAPP_MODEL = "Samples/TypeScript/Demo/src/lappmodel.ts";
-const SAMPLE_LAPP_PAL = "Samples/TypeScript/Demo/src/lapppal.ts";
 const SAMPLE_SOURCE = "Samples/TypeScript/Demo/src";
+const REQUIRED_SAMPLE_SOURCE_FILES = [
+  "lappdefine.ts",
+  "lappdelegate.ts",
+  "lappglmanager.ts",
+  "lapplive2dmanager.ts",
+  "lappmodel.ts",
+  "lapppal.ts",
+  "lappsprite.ts",
+  "lappsubdelegate.ts",
+  "lapptexturemanager.ts",
+  "lappview.ts",
+  "lappwavfilehandler.ts",
+  "touchmanager.ts"
+] as const;
 const REQUIRED_SAMPLE_RUNTIME_FILES = [
   "live2dcubismframework.ts",
   "math/cubismmatrix44.ts",
@@ -194,11 +207,7 @@ async function missingRuntimeReasonForMode(options: {
   sampleSourceDir: string;
   sdkDir: string;
 }): Promise<DoudouOfficialLive2DRuntimeModuleBuildFailureReason | null> {
-  if (
-    options.mode === "sample" &&
-    (!await exists(path.join(options.sdkDir, SAMPLE_LAPP_MODEL)) ||
-      !await exists(path.join(options.sdkDir, SAMPLE_LAPP_PAL)))
-  ) {
+  if (options.mode === "sample" && !await hasRequiredSampleSourceFiles(options.sampleSourceDir)) {
     return "sdk_sample_runtime_missing";
   }
   const requiredFrameworkFiles = options.mode === "sample"
@@ -208,6 +217,15 @@ async function missingRuntimeReasonForMode(options: {
     return "sdk_framework_runtime_missing";
   }
   return null;
+}
+
+async function hasRequiredSampleSourceFiles(sampleSourceDir: string): Promise<boolean> {
+  for (const relativeFile of REQUIRED_SAMPLE_SOURCE_FILES) {
+    if (!await exists(path.join(sampleSourceDir, relativeFile))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 async function hasRequiredFrameworkRuntimeFiles(

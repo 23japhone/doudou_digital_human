@@ -139,15 +139,66 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
       await rm(tempRoot, { force: true, recursive: true });
     }
   });
+
+  test("rejects a configured SDK missing official sample support files", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-missing-sample-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      await writeLocalOfficialSdkFixture(sdkDir, { sampleSupportFiles: false });
+      await writeDefaultDoudouModelFixture(modelDir);
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "sdk_sample_runtime_missing"
+        },
+        reason: "sdk_sample_runtime_missing"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
 });
 
-async function writeLocalOfficialSdkFixture(sdkDir: string): Promise<void> {
+async function writeLocalOfficialSdkFixture(
+  sdkDir: string,
+  options: { sampleSupportFiles?: boolean } = {}
+): Promise<void> {
   await mkdir(path.join(sdkDir, "Core"), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src"), { recursive: true });
   await mkdir(path.join(sdkDir, "Samples/TypeScript/Demo/src"), { recursive: true });
   await writeFile(path.join(sdkDir, "Core/live2dcubismcore.js"), "window.Live2DCubismCore = {};\n", "utf8");
   await writeFile(path.join(sdkDir, "Framework/src/live2dcubismframework.ts"), "export {};\n", "utf8");
   await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src/lappmodel.ts"), "export class LAppModel {}\n", "utf8");
+  await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src/lapppal.ts"), "export class LAppPal {}\n", "utf8");
+  if (options.sampleSupportFiles ?? true) {
+    await writeLocalOfficialSampleSupportFiles(sdkDir);
+  }
+}
+
+async function writeLocalOfficialSampleSupportFiles(sdkDir: string): Promise<void> {
+  const sampleSupportFiles = [
+    "lappdefine.ts",
+    "lappdelegate.ts",
+    "lappglmanager.ts",
+    "lapplive2dmanager.ts",
+    "lappsprite.ts",
+    "lappsubdelegate.ts",
+    "lapptexturemanager.ts",
+    "lappview.ts",
+    "lappwavfilehandler.ts",
+    "touchmanager.ts"
+  ];
+  for (const sampleSupportFile of sampleSupportFiles) {
+    await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src", sampleSupportFile), "export {};\n", "utf8");
+  }
 }
 
 async function writeDefaultDoudouModelFixture(modelDir: string): Promise<void> {

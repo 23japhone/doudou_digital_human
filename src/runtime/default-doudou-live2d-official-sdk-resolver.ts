@@ -88,6 +88,21 @@ const CORE_SCRIPT = "Core/live2dcubismcore.js";
 const CORE_SCRIPT_MIN = "Core/live2dcubismcore.min.js";
 const FRAMEWORK_SOURCE = "Framework/src";
 const SAMPLE_LAPP_MODEL = "Samples/TypeScript/Demo/src/lappmodel.ts";
+const SAMPLE_SOURCE = "Samples/TypeScript/Demo/src";
+const REQUIRED_SAMPLE_SOURCE_FILES = [
+  "lappdefine.ts",
+  "lappdelegate.ts",
+  "lappglmanager.ts",
+  "lapplive2dmanager.ts",
+  "lappmodel.ts",
+  "lapppal.ts",
+  "lappsprite.ts",
+  "lappsubdelegate.ts",
+  "lapptexturemanager.ts",
+  "lappview.ts",
+  "lappwavfilehandler.ts",
+  "touchmanager.ts"
+] as const;
 
 export async function resolveDoudouOfficialLive2DRendererRuntime(
   input: ResolveDoudouOfficialLive2DRendererRuntimeInput
@@ -107,7 +122,7 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
   if (!await isDirectory(path.join(sdkDir, FRAMEWORK_SOURCE))) {
     return unavailable("sdk_framework_missing", true);
   }
-  if (!await exists(path.join(sdkDir, SAMPLE_LAPP_MODEL))) {
+  if (!await hasRequiredSampleSourceFiles(path.join(sdkDir, SAMPLE_SOURCE))) {
     return unavailable("sdk_sample_runtime_missing", true);
   }
 
@@ -170,6 +185,15 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
       runtimeModuleUrl: runtimeModuleFile ? pathToFileURL(runtimeModuleFile).href : undefined
     }
   };
+}
+
+async function hasRequiredSampleSourceFiles(sampleSourceDir: string): Promise<boolean> {
+  for (const relativeFile of REQUIRED_SAMPLE_SOURCE_FILES) {
+    if (!await exists(path.join(sampleSourceDir, relativeFile))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function unavailable(
