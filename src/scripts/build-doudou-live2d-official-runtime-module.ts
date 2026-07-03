@@ -723,7 +723,7 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
     for (let textureIndex = 0; textureIndex < textureCount; textureIndex += 1) {
       const textureFile = this.setting.getTextureFileName(textureIndex);
       if (!textureFile) {
-        continue;
+        throw new Error("Live2D model setting declared a texture without a file name.");
       }
       const image = await loadImage(new URL(textureFile, this.modelRootUrl).href);
       const texture = this.gl.createTexture();
