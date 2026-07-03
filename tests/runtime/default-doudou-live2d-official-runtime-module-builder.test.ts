@@ -179,6 +179,78 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("uses the official sample expression updater when Sample Data already lists expressions", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-bundled-expressions-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir, { bundledExpressionUpdater: true });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-bundled-expressions-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async () => undefined
+      });
+
+      await host.loadDefaultModel(library);
+      await host.switchExpression(library, "delighted");
+      host.renderFrame(1000);
+      host.renderFrame(1033);
+
+      expect(host.evidence()).toMatchObject({
+        activeEmotionId: "delighted",
+        modelLoaded: true,
+        runtimeLifecycle: {
+          expressionLoadCalls: 12,
+          expressionSetCalls: 1,
+          modelUpdateCalls: 2,
+          updateMotionCalls: 2
+        },
+        runtimeModuleProbe: "loaded"
+      });
+      expect(calls.filter((call) => call === "LAppModel.updateScheduler.addUpdatableList:SyntheticCubismExpressionUpdater")).toHaveLength(1);
+      expect(calls.filter((call) => call === "LAppModel.modelSetting.getExpressionCount:12")).toHaveLength(1);
+      const firstFrameUpdateIndex = calls.indexOf("LAppModel.update");
+      const firstSchedulerIndex = calls.indexOf("LAppModel.updateScheduler.onLateUpdate");
+      const firstExpressionUpdateIndex = calls.indexOf("LAppModel.expressionUpdateMotion:0.000");
+      expect(firstFrameUpdateIndex).toBeGreaterThanOrEqual(0);
+      expect(firstSchedulerIndex).toBeGreaterThan(firstFrameUpdateIndex);
+      expect(firstExpressionUpdateIndex).toBeGreaterThan(firstSchedulerIndex);
+      expect(JSON.stringify(host.evidence())).not.toContain(tempRoot);
+    } finally {
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("rejects sample mode expression switches when LAppModel refuses setExpression", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-expression-rejected-"));
     try {
@@ -1173,6 +1245,7 @@ describe("default doudou official Live2D runtime module builder", () => {
 async function writeSyntheticCubismSampleSdk(
   sdkDir: string,
   options: {
+    bundledExpressionUpdater?: boolean;
     expressionMap?: "brokenCsmMap" | "brokenNativeMap" | "csmMap" | "missing" | "nativeMap";
     readiness?: "loadedFlag" | "delayedCompleteSetup" | "textureCallbackCompleteSetup";
     sampleFrameworkFiles?: boolean;
@@ -1180,6 +1253,7 @@ async function writeSyntheticCubismSampleSdk(
     setExpressionResult?: "accepted" | "rejected";
   } = {}
 ): Promise<void> {
+  const bundledExpressionUpdater = options.bundledExpressionUpdater ?? false;
   const expressionMap = options.expressionMap ?? "nativeMap";
   const readiness = options.readiness ?? "loadedFlag";
   const sampleFrameworkFiles = options.sampleFrameworkFiles ?? true;
@@ -1262,9 +1336,18 @@ export class LAppPal {
     `
 import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
 const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
+const bundledExpressionUpdater = ${JSON.stringify(bundledExpressionUpdater)};
 const expressionMap = ${JSON.stringify(expressionMap)};
 const readiness = ${JSON.stringify(readiness)};
 const setExpressionResult = ${JSON.stringify(setExpressionResult)};
+class SyntheticCubismExpressionUpdater {
+  constructor(expressionManager) {
+    this.expressionManager = expressionManager;
+  }
+  update(model) {
+    this.expressionManager.updateMotion(model, 0);
+  }
+}
 export class LAppModel {
   constructor() {
     calls().push("LAppModel.constructor");
@@ -1324,6 +1407,27 @@ export class LAppModel {
         calls().push("LAppModel.expressionUpdateMotion:" + deltaTimeSeconds.toFixed(3));
       }
     };
+    if (bundledExpressionUpdater) {
+      this._modelSetting = {
+        getExpressionCount() {
+          calls().push("LAppModel.modelSetting.getExpressionCount:12");
+          return 12;
+        }
+      };
+      this._updateScheduler = {
+        updaters: [],
+        addUpdatableList(updater) {
+          calls().push("LAppModel.updateScheduler.addUpdatableList:" + updater.constructor.name);
+          this.updaters.push(updater);
+        },
+        onLateUpdate(model) {
+          calls().push("LAppModel.updateScheduler.onLateUpdate");
+          for (const updater of this.updaters) {
+            updater.update(model);
+          }
+        }
+      };
+    }
   }
   setSubdelegate(subdelegate) {
     this.subdelegate = subdelegate;
@@ -1331,6 +1435,9 @@ export class LAppModel {
   }
   loadAssets(dir, fileName) {
     calls().push("LAppModel.loadAssets:" + dir + ":" + fileName);
+    if (bundledExpressionUpdater) {
+      this._updateScheduler.addUpdatableList(new SyntheticCubismExpressionUpdater(this._expressionManager));
+    }
     if (readiness === "delayedCompleteSetup") {
       this._updating = false;
       this._initialized = true;
@@ -1387,6 +1494,7 @@ export class LAppModel {
   }
   update() {
     calls().push("LAppModel.update");
+    this._updateScheduler?.onLateUpdate?.(this._model);
   }
   draw(matrix) {
     calls().push("LAppModel.draw:" + (matrix instanceof CubismMatrix44));
