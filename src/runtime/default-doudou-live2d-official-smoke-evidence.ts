@@ -1,6 +1,7 @@
 export interface DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
   activeEmotionId: string;
   canvasLayerVisible: boolean;
+  canvasNonTransparentPixel: boolean;
   drawCalls: number;
   expressionCount: number;
   expressionSwitches: number;
@@ -54,6 +55,9 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (!evidence.canvasLayerVisible) {
     failures.push(`${label}.canvasLayerVisible`);
   }
+  if (!evidence.canvasNonTransparentPixel) {
+    failures.push(`${label}.canvasNonTransparentPixel`);
+  }
   if (evidence.expressionCount !== 12) {
     failures.push(`${label}.expressionCount`);
   }
@@ -94,6 +98,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
   const runtimeModule = officialRuntime.runtimeModule;
   if (
     typeof officialRuntime.canvasLayerVisible !== "boolean" ||
+    typeof officialRuntime.canvasNonTransparentPixel !== "boolean" ||
     typeof officialRuntime.rendererAssetProbe !== "string" ||
     typeof runtimeModule.activeEmotionId !== "string" ||
     typeof runtimeModule.drawCalls !== "number" ||
@@ -109,6 +114,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
   return {
     activeEmotionId: runtimeModule.activeEmotionId,
     canvasLayerVisible: officialRuntime.canvasLayerVisible,
+    canvasNonTransparentPixel: officialRuntime.canvasNonTransparentPixel,
     drawCalls: runtimeModule.drawCalls,
     expressionCount: runtimeModule.expressionCount,
     expressionSwitches: runtimeModule.expressionSwitches,

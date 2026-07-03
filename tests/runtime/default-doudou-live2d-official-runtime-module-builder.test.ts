@@ -34,7 +34,9 @@ describe("default doudou official Live2D runtime module builder", () => {
           sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
         }
       });
-      expect(await readFile(outputFile, "utf8")).not.toContain(tempRoot);
+      const outputSource = await readFile(outputFile, "utf8");
+      expect(outputSource).not.toContain(tempRoot);
+      expect(outputSource).toContain("preserveDrawingBuffer: true");
 
       const calls: string[] = [];
       (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
@@ -116,7 +118,9 @@ describe("default doudou official Live2D runtime module builder", () => {
           frameworkSource: "Framework/src"
         }
       });
-      expect(await readFile(outputFile, "utf8")).not.toContain(tempRoot);
+      const outputSource = await readFile(outputFile, "utf8");
+      expect(outputSource).not.toContain(tempRoot);
+      expect(outputSource).toContain("preserveDrawingBuffer: true");
 
       const calls: string[] = [];
       globalThis.fetch = vi.fn(async (url: string | URL | Request) => {

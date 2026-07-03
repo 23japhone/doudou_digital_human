@@ -1172,6 +1172,7 @@ function live2DRendererSpikeSmokeResult(): RuntimeLive2DRendererSpikeSmokeResult
     officialRuntime: {
       ...config.officialRuntime.publicEvidence,
       canvasLayerVisible: live2DOfficialCanvasLayerVisible(),
+      canvasNonTransparentPixel: live2DOfficialCanvasHasNonTransparentPixel(),
       rendererAssetProbe: live2DOfficialRendererAssetProbe,
       runtimeModule: live2DOfficialRendererHostEvidence()
     },
@@ -1209,6 +1210,54 @@ function live2DOfficialCanvasLayerVisible(): boolean {
   const petOpacity = Number.parseFloat(getComputedStyle(petCanvas).opacity);
   const live2DOpacity = Number.parseFloat(getComputedStyle(live2DCanvas).opacity);
   return live2DOpacity > 0.5 && petOpacity < 0.5;
+}
+
+function live2DOfficialCanvasHasNonTransparentPixel(): boolean {
+  if (!live2DOfficialCanvasLayerVisible()) {
+    return false;
+  }
+  return live2DCanvasWebGLHasNonTransparentPixel() || live2DCanvas2DHasNonTransparentPixel();
+}
+
+function live2DCanvas2DHasNonTransparentPixel(): boolean {
+  const context2d = live2DCanvas.getContext("2d", { willReadFrequently: true });
+  if (!context2d) {
+    return false;
+  }
+  try {
+    const imageData = context2d.getImageData(0, 0, live2DCanvas.width, live2DCanvas.height);
+    return imageDataHasNonTransparentPixel(imageData.data);
+  } catch {
+    return false;
+  }
+}
+
+function live2DCanvasWebGLHasNonTransparentPixel(): boolean {
+  const gl = live2DCanvas.getContext("webgl2") ?? live2DCanvas.getContext("webgl");
+  if (!gl) {
+    return false;
+  }
+  try {
+    const width = gl.drawingBufferWidth;
+    const height = gl.drawingBufferHeight;
+    if (width <= 0 || height <= 0) {
+      return false;
+    }
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    return imageDataHasNonTransparentPixel(pixels);
+  } catch {
+    return false;
+  }
+}
+
+function imageDataHasNonTransparentPixel(data: Uint8ClampedArray | Uint8Array): boolean {
+  for (let index = 3; index < data.length; index += 4) {
+    if (data[index] > 0) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isLive2DRendererSmokePending(): boolean {

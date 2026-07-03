@@ -66,6 +66,7 @@ export type RuntimeLive2DOfficialRendererAssetProbe =
 export interface RuntimeLive2DOfficialRendererSmokeEvidence
   extends Omit<DoudouOfficialLive2DRendererRuntimeEvidence, "runtimeModule"> {
   canvasLayerVisible: boolean;
+  canvasNonTransparentPixel: boolean;
   rendererAssetProbe: RuntimeLive2DOfficialRendererAssetProbe;
   runtimeModule: DoudouOfficialLive2DRendererHostEvidence;
 }

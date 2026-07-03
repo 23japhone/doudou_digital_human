@@ -31,6 +31,17 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
   });
 
+  test("requires loaded official runtime evidence to prove the Live2D canvas rendered pixels", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      canvasNonTransparentPixel: false
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.canvasNonTransparentPixel"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
   test("accepts complete loaded official runtime evidence", () => {
     const evidence = createOfficialRuntimeEvidence({
       activeEmotionId: "delighted",
@@ -73,6 +84,7 @@ function createOfficialRuntimeEvidence(
   return {
     activeEmotionId: "delighted",
     canvasLayerVisible: true,
+    canvasNonTransparentPixel: true,
     drawCalls: 2,
     expressionCount: 12,
     expressionSwitches: 1,
@@ -90,6 +102,7 @@ function createRuntimeSmokeResult(evidence: DoudouOfficialLive2DRendererRuntimeS
     live2DRendererSpike: {
       officialRuntime: {
         canvasLayerVisible: evidence.canvasLayerVisible,
+        canvasNonTransparentPixel: evidence.canvasNonTransparentPixel,
         rendererAssetProbe: evidence.rendererAssetProbe,
         runtimeModule: {
           activeEmotionId: evidence.activeEmotionId,

@@ -425,8 +425,16 @@ function loadImage(src) {
 }
 
 function requireWebGlContext(canvas) {
-  const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: true })
-    ?? canvas.getContext("experimental-webgl", { alpha: true, premultipliedAlpha: true });
+  const gl = canvas.getContext("webgl", {
+    alpha: true,
+    premultipliedAlpha: true,
+    preserveDrawingBuffer: true
+  })
+    ?? canvas.getContext("experimental-webgl", {
+      alpha: true,
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: true
+    });
   if (!gl) {
     throw new Error("Live2D runtime requires a WebGL context.");
   }
@@ -606,8 +614,16 @@ function loadImage(src) {
 }
 
 function requireWebGlContext(canvas) {
-  const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: true })
-    ?? canvas.getContext("experimental-webgl", { alpha: true, premultipliedAlpha: true });
+  const gl = canvas.getContext("webgl", {
+    alpha: true,
+    premultipliedAlpha: true,
+    preserveDrawingBuffer: true
+  })
+    ?? canvas.getContext("experimental-webgl", {
+      alpha: true,
+      premultipliedAlpha: true,
+      preserveDrawingBuffer: true
+    });
   if (!gl) {
     throw new Error("Live2D runtime requires a WebGL context.");
   }

@@ -165,6 +165,7 @@ function hasLive2DRendererSpike(spike: {
   officialRuntime: {
     available: boolean;
     canvasLayerVisible: boolean;
+    canvasNonTransparentPixel: boolean;
     configured: boolean;
     reason?: string;
     rendererAssetProbe: string;
@@ -377,6 +378,7 @@ function parseSmokeResult(output: string) {
         configured: boolean;
         reason?: string;
         canvasLayerVisible: boolean;
+        canvasNonTransparentPixel: boolean;
         rendererAssetProbe: string;
         runtimeModule: {
           activeEmotionId: string;
