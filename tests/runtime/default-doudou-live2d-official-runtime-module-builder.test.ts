@@ -273,6 +273,75 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("drives the official sample texture manager callback before loading expressions", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-texture-ready-"));
+    const restoreImage = installFakeImage();
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir, { readiness: "textureCallbackCompleteSetup" });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-texture-ready-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async (coreScriptUrl) => {
+          calls.push(`loadCore:${coreScriptUrl}`);
+        }
+      });
+
+      await host.loadDefaultModel(library);
+
+      const textureLoadedIndex = calls.indexOf("LAppModel.textureLoaded:file:///models/textures/default-doudou.png:64x32:true");
+      const firstExpressionLoadIndex = calls.findIndex((call) => call.startsWith("LAppModel.loadExpression:"));
+      expect(calls).toContain("Image.src:file:///models/textures/default-doudou.png");
+      expect(calls).toContain("WebGL.createTexture");
+      expect(calls).toContain("WebGL.pixelStorei:1");
+      expect(calls).toContain("WebGL.texImage2D:64x32");
+      expect(textureLoadedIndex).toBeGreaterThanOrEqual(0);
+      expect(firstExpressionLoadIndex).toBeGreaterThan(textureLoadedIndex);
+      expect(host.evidence()).toMatchObject({
+        expressionCount: 12,
+        modelLoaded: true,
+        runtimeLifecycle: {
+          expressionLoadCalls: 12
+        },
+        runtimeModuleProbe: "loaded"
+      });
+    } finally {
+      restoreImage();
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("rejects sample mode evidence when loaded expressions cannot be registered", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-expression-map-missing-"));
     try {
@@ -444,7 +513,7 @@ async function writeSyntheticCubismSampleSdk(
   sdkDir: string,
   options: {
     expressionMap?: "csmMap" | "missing";
-    readiness?: "loadedFlag" | "delayedCompleteSetup";
+    readiness?: "loadedFlag" | "delayedCompleteSetup" | "textureCallbackCompleteSetup";
     sampleFrameworkFiles?: boolean;
     sampleSupportFiles?: boolean;
   } = {}
@@ -553,12 +622,42 @@ export class LAppModel {
     if (readiness === "delayedCompleteSetup") {
       this._updating = false;
       this._initialized = true;
-      this._state = 21;
+      this._state = 22;
       calls().push("LAppModel.waitLoadTexture");
       setTimeout(() => {
-        this._state = 22;
+        this._state = 23;
         calls().push("LAppModel.completeSetup");
       }, 40);
+    } else if (readiness === "textureCallbackCompleteSetup") {
+      this._updating = false;
+      this._initialized = true;
+      this._state = 22;
+      this._textureCount = 0;
+      this._modelSetting = {
+        getTextureCount() {
+          return 1;
+        }
+      };
+      calls().push("LAppModel.waitLoadTexture");
+      this.subdelegate.getTextureManager().createTextureFromPngFile(
+        dir + "textures/default-doudou.png",
+        true,
+        (textureInfo) => {
+          calls().push(
+            "LAppModel.textureLoaded:" +
+              textureInfo.fileName +
+              ":" +
+              textureInfo.width +
+              "x" +
+              textureInfo.height +
+              ":" +
+              textureInfo.usePremultply
+          );
+          this._textureCount += 1;
+          this._state = 23;
+          calls().push("LAppModel.completeSetup");
+        }
+      );
     } else {
       this.loaded = true;
     }
@@ -634,19 +733,50 @@ async function writeSyntheticCubismSampleSupportFiles(sdkDir: string): Promise<v
 }
 
 function createFakeCanvas(): HTMLCanvasElement {
+  const calls = (): string[] => (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] })
+    .__doudouOfficialRuntimeFixtureCalls ?? [];
   const gl = {
     BLEND: 1,
     COLOR_BUFFER_BIT: 2,
     DEPTH_BUFFER_BIT: 4,
+    FRAMEBUFFER_BINDING: 7,
+    LINEAR: 8,
     ONE_MINUS_SRC_ALPHA: 5,
+    RGBA: 9,
     SRC_ALPHA: 6,
+    TEXTURE_2D: 10,
+    TEXTURE_MAG_FILTER: 11,
+    TEXTURE_MIN_FILTER: 12,
+    UNPACK_PREMULTIPLY_ALPHA_WEBGL: 13,
+    UNSIGNED_BYTE: 14,
     blendFunc() {},
+    bindTexture(_target: number, texture: unknown) {
+      calls().push(`WebGL.bindTexture:${Boolean(texture)}`);
+    },
     clear() {},
     clearColor() {},
+    createTexture() {
+      calls().push("WebGL.createTexture");
+      return { id: "fixture-texture" };
+    },
     enable() {},
     getParameter() {
       return null;
     },
+    pixelStorei(_parameterName: number, parameterValue: number) {
+      calls().push(`WebGL.pixelStorei:${parameterValue}`);
+    },
+    texImage2D(
+      _target: number,
+      _level: number,
+      _internalFormat: number,
+      _format: number,
+      _type: number,
+      image: { height: number; width: number }
+    ) {
+      calls().push(`WebGL.texImage2D:${image.width}x${image.height}`);
+    },
+    texParameteri() {},
     viewport() {}
   };
   return {
@@ -656,6 +786,36 @@ function createFakeCanvas(): HTMLCanvasElement {
       return type === "webgl" || type === "experimental-webgl" ? gl : null;
     }
   } as unknown as HTMLCanvasElement;
+}
+
+function installFakeImage(): () => void {
+  const originalImage = globalThis.Image;
+  class FixtureImage {
+    height = 32;
+    width = 64;
+    private listeners = new Map<string, Array<() => void>>();
+
+    addEventListener(eventName: string, listener: () => void): void {
+      const listeners = this.listeners.get(eventName) ?? [];
+      listeners.push(listener);
+      this.listeners.set(eventName, listeners);
+    }
+
+    set src(value: string) {
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls?.push(
+        `Image.src:${value}`
+      );
+      setTimeout(() => {
+        for (const listener of this.listeners.get("load") ?? []) {
+          listener();
+        }
+      }, 0);
+    }
+  }
+  globalThis.Image = FixtureImage as unknown as typeof Image;
+  return () => {
+    globalThis.Image = originalImage;
+  };
 }
 
 async function writeSyntheticCubismFrameworkSdk(sdkDir: string): Promise<void> {

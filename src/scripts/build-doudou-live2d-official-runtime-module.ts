@@ -303,6 +303,9 @@ import { CubismExpressionUpdater } from "@framework/motion/cubismexpressionupdat
 import { LAppModel } from "@sample/lappmodel";
 import { LAppPal } from "@sample/lapppal";
 
+// LAppModel's LoadStep enum is private; CompleteSetup follows WaitLoadTexture (22).
+const SAMPLE_LOAD_STEP_COMPLETE_SETUP = 23;
+
 export function createDoudouOfficialLive2DRendererRuntime(options) {
   return new DefaultDoudouOfficialSampleLive2DRendererRuntime(options);
 }
@@ -499,7 +502,7 @@ function isSampleModelReady(model) {
 }
 
 function hasSampleCompleteSetupState(model) {
-  return model._state === 22 ||
+  return model._state === SAMPLE_LOAD_STEP_COMPLETE_SETUP ||
     model._stateName === "CompleteSetup";
 }
 
