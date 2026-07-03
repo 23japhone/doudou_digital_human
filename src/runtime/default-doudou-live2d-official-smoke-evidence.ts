@@ -94,8 +94,13 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (evidence.runtimeModuleProbe !== "loaded") {
     failures.push(`${label}.runtimeModuleProbe`);
   }
-  if (evidence.runtimeModuleProbe === "loaded" && evidence.runtimeFailureReason !== null) {
-    failures.push(`${label}.runtimeFailureReason`);
+  if (evidence.runtimeFailureReason !== null) {
+    const failureReason = sanitizeRuntimeFailureReason(evidence.runtimeFailureReason);
+    failures.push(
+      failureReason
+        ? `${label}.runtimeFailureReason.${failureReason}`
+        : `${label}.runtimeFailureReason`
+    );
   }
   if (!evidence.modelLoaded) {
     failures.push(`${label}.modelLoaded`);
@@ -284,11 +289,13 @@ function smokeFailureCategory(failedCheck: string): DoudouOfficialLive2DRenderer
     return "canvas";
   }
   if (
+    failedCheck.endsWith(".runtimeFailureReason.model_or_expression_load_failed") ||
     failedCheck.endsWith(".modelLoaded")
   ) {
     return "model";
   }
   if (
+    failedCheck.endsWith(".runtimeFailureReason.frame_failed") ||
     failedCheck.endsWith(".frameLoopAdvanced") ||
     failedCheck.endsWith(".drawCalls") ||
     failedCheck.endsWith(".updateCalls") ||
@@ -299,6 +306,7 @@ function smokeFailureCategory(failedCheck: string): DoudouOfficialLive2DRenderer
     return "frameLoop";
   }
   if (
+    failedCheck.endsWith(".runtimeFailureReason.expression_switch_rejected") ||
     failedCheck.endsWith(".activeEmotionId") ||
     failedCheck.endsWith(".expressionAppliedAfterFrame") ||
     failedCheck.endsWith(".expressionCanvasChangedAfterFrame") ||

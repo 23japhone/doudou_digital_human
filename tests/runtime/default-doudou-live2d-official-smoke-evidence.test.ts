@@ -152,6 +152,10 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(doudouOfficialLive2DRendererSmokeFailureSummary([
       "fixtureBundle.rendererAssetProbe",
       "fixtureBundle.runtimeModuleProbe",
+      "fixtureBundle.runtimeFailureReason.core_or_module_load_failed",
+      "fixtureBundle.runtimeFailureReason.model_or_expression_load_failed",
+      "fixtureBundle.runtimeFailureReason.expression_switch_rejected",
+      "fixtureBundle.runtimeFailureReason.frame_failed",
       "fixtureBundle.modelLoaded",
       "fixtureBundle.canvasLayerVisible",
       "fixtureBundle.canvasNonTransparentPixel",
@@ -173,6 +177,7 @@ describe("default doudou official Live2D smoke evidence", () => {
         "fixtureBundle.canvasNonTransparentPixel"
       ],
       expression: [
+        "fixtureBundle.runtimeFailureReason.expression_switch_rejected",
         "fixtureBundle.expressionAppliedAfterFrame",
         "fixtureBundle.expressionCanvasChangedAfterFrame",
         "fixtureBundle.expressionEmotionIdsObserved",
@@ -180,6 +185,7 @@ describe("default doudou official Live2D smoke evidence", () => {
         "fixtureBundle.activeEmotionId"
       ],
       frameLoop: [
+        "fixtureBundle.runtimeFailureReason.frame_failed",
         "fixtureBundle.runtimeLifecycle.updateMotionCalls",
         "fixtureBundle.runtimeLifecycle.modelUpdateCalls",
         "fixtureBundle.runtimeLifecycle.drawCalls",
@@ -187,8 +193,14 @@ describe("default doudou official Live2D smoke evidence", () => {
         "fixtureBundle.updateCalls"
       ],
       missing: ["generatedBundle.missing"],
-      model: ["fixtureBundle.modelLoaded"],
-      runtime: ["fixtureBundle.runtimeModuleProbe"]
+      model: [
+        "fixtureBundle.runtimeFailureReason.model_or_expression_load_failed",
+        "fixtureBundle.modelLoaded"
+      ],
+      runtime: [
+        "fixtureBundle.runtimeModuleProbe",
+        "fixtureBundle.runtimeFailureReason.core_or_module_load_failed"
+      ]
     });
   });
 
@@ -198,7 +210,22 @@ describe("default doudou official Live2D smoke evidence", () => {
     });
 
     expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
-      "officialRuntime.runtimeFailureReason"
+      "officialRuntime.runtimeFailureReason.frame_failed"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
+  test("includes sanitized runtime failure reason suffixes when the runtime probe already failed", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      modelLoaded: false,
+      runtimeFailureReason: "model_or_expression_load_failed",
+      runtimeModuleProbe: "model_failed"
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.runtimeModuleProbe",
+      "officialRuntime.runtimeFailureReason.model_or_expression_load_failed",
+      "officialRuntime.modelLoaded"
     ]);
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
   });
