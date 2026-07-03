@@ -301,7 +301,33 @@ describe("runDoudouOfficialLive2DSmoke", () => {
           "fixtureBundle.updateCalls",
           "fixtureBundle.activeEmotionId",
           "generatedBundle.missing"
-        ]
+        ],
+        officialRenderer: {
+          fixtureBundle: {
+            activeEmotionId: "calm_idle",
+            canvasLayerVisible: true,
+            canvasNonTransparentPixel: true,
+            drawCalls: 1,
+            expressionAppliedAfterFrame: false,
+            expressionCanvasChangedAfterFrame: false,
+            expressionCount: 12,
+            expressionEmotionIdsObserved: ["delighted"],
+            expressionSwitches: 1,
+            frameLoopAdvanced: true,
+            modelLoaded: true,
+            pendingExpressionSwitches: 0,
+            rendererAssetProbe: "model3_fetched",
+            runtimeLifecycle: {
+              drawCalls: 1,
+              expressionLoadCalls: 12,
+              expressionSetCalls: 1,
+              modelUpdateCalls: 1,
+              updateMotionCalls: 1
+            },
+            runtimeModuleProbe: "loaded",
+            updateCalls: 1
+          }
+        }
       }
     });
     expect(result.output).not.toContain(sdkDir);

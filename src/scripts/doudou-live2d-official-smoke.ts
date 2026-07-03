@@ -158,7 +158,8 @@ export async function runDoudouOfficialLive2DSmoke(
       runtimeModule: sanitizeBuildResult(buildResult),
       runtimeSmoke: {
         exitCode: 0,
-        failedChecks
+        failedChecks,
+        officialRenderer
       }
     });
   }
