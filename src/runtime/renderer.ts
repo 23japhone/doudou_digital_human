@@ -57,6 +57,12 @@ import {
   type DoudouOfficialLive2DRendererHostEvidence,
   type DoudouOfficialLive2DRendererRuntimeModule
 } from "./default-doudou-live2d-official-renderer-host.js";
+import {
+  DOUDOU_LIVE2D_RENDERER_SMOKE_SETTLE_POLL_MS,
+  DOUDOU_LIVE2D_RENDERER_SMOKE_SETTLE_TIMEOUT_MS,
+  isDoudouLive2DRendererSmokePending,
+  isDoudouLive2DRendererSmokeSettledAfterInteractions
+} from "./default-doudou-live2d-official-smoke-settle.js";
 import "./styles.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
@@ -951,27 +957,17 @@ function waitForSmokeMotion(durationMs: number): Promise<void> {
 }
 
 async function waitForLive2DRendererSmokeEvidenceAfterInteractions(): Promise<void> {
-  const deadlineMs = performance.now() + 900;
+  const deadlineMs = performance.now() + DOUDOU_LIVE2D_RENDERER_SMOKE_SETTLE_TIMEOUT_MS;
   while (!isLive2DRendererSmokeSettledAfterInteractions() && performance.now() < deadlineMs) {
-    await waitForSmokeMotion(50);
+    await waitForSmokeMotion(DOUDOU_LIVE2D_RENDERER_SMOKE_SETTLE_POLL_MS);
   }
 }
 
 function isLive2DRendererSmokeSettledAfterInteractions(): boolean {
-  if (isLive2DRendererSmokePending()) {
-    return false;
-  }
-  const officialRendererHostEvidence = live2DOfficialRendererHostEvidence();
-  if (officialRendererHostEvidence.runtimeModuleProbe !== "loaded") {
-    return true;
-  }
-  if (officialRendererHostEvidence.expressionSwitches <= 0) {
-    return true;
-  }
-  return (
-    officialRendererHostEvidence.expressionAppliedAfterFrame &&
-    officialRendererHostEvidence.expressionCanvasChangedAfterFrame
-  );
+  return isDoudouLive2DRendererSmokeSettledAfterInteractions({
+    rendererAssetProbe: live2DOfficialRendererAssetProbe,
+    runtimeModule: live2DOfficialRendererHostEvidence()
+  });
 }
 
 function isRuntimeFrameHiddenByDefault(): boolean {
@@ -1347,12 +1343,10 @@ function pixelDataSignature(data: Uint8ClampedArray | Uint8Array, width: number,
 }
 
 function isLive2DRendererSmokePending(): boolean {
-  const officialRendererHostEvidence = live2DOfficialRendererHostEvidence();
-  return (
-    live2DOfficialRendererAssetProbe === "model3_fetch_pending" ||
-    officialRendererHostEvidence.runtimeModuleProbe === "load_pending" ||
-    officialRendererHostEvidence.pendingExpressionSwitches > 0
-  );
+  return isDoudouLive2DRendererSmokePending({
+    rendererAssetProbe: live2DOfficialRendererAssetProbe,
+    runtimeModule: live2DOfficialRendererHostEvidence()
+  });
 }
 
 function drawLive2DExpressionOverlay(emotionId: DefaultDoudouEmotionId): void {
