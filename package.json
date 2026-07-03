@@ -18,6 +18,7 @@
     "export:doudou-live2d": "npm run build:main && node dist/src/cli/doudou-live2d-exp3.js export",
     "validate:doudou-live2d": "npm run build:main && node dist/src/cli/doudou-live2d-exp3.js validate",
     "preview:doudou-live2d": "npm run build:main && node dist/src/cli/doudou-live2d-preview.js",
+    "prepare:doudou-live2d-sample": "npm run build:main && node dist/src/scripts/prepare-doudou-live2d-sample-model.js",
     "build:doudou-live2d-runtime-module": "npm run build:main && node dist/src/scripts/build-doudou-live2d-official-runtime-module.js",
     "qa:stylizer": "npm run build:main && node dist/src/scripts/stylizer-qa.js",
     "qa:stylizer:check": "npm run build:main && node dist/src/scripts/stylizer-qa-check.js",
