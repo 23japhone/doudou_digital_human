@@ -273,6 +273,68 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("rejects sample mode evidence when loaded expressions cannot be registered", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-expression-map-missing-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir, { expressionMap: "missing" });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-expression-map-missing-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async (coreScriptUrl) => {
+          calls.push(`loadCore:${coreScriptUrl}`);
+        }
+      });
+
+      await host.loadDefaultModel(library);
+
+      expect(host.evidence()).toMatchObject({
+        expressionCount: 0,
+        modelLoaded: false,
+        runtimeLifecycle: {
+          expressionLoadCalls: 0,
+          expressionSetCalls: 0
+        },
+        runtimeModuleProbe: "model_failed"
+      });
+      expect(calls.some((call) => call.startsWith("LAppModel.loadExpression:"))).toBe(true);
+      expect(calls.some((call) => call.startsWith("LAppModel.expressionMap.setValue:"))).toBe(false);
+    } finally {
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("passes framework mode through the CLI instead of falling back to sample mode", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-runtime-cli-mode-"));
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -381,11 +443,13 @@ describe("default doudou official Live2D runtime module builder", () => {
 async function writeSyntheticCubismSampleSdk(
   sdkDir: string,
   options: {
+    expressionMap?: "csmMap" | "missing";
     readiness?: "loadedFlag" | "delayedCompleteSetup";
     sampleFrameworkFiles?: boolean;
     sampleSupportFiles?: boolean;
   } = {}
 ): Promise<void> {
+  const expressionMap = options.expressionMap ?? "csmMap";
   const readiness = options.readiness ?? "loadedFlag";
   const sampleFrameworkFiles = options.sampleFrameworkFiles ?? true;
   const sampleSupportFiles = options.sampleSupportFiles ?? true;
@@ -462,15 +526,18 @@ export class LAppPal {
     `
 import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
 const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
+const expressionMap = ${JSON.stringify(expressionMap)};
 const readiness = ${JSON.stringify(readiness)};
 export class LAppModel {
   constructor() {
     this._model = {};
-    this._expressions = {
-      setValue(name, expression) {
-        calls().push("LAppModel.expressionMap.setValue:" + name + ":" + expression.name);
-      }
-    };
+    if (expressionMap === "csmMap") {
+      this._expressions = {
+        setValue(name, expression) {
+          calls().push("LAppModel.expressionMap.setValue:" + name + ":" + expression.name);
+        }
+      };
+    }
     this._expressionManager = {
       updateMotion(_model, deltaTimeSeconds) {
         calls().push("LAppModel.expressionUpdateMotion:" + deltaTimeSeconds.toFixed(3));

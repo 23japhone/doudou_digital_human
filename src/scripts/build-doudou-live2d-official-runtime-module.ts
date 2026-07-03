@@ -337,19 +337,21 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
 
   async loadExpression(input) {
     if (typeof this.model.loadExpression !== "function") {
-      return null;
+      throw new Error("Live2D sample LAppModel does not support expression loading.");
     }
     const expressionJson = JSON.stringify(input.expressionJson);
     const encoded = new TextEncoder().encode(expressionJson);
     const buffer = encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength);
     const expression = this.model.loadExpression(buffer, encoded.byteLength, input.expressionName);
     if (!expression) {
-      return null;
+      throw new Error("Live2D sample LAppModel failed to load an expression.");
+    }
+    if (!setSampleExpression(this.model._expressions, input.expressionName, expression)) {
+      throw new Error("Live2D sample LAppModel did not expose a writable expression map.");
     }
     this.lifecycle.expressionLoadCalls += 1;
     this.expressions.set(input.emotionId, input.expressionName);
     this.expressions.set(input.expressionName, input.expressionName);
-    setSampleExpression(this.model._expressions, input.expressionName, expression);
     ensureSampleExpressionUpdater(this.model);
     this.instrumentExpressionManager();
     return expression;
@@ -412,11 +414,13 @@ function updateSampleFrameTime() {
 function setSampleExpression(expressionMap, expressionName, expression) {
   if (typeof expressionMap?.setValue === "function") {
     expressionMap.setValue(expressionName, expression);
-    return;
+    return true;
   }
   if (typeof expressionMap?.set === "function") {
     expressionMap.set(expressionName, expression);
+    return true;
   }
+  return false;
 }
 
 function ensureSampleExpressionUpdater(model) {
