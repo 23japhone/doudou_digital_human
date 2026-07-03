@@ -182,6 +182,8 @@ function hasLive2DRendererSpike(spike: {
       pendingExpressionSwitches: number;
       runtimeLifecycle: {
         drawCalls: number;
+        expressionLoadCalls: number;
+        expressionSetCalls: number;
         modelUpdateCalls: number;
         updateMotionCalls: number;
       };
@@ -231,6 +233,8 @@ function hasOfficialLive2DRendererRuntimeEvidence(officialRuntime: {
     pendingExpressionSwitches: number;
     runtimeLifecycle: {
       drawCalls: number;
+      expressionLoadCalls: number;
+      expressionSetCalls: number;
       modelUpdateCalls: number;
       updateMotionCalls: number;
     };
@@ -411,6 +415,8 @@ function parseSmokeResult(output: string) {
           pendingExpressionSwitches: number;
           runtimeLifecycle: {
             drawCalls: number;
+            expressionLoadCalls: number;
+            expressionSetCalls: number;
             modelUpdateCalls: number;
             updateMotionCalls: number;
           };

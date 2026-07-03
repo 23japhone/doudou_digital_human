@@ -1224,6 +1224,8 @@ function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostE
     pendingExpressionSwitches: 0,
     runtimeLifecycle: {
       drawCalls: 0,
+      expressionLoadCalls: 0,
+      expressionSetCalls: 0,
       modelUpdateCalls: 0,
       updateMotionCalls: 0
     },

@@ -267,6 +267,8 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
     this.gl = requireWebGlContext(options.canvas);
     this.lifecycle = {
       drawCalls: 0,
+      expressionLoadCalls: 0,
+      expressionSetCalls: 0,
       modelUpdateCalls: 0,
       updateMotionCalls: 0
     };
@@ -293,10 +295,14 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
     const encoded = new TextEncoder().encode(expressionJson);
     const buffer = encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength);
     const expression = this.model.loadExpression(buffer, encoded.byteLength, input.expressionName);
+    if (!expression) {
+      return null;
+    }
+    this.lifecycle.expressionLoadCalls += 1;
     this.expressions.set(input.emotionId, input.expressionName);
     this.expressions.set(input.expressionName, input.expressionName);
     const expressionMap = this.model._expressions;
-    if (expressionMap?.set && expression) {
+    if (expressionMap?.set) {
       expressionMap.set(input.expressionName, expression);
     }
     ensureSampleExpressionUpdater(this.model);
@@ -309,6 +315,7 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
       await this.loadExpression(input);
     }
     this.model.setExpression(input.expressionName);
+    this.lifecycle.expressionSetCalls += 1;
   }
 
   update(deltaTimeSeconds) {
@@ -501,6 +508,8 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
     this.gl = requireWebGlContext(options.canvas);
     this.lifecycle = {
       drawCalls: 0,
+      expressionLoadCalls: 0,
+      expressionSetCalls: 0,
       modelUpdateCalls: 0,
       updateMotionCalls: 0
     };
@@ -553,6 +562,7 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
     if (!expression) {
       throw new Error("Live2D CubismExpressionMotion.create failed.");
     }
+    this.lifecycle.expressionLoadCalls += 1;
     this.expressions.set(input.emotionId, expression);
     this.expressions.set(input.expressionName, expression);
     return expression;
@@ -564,6 +574,7 @@ class DefaultDoudouOfficialLive2DRendererRuntime {
       expression = await this.loadExpression(input);
     }
     this.expressionManager.startMotionPriority(expression, false, DOUDOU_EXPRESSION_PRIORITY_FORCE);
+    this.lifecycle.expressionSetCalls += 1;
   }
 
   update(deltaTimeSeconds) {

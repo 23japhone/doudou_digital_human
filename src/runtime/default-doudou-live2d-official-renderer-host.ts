@@ -30,6 +30,8 @@ export interface DoudouOfficialLive2DRendererHostEvidence {
 
 export interface DoudouOfficialLive2DRendererRuntimeLifecycleEvidence {
   drawCalls: number;
+  expressionLoadCalls: number;
+  expressionSetCalls: number;
   modelUpdateCalls: number;
   updateMotionCalls: number;
 }
@@ -267,11 +269,15 @@ export function createDoudouOfficialLive2DRendererHost(
       const lifecycle = runtime.evidence();
       if (
         typeof lifecycle.drawCalls === "number" &&
+        typeof lifecycle.expressionLoadCalls === "number" &&
+        typeof lifecycle.expressionSetCalls === "number" &&
         typeof lifecycle.modelUpdateCalls === "number" &&
         typeof lifecycle.updateMotionCalls === "number"
       ) {
         return {
           drawCalls: lifecycle.drawCalls,
+          expressionLoadCalls: lifecycle.expressionLoadCalls,
+          expressionSetCalls: lifecycle.expressionSetCalls,
           modelUpdateCalls: lifecycle.modelUpdateCalls,
           updateMotionCalls: lifecycle.updateMotionCalls
         };
@@ -286,6 +292,8 @@ export function createDoudouOfficialLive2DRendererHost(
 function emptyRuntimeLifecycleEvidence(): DoudouOfficialLive2DRendererRuntimeLifecycleEvidence {
   return {
     drawCalls: 0,
+    expressionLoadCalls: 0,
+    expressionSetCalls: 0,
     modelUpdateCalls: 0,
     updateMotionCalls: 0
   };

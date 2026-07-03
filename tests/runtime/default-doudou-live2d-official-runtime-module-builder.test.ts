@@ -81,6 +81,8 @@ describe("default doudou official Live2D runtime module builder", () => {
         modelLoaded: true,
         runtimeLifecycle: {
           drawCalls: 2,
+          expressionLoadCalls: 12,
+          expressionSetCalls: 1,
           modelUpdateCalls: 2,
           updateMotionCalls: 2
         },
@@ -176,6 +178,8 @@ describe("default doudou official Live2D runtime module builder", () => {
         modelLoaded: true,
         runtimeLifecycle: {
           drawCalls: 2,
+          expressionLoadCalls: 12,
+          expressionSetCalls: 1,
           modelUpdateCalls: 2,
           updateMotionCalls: 2
         },

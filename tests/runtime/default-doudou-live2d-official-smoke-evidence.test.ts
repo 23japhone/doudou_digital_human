@@ -90,6 +90,8 @@ describe("default doudou official Live2D smoke evidence", () => {
     const evidence = createOfficialRuntimeEvidence({
       runtimeLifecycle: {
         drawCalls: 2,
+        expressionLoadCalls: 12,
+        expressionSetCalls: 2,
         modelUpdateCalls: 2,
         updateMotionCalls: 0
       }
@@ -101,10 +103,44 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
   });
 
+  test("requires loaded official runtime evidence to load all default expressions inside the module", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      runtimeLifecycle: {
+        drawCalls: 2,
+        expressionLoadCalls: 11,
+        expressionSetCalls: 2,
+        modelUpdateCalls: 2,
+        updateMotionCalls: 2
+      }
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.runtimeLifecycle.expressionLoadCalls"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
+  test("requires loaded official runtime evidence to set expressions inside the module", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      runtimeLifecycle: {
+        drawCalls: 2,
+        expressionLoadCalls: 12,
+        expressionSetCalls: 1,
+        modelUpdateCalls: 2,
+        updateMotionCalls: 2
+      }
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.runtimeLifecycle.expressionSetCalls"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
   test("accepts complete loaded official runtime evidence", () => {
     const evidence = createOfficialRuntimeEvidence({
       activeEmotionId: "delighted",
-      expressionSwitches: 1
+      expressionSwitches: 2
     });
 
     expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([]);
@@ -114,7 +150,7 @@ describe("default doudou official Live2D smoke evidence", () => {
   test("parses fixture and generated bundle official runtime smoke output", () => {
     const fixtureBundle = createRuntimeSmokeResult(createOfficialRuntimeEvidence({
       activeEmotionId: "delighted",
-      expressionSwitches: 1
+      expressionSwitches: 2
     }));
     const generatedBundle = createRuntimeSmokeResult(createOfficialRuntimeEvidence({
       activeEmotionId: "focused_working",
@@ -127,7 +163,7 @@ describe("default doudou official Live2D smoke evidence", () => {
     ].join("\n"))).toEqual({
       fixtureBundle: createOfficialRuntimeEvidence({
         activeEmotionId: "delighted",
-        expressionSwitches: 1
+        expressionSwitches: 2
       }),
       generatedBundle: createOfficialRuntimeEvidence({
         activeEmotionId: "focused_working",
@@ -156,6 +192,8 @@ function createOfficialRuntimeEvidence(
     rendererAssetProbe: "model3_fetched",
     runtimeLifecycle: {
       drawCalls: 2,
+      expressionLoadCalls: 12,
+      expressionSetCalls: 2,
       modelUpdateCalls: 2,
       updateMotionCalls: 2
     },

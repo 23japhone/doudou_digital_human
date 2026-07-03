@@ -14,6 +14,8 @@ export interface DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
   rendererAssetProbe: string;
   runtimeLifecycle: {
     drawCalls: number;
+    expressionLoadCalls: number;
+    expressionSetCalls: number;
     modelUpdateCalls: number;
     updateMotionCalls: number;
   };
@@ -85,6 +87,12 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (new Set(evidence.expressionEmotionIdsObserved.filter((emotionId) => emotionId !== "calm_idle")).size < 2) {
     failures.push(`${label}.expressionEmotionIdsObserved`);
   }
+  if (evidence.runtimeLifecycle.expressionLoadCalls < 12) {
+    failures.push(`${label}.runtimeLifecycle.expressionLoadCalls`);
+  }
+  if (evidence.runtimeLifecycle.expressionSetCalls < 2) {
+    failures.push(`${label}.runtimeLifecycle.expressionSetCalls`);
+  }
   if (evidence.runtimeLifecycle.updateMotionCalls < 2) {
     failures.push(`${label}.runtimeLifecycle.updateMotionCalls`);
   }
@@ -144,6 +152,8 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     typeof runtimeModule.runtimeModuleProbe !== "string" ||
     typeof runtimeModule.updateCalls !== "number" ||
     typeof runtimeModule.runtimeLifecycle.drawCalls !== "number" ||
+    typeof runtimeModule.runtimeLifecycle.expressionLoadCalls !== "number" ||
+    typeof runtimeModule.runtimeLifecycle.expressionSetCalls !== "number" ||
     typeof runtimeModule.runtimeLifecycle.modelUpdateCalls !== "number" ||
     typeof runtimeModule.runtimeLifecycle.updateMotionCalls !== "number"
   ) {
@@ -165,6 +175,8 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     rendererAssetProbe: officialRuntime.rendererAssetProbe,
     runtimeLifecycle: {
       drawCalls: runtimeModule.runtimeLifecycle.drawCalls,
+      expressionLoadCalls: runtimeModule.runtimeLifecycle.expressionLoadCalls,
+      expressionSetCalls: runtimeModule.runtimeLifecycle.expressionSetCalls,
       modelUpdateCalls: runtimeModule.runtimeLifecycle.modelUpdateCalls,
       updateMotionCalls: runtimeModule.runtimeLifecycle.updateMotionCalls
     },
