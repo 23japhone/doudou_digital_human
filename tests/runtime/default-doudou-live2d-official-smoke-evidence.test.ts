@@ -53,6 +53,17 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
   });
 
+  test("requires loaded official runtime evidence to observe multiple non-idle expression emotions", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      expressionEmotionIdsObserved: ["delighted"]
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.expressionEmotionIdsObserved"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
   test("accepts complete loaded official runtime evidence", () => {
     const evidence = createOfficialRuntimeEvidence({
       activeEmotionId: "delighted",
@@ -99,6 +110,7 @@ function createOfficialRuntimeEvidence(
     drawCalls: 2,
     expressionAppliedAfterFrame: true,
     expressionCount: 12,
+    expressionEmotionIdsObserved: ["delighted", "focused_working"],
     expressionSwitches: 1,
     frameLoopAdvanced: true,
     modelLoaded: true,
@@ -121,6 +133,7 @@ function createRuntimeSmokeResult(evidence: DoudouOfficialLive2DRendererRuntimeS
           drawCalls: evidence.drawCalls,
           expressionAppliedAfterFrame: evidence.expressionAppliedAfterFrame,
           expressionCount: evidence.expressionCount,
+          expressionEmotionIdsObserved: evidence.expressionEmotionIdsObserved,
           expressionSwitches: evidence.expressionSwitches,
           frameLoopAdvanced: evidence.frameLoopAdvanced,
           modelLoaded: evidence.modelLoaded,

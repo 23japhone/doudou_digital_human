@@ -5,6 +5,7 @@ export interface DoudouOfficialLive2DRendererRuntimeSmokeEvidence {
   drawCalls: number;
   expressionAppliedAfterFrame: boolean;
   expressionCount: number;
+  expressionEmotionIdsObserved: string[];
   expressionSwitches: number;
   frameLoopAdvanced: boolean;
   modelLoaded: boolean;
@@ -68,6 +69,9 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (!evidence.expressionAppliedAfterFrame) {
     failures.push(`${label}.expressionAppliedAfterFrame`);
   }
+  if (new Set(evidence.expressionEmotionIdsObserved.filter((emotionId) => emotionId !== "calm_idle")).size < 2) {
+    failures.push(`${label}.expressionEmotionIdsObserved`);
+  }
   if (!evidence.frameLoopAdvanced) {
     failures.push(`${label}.frameLoopAdvanced`);
   }
@@ -108,6 +112,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     typeof runtimeModule.drawCalls !== "number" ||
     typeof runtimeModule.expressionAppliedAfterFrame !== "boolean" ||
     typeof runtimeModule.expressionCount !== "number" ||
+    !isStringArray(runtimeModule.expressionEmotionIdsObserved) ||
     typeof runtimeModule.expressionSwitches !== "number" ||
     typeof runtimeModule.frameLoopAdvanced !== "boolean" ||
     typeof runtimeModule.modelLoaded !== "boolean" ||
@@ -123,6 +128,7 @@ export function sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence(
     drawCalls: runtimeModule.drawCalls,
     expressionAppliedAfterFrame: runtimeModule.expressionAppliedAfterFrame,
     expressionCount: runtimeModule.expressionCount,
+    expressionEmotionIdsObserved: runtimeModule.expressionEmotionIdsObserved,
     expressionSwitches: runtimeModule.expressionSwitches,
     frameLoopAdvanced: runtimeModule.frameLoopAdvanced,
     modelLoaded: runtimeModule.modelLoaded,
@@ -150,4 +156,8 @@ function parseDoudouOfficialLive2DRendererSmokeLine(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
 }

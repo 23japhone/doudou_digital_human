@@ -126,6 +126,47 @@ describe("default doudou official Live2D renderer host", () => {
     });
     expect(calls).toEqual([]);
   });
+
+  test("records distinct official runtime expression emotions observed through desktop switches", async () => {
+    const calls: string[] = [];
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => createFakeOfficialRuntimeModule(calls),
+      loadCoreScript: async () => undefined
+    });
+
+    await host.loadDefaultModel(library);
+    await host.switchExpression(library, "delighted");
+    host.renderFrame(1000);
+    await host.switchExpression(library, "delighted");
+    await host.switchExpression(library, "curious_tilt");
+    host.renderFrame(1033);
+
+    expect(host.evidence()).toMatchObject({
+      activeEmotionId: "curious_tilt",
+      expressionAppliedAfterFrame: true,
+      expressionEmotionIdsObserved: ["delighted", "curious_tilt"],
+      expressionSwitches: 3
+    });
+    expect(JSON.stringify(host.evidence())).not.toContain("/models/");
+  });
 });
 
 function createFakeOfficialRuntimeModule(calls: string[]): DoudouOfficialLive2DRendererRuntimeModule {

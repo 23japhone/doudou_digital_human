@@ -1190,6 +1190,7 @@ function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostE
     drawCalls: 0,
     expressionAppliedAfterFrame: false,
     expressionCount: 0,
+    expressionEmotionIdsObserved: [],
     expressionSwitches: 0,
     frameLoopAdvanced: false,
     modelLoaded: false,
