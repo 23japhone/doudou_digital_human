@@ -9,7 +9,8 @@ export type PrepareDoudouLive2DSampleModelFailureReason =
   | "prepare_failed"
   | "sample_model_ambiguous"
   | "sample_model_invalid"
-  | "sample_model_missing";
+  | "sample_model_missing"
+  | "unsafe_output_dir";
 
 export type PrepareDoudouLive2DSampleModelResult =
   | {
@@ -27,12 +28,15 @@ export type PrepareDoudouLive2DSampleModelResult =
 
 export interface PrepareDoudouLive2DSampleModelInput {
   outputDir: string;
+  overwrite?: boolean;
   sampleName?: string;
   sdkDir: string;
 }
 
 const DEFAULT_SAMPLE_NAME = "Mao";
 const DEFAULT_MODEL3_JSON = "default-doudou.model3.json";
+const PREPARED_MARKER_FILE = ".doudou-live2d-sample-model.json";
+const PREPARED_MARKER_CREATED_BY = "doudou-live2d-sample-model";
 
 export async function prepareDoudouLive2DSampleModel(
   input: PrepareDoudouLive2DSampleModelInput
@@ -45,7 +49,13 @@ export async function prepareDoudouLive2DSampleModel(
     return { ok: false, reason: "sample_model_missing" };
   }
   if (await exists(outputDir)) {
-    return { ok: false, reason: "output_exists" };
+    if (!input.overwrite) {
+      return { ok: false, reason: "output_exists" };
+    }
+    if (!await isSafePreparedOutputDir(outputDir)) {
+      return { ok: false, reason: "unsafe_output_dir" };
+    }
+    await rm(outputDir, { force: true, recursive: true });
   }
 
   const sourceModel3Json = await sampleModel3JsonFile(sampleDir, sampleName);
@@ -70,6 +80,7 @@ export async function prepareDoudouLive2DSampleModel(
       Name: spec.expressionName
     }));
     await writeFile(path.join(outputDir, DEFAULT_MODEL3_JSON), `${JSON.stringify(model3, null, 2)}\n`, "utf8");
+    await writePreparedMarker(outputDir, sampleName, sourceModel3Json);
     return {
       ok: true,
       expressionCount: expressionExport.expressionCount,
@@ -86,11 +97,14 @@ export async function prepareDoudouLive2DSampleModel(
 export async function runPrepareDoudouLive2DSampleModelCli(argv: string[]): Promise<number> {
   const args = parseArgs(argv.slice(2));
   if (!args.sdkDir) {
-    console.error("Usage: prepare-doudou-live2d-sample-model --sdk-dir <sdk-dir> [--sample <name>] [--out <model-dir>]");
+    console.error(
+      "Usage: prepare-doudou-live2d-sample-model --sdk-dir <sdk-dir> [--sample <name>] [--out <model-dir>] [--overwrite]"
+    );
     return 2;
   }
   const result = await prepareDoudouLive2DSampleModel({
     outputDir: args.outputDir ?? path.join(process.cwd(), "local_live2d_models", "default-doudou-sample"),
+    overwrite: args.overwrite,
     sampleName: args.sampleName,
     sdkDir: args.sdkDir
   });
@@ -167,13 +181,42 @@ async function isDirectory(filePath: string): Promise<boolean> {
   }
 }
 
+async function isSafePreparedOutputDir(outputDir: string): Promise<boolean> {
+  if (path.parse(outputDir).root === outputDir) {
+    return false;
+  }
+  try {
+    const marker = JSON.parse(await readFile(path.join(outputDir, PREPARED_MARKER_FILE), "utf8")) as unknown;
+    return isRecord(marker) &&
+      marker.createdBy === PREPARED_MARKER_CREATED_BY &&
+      marker.model3Json === DEFAULT_MODEL3_JSON;
+  } catch {
+    return false;
+  }
+}
+
+async function writePreparedMarker(
+  outputDir: string,
+  sampleName: string,
+  sourceModel3Json: string
+): Promise<void> {
+  await writeFile(path.join(outputDir, PREPARED_MARKER_FILE), `${JSON.stringify({
+    createdBy: PREPARED_MARKER_CREATED_BY,
+    model3Json: DEFAULT_MODEL3_JSON,
+    sampleName,
+    sourceModel3Json
+  }, null, 2)}\n`, "utf8");
+}
+
 function parseArgs(args: string[]): {
   outputDir?: string;
+  overwrite?: boolean;
   sampleName?: string;
   sdkDir?: string;
 } {
   const parsed: {
     outputDir?: string;
+    overwrite?: boolean;
     sampleName?: string;
     sdkDir?: string;
   } = {};
@@ -188,6 +231,8 @@ function parseArgs(args: string[]): {
     } else if (arg === "--out") {
       parsed.outputDir = args[index + 1];
       index += 1;
+    } else if (arg === "--overwrite") {
+      parsed.overwrite = true;
     }
   }
   return parsed;

@@ -66,6 +66,7 @@ interface ParsedOfficialSmokeArgs {
   mode: DoudouOfficialLive2DRuntimeModuleBuildMode;
   modelDir?: string;
   outputFile?: string;
+  overwriteSample?: boolean;
   sampleModelName?: string;
   sampleOutputDir?: string;
   sdkDir?: string;
@@ -100,6 +101,7 @@ export async function runDoudouOfficialLive2DSmoke(
     const prepareSampleModel = options.prepareSampleModel ?? prepareDoudouLive2DSampleModel;
     const sampleModel = await prepareSampleModel({
       outputDir: sampleOutputDir,
+      overwrite: args.overwriteSample ?? false,
       sampleName: args.sampleModelName,
       sdkDir
     });
@@ -270,6 +272,8 @@ function parseArgs(args: string[]): ParsedOfficialSmokeArgs {
     } else if (arg === "--sample-out" || arg === "--sample-output-dir") {
       parsed.sampleOutputDir = args[index + 1];
       index += 1;
+    } else if (arg === "--overwrite-sample") {
+      parsed.overwriteSample = true;
     } else if (arg === "--mode") {
       parsed.mode = args[index + 1] === "framework" ? "framework" : "sample";
       index += 1;

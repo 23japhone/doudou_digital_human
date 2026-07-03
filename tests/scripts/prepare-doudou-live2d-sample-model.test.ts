@@ -62,6 +62,59 @@ describe("prepareDoudouLive2DSampleModel", () => {
       ok: true,
       expressionCount: DEFAULT_DOUDOU_EMOTION_IDS.length
     });
+    await expect(stat(path.join(outputDir, ".doudou-live2d-sample-model.json"))).resolves.toMatchObject({
+      size: expect.any(Number)
+    });
+  });
+
+  test("overwrites a previously prepared sample output only when explicitly requested", async () => {
+    const root = await createTempDir();
+    const sdkDir = path.join(root, "CubismSdkForWeb");
+    const outputDir = path.join(root, "local_live2d_models", "default-doudou-sample");
+    await writeSyntheticSampleModel(sdkDir, "Mao", { moc: "first moc" });
+    await expect(prepareDoudouLive2DSampleModel({
+      outputDir,
+      sampleName: "Mao",
+      sdkDir
+    })).resolves.toMatchObject({ ok: true });
+    await writeFile(path.join(outputDir, "stale-local-file.txt"), "stale");
+    await writeSyntheticSampleModel(sdkDir, "Mao", { moc: "updated moc" });
+
+    const result = await prepareDoudouLive2DSampleModel({
+      outputDir,
+      overwrite: true,
+      sampleName: "Mao",
+      sdkDir
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    await expect(readFile(path.join(outputDir, "mao.moc3"), "utf8")).resolves.toBe("updated moc");
+    await expect(stat(path.join(outputDir, "stale-local-file.txt"))).rejects.toThrow();
+    await expect(stat(path.join(outputDir, ".doudou-live2d-sample-model.json"))).resolves.toMatchObject({
+      size: expect.any(Number)
+    });
+  });
+
+  test("refuses to overwrite an existing unmarked output directory", async () => {
+    const root = await createTempDir();
+    const sdkDir = path.join(root, "CubismSdkForWeb");
+    const outputDir = path.join(root, "local_live2d_models", "handmade-model");
+    await writeSyntheticSampleModel(sdkDir, "Mao");
+    await mkdir(outputDir, { recursive: true });
+    await writeFile(path.join(outputDir, "user-model.txt"), "do not delete");
+
+    const result = await prepareDoudouLive2DSampleModel({
+      outputDir,
+      overwrite: true,
+      sampleName: "Mao",
+      sdkDir
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      reason: "unsafe_output_dir"
+    });
+    await expect(readFile(path.join(outputDir, "user-model.txt"), "utf8")).resolves.toBe("do not delete");
   });
 });
 
@@ -114,6 +167,47 @@ describe("prepareDoudouLive2DSampleModel CLI", () => {
     expect(consoleCapture.stderr.join("\n")).not.toContain(root);
     expect(consoleCapture.stdout).toEqual([]);
   });
+
+  test("allows rerunning against the same prepared output with explicit overwrite", async () => {
+    const root = await createTempDir();
+    const sdkDir = path.join(root, "CubismSdkForWeb");
+    const outputDir = path.join(root, "local_live2d_models", "default-doudou-sample");
+    await writeSyntheticSampleModel(sdkDir, "Mao", { moc: "first cli moc" });
+    const firstCapture = captureConsole();
+
+    await expect(runPrepareDoudouLive2DSampleModelCli([
+      "node",
+      "prepare-doudou-live2d-sample-model",
+      "--sdk-dir",
+      sdkDir,
+      "--sample",
+      "Mao",
+      "--out",
+      outputDir
+    ])).resolves.toBe(0);
+    vi.restoreAllMocks();
+    await writeSyntheticSampleModel(sdkDir, "Mao", { moc: "second cli moc" });
+    const secondCapture = captureConsole();
+
+    const exitCode = await runPrepareDoudouLive2DSampleModelCli([
+      "node",
+      "prepare-doudou-live2d-sample-model",
+      "--sdk-dir",
+      sdkDir,
+      "--sample",
+      "Mao",
+      "--out",
+      outputDir,
+      "--overwrite"
+    ]);
+
+    expect(exitCode).toBe(0);
+    expect(JSON.parse(firstCapture.stdout.join("\n"))).toMatchObject({ ok: true });
+    expect(JSON.parse(secondCapture.stdout.join("\n"))).toMatchObject({ ok: true });
+    expect(secondCapture.stdout.join("\n")).not.toContain(root);
+    expect(secondCapture.stderr).toEqual([]);
+    await expect(readFile(path.join(outputDir, "mao.moc3"), "utf8")).resolves.toBe("second cli moc");
+  });
 });
 
 async function createTempDir(): Promise<string> {
@@ -122,11 +216,15 @@ async function createTempDir(): Promise<string> {
   return dir;
 }
 
-async function writeSyntheticSampleModel(sdkDir: string, sampleName: string): Promise<void> {
+async function writeSyntheticSampleModel(
+  sdkDir: string,
+  sampleName: string,
+  options: { moc?: string } = {}
+): Promise<void> {
   const sampleDir = path.join(sdkDir, "Samples", "Resources", sampleName);
   await mkdir(path.join(sampleDir, "textures"), { recursive: true });
   await mkdir(path.join(sampleDir, "expressions"), { recursive: true });
-  await writeFile(path.join(sampleDir, "mao.moc3"), "synthetic moc");
+  await writeFile(path.join(sampleDir, "mao.moc3"), options.moc ?? "synthetic moc");
   await writeFile(path.join(sampleDir, "textures", "texture_00.png"), "synthetic texture");
   await writeFile(
     path.join(sampleDir, "expressions", "original.exp3.json"),

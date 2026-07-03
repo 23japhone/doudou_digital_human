@@ -40,6 +40,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
         "Mao",
         "--sample-out",
         sampleOutputDir,
+        "--overwrite-sample",
         "--out",
         outputFile,
         "--mode",
@@ -111,6 +112,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
       {
         prepare: {
           outputDir: sampleOutputDir,
+          overwrite: true,
           sampleName: "Mao",
           sdkDir
         }
@@ -172,6 +174,7 @@ describe("runDoudouOfficialLive2DSmoke", () => {
       prepareSampleModel: async (input) => {
         expect(input).toEqual({
           outputDir: sampleOutputDir,
+          overwrite: false,
           sampleName: "MissingSample",
           sdkDir
         });
