@@ -2,6 +2,9 @@ import { app, BrowserWindow, clipboard, ipcMain, Menu, screen } from "electron";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validatePetBundle, type ValidatedPetBundle } from "../pet_bundle/validate.js";
+import { DEFAULT_DOUDOU_EMOTION_IDS } from "./default-doudou-emotions.js";
+import { toDoudouLive2DExp3Json } from "./default-doudou-exp3.js";
+import { doudouLive2DExpressionForEmotion } from "./default-doudou-live2d.js";
 import {
   calculateDraggedWindowPosition,
   createWindowDragSession,
@@ -9,6 +12,7 @@ import {
   type WindowDragSession
 } from "./drag.js";
 import type {
+  RuntimeDefaultDoudouLive2DRendererSpikeConfig,
   RuntimeBundle,
   RuntimeCursorHitTestResult,
   RuntimeScaleSource,
@@ -65,6 +69,7 @@ const RUNTIME_CLIPBOARD_TEXT_MAX_LENGTH = 512;
 
 interface RuntimeOptions {
   bundleDir: string;
+  live2dRendererSpike: boolean;
   readySignal: boolean;
   smoke: boolean;
   tuning: boolean;
@@ -88,6 +93,7 @@ let smokeMaxEmotionWariness = 0;
 let runtimeMotionTuning = RUNTIME_MOTION_TUNING_DEFAULTS;
 let runtimeMotionTuningEnabled = false;
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = [];
+let live2DRendererSpikeEnabled = false;
 let smokeTimeout: NodeJS.Timeout | null = null;
 let cursorFollowTimer: NodeJS.Timeout | null = null;
 let cursorFollowPausedUntil = 0;
@@ -110,6 +116,7 @@ async function main(): Promise<void> {
 
   smokeMode = options.smoke ?? false;
   readySignalMode = options.readySignal ?? false;
+  live2DRendererSpikeEnabled = Boolean(options.live2dRendererSpike || process.env.DOUDOU_LIVE2D_RENDERER_SPIKE === "1");
   runtimeMotionTuningEnabled = Boolean(options.tuning || process.env.DOUDOU_RUNTIME_TUNING === "1");
   runtimeMotionTuning = runtimeMotionTuningFromEnv(process.env);
   applyRuntimeUserDataDirFromEnv(process.env);
@@ -135,7 +142,12 @@ async function main(): Promise<void> {
 }
 
 function parseArgs(args: string[]): Partial<RuntimeOptions> {
-  const options: Partial<RuntimeOptions> = { readySignal: false, smoke: false, tuning: false };
+  const options: Partial<RuntimeOptions> = {
+    live2dRendererSpike: false,
+    readySignal: false,
+    smoke: false,
+    tuning: false
+  };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--bundle") {
@@ -147,6 +159,8 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
       options.readySignal = true;
     } else if (arg === "--tuning") {
       options.tuning = true;
+    } else if (arg === "--live2d-renderer-spike") {
+      options.live2dRendererSpike = true;
     }
   }
   return options;
@@ -231,6 +245,7 @@ ipcMain.handle("pet:get-bundle", () => {
       id: atlas.id,
       url: pathToFileURL(join(currentBundle!.rootDir, atlas.path)).href
     })),
+    live2DRendererSpike: live2DRendererSpikeEnabled ? createRuntimeDefaultDoudouLive2DRendererSpikeConfig() : null,
     previewUrl: pathToFileURL(join(currentBundle.rootDir, manifest.assets.preview)).href,
     scale: runtimeScale,
     scaleLimits: RUNTIME_SCALE_LIMITS,
@@ -241,6 +256,36 @@ ipcMain.handle("pet:get-bundle", () => {
   };
   return runtimeBundle;
 });
+
+function createRuntimeDefaultDoudouLive2DRendererSpikeConfig(): RuntimeDefaultDoudouLive2DRendererSpikeConfig {
+  const byEmotion = {} as RuntimeDefaultDoudouLive2DRendererSpikeConfig["library"]["byEmotion"];
+  const loadRequests: RuntimeDefaultDoudouLive2DRendererSpikeConfig["library"]["loadRequests"][number][] = [];
+  for (const emotionId of DEFAULT_DOUDOU_EMOTION_IDS) {
+    const spec = doudouLive2DExpressionForEmotion(emotionId);
+    const expressionJson = toDoudouLive2DExp3Json(spec);
+    const request = {
+      emotionId,
+      expressionName: spec.expressionName,
+      expressionFile: spec.expressionFile,
+      motionCue: spec.motionCue,
+      fadeInTime: expressionJson.FadeInTime,
+      fadeOutTime: expressionJson.FadeOutTime,
+      parameterCount: expressionJson.Parameters.length,
+      expressionJson
+    };
+    byEmotion[emotionId] = request;
+    loadRequests.push(request);
+  }
+  return {
+    library: {
+      expressionCount: loadRequests.length,
+      loadRequests,
+      byEmotion
+    },
+    model3Json: "default-doudou.model3.json",
+    modelId: "default-doudou"
+  };
+}
 
 ipcMain.on("pet:set-ignore-mouse-events", (_event, ignore: boolean) => {
   if (!mainWindow || ignore === ignoreMouseEvents) {
@@ -563,12 +608,16 @@ async function tickCursorFollowMotionAsync(): Promise<void> {
     );
   } finally {
     // Passive cursor cues must not move the window; smoke records actual bounds.
-    if (smokeMode && mainWindow) {
+    if (smokeMode && mainWindow && shouldRecordPassiveCursorMovementSmoke()) {
       const appliedBounds = mainWindow.getBounds();
       smokePassiveCursorMovedWindow ||= appliedBounds.x !== currentBounds.x || appliedBounds.y !== currentBounds.y;
     }
     cursorFollowHitTestPending = false;
   }
+}
+
+function shouldRecordPassiveCursorMovementSmoke(nowMs = Date.now()): boolean {
+  return !dragSession && nowMs >= cursorFollowPausedUntil;
 }
 
 interface PendingCursorHitTest {

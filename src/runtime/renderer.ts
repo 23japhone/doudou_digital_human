@@ -1,6 +1,12 @@
 import { createAnimationPlayer } from "./animation.js";
 import type { PetAtlas } from "../pet_bundle/manifest.js";
-import type { RuntimeBundle, RuntimeScaleSource, RuntimeSmokeResult } from "./runtime-types.js";
+import type {
+  RuntimeBundle,
+  RuntimeDefaultDoudouLive2DRendererSpikeConfig,
+  RuntimeLive2DRendererSpikeSmokeResult,
+  RuntimeScaleSource,
+  RuntimeSmokeResult
+} from "./runtime-types.js";
 import {
   doudouEmotionForRuntimeScenario,
   doudouEmotionScenarioForRuntimeState,
@@ -39,6 +45,11 @@ import {
   type RuntimeMotionTuning,
   type RuntimeMotionTuningPreset
 } from "./tuning.js";
+import {
+  createDoudouWebCubismRendererSpike,
+  type DoudouWebCubismRendererSpike,
+  type DoudouWebCubismRendererSpikeRuntime
+} from "./default-doudou-live2d-web-renderer-spike.js";
 import "./styles.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
@@ -109,6 +120,9 @@ const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
 const defaultDoudouEmotionIdsObserved = new Set<DefaultDoudouEmotionId>();
 const defaultDoudouEmotionScenariosObserved = new Set<DefaultDoudouEmotionScenario>();
+let live2DRendererSpike: DoudouWebCubismRendererSpike | null = null;
+let live2DRendererSpikeActiveEmotionId: DefaultDoudouEmotionId = "calm_idle";
+let live2DRendererSpikeSdkCalls: string[] = [];
 type RuntimeMotionTuningKey = keyof RuntimeMotionTuning;
 interface RuntimeTuningControl {
   key: RuntimeMotionTuningKey;
@@ -131,6 +145,7 @@ let tuningPresetStatus: HTMLElement | null = null;
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
 petFrame.style.setProperty("--runtime-frame-padding", `${RUNTIME_FRAME_PADDING}px`);
+setupLive2DRendererSpike();
 applyRuntimePetState(visualState);
 setupRuntimeTuningPanel();
 
@@ -367,6 +382,7 @@ function render(timestamp: number): void {
   applyRuntimePetState(stateMachine.advance(deltaMs, timestamp));
   player.advance(deltaMs);
   drawCurrentFrame();
+  drawLive2DRendererSpikeFrame(timestamp);
   reportSmokeResultIfReady();
   requestAnimationFrame(render);
 }
@@ -554,7 +570,8 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     initialFrameIndex: initialFrameIndex ?? -1,
     currentFrameIndex,
     frameHiddenByDefault: isRuntimeFrameHiddenByDefault(),
-    frameVisibleOnResizeEdge: isRuntimeFrameVisibleOnResizeEdge()
+    frameVisibleOnResizeEdge: isRuntimeFrameVisibleOnResizeEdge(),
+    live2DRendererSpike: live2DRendererSpikeSmokeResult()
   };
 }
 
@@ -843,6 +860,7 @@ function recordDefaultDoudouEmotionState(state: RuntimePetState, previousState: 
   petFrame.dataset.doudouEmotionLabel = scenarioEmotion.labelZh;
   defaultDoudouEmotionIdsObserved.add(scenarioEmotion.id);
   defaultDoudouEmotionScenariosObserved.add(scenario);
+  switchLive2DRendererSpikeExpression(scenarioEmotion.id);
 }
 
 function isRuntimeVisualStateApplied(): boolean {
@@ -947,4 +965,159 @@ function canvasHasNonTransparentPixel(): boolean {
     }
   }
   return false;
+}
+
+function setupLive2DRendererSpike(): void {
+  const config = bundle.live2DRendererSpike;
+  if (!config) {
+    return;
+  }
+  live2DRendererSpikeSdkCalls = [];
+  live2DRendererSpikeActiveEmotionId = "calm_idle";
+  live2DRendererSpike = createDoudouWebCubismRendererSpike({
+    modelId: config.modelId,
+    model3Json: config.model3Json,
+    runtime: createInstrumentedLive2DRendererSpikeRuntime(config)
+  });
+  live2DRendererSpike.loadDefaultModel(config.library);
+}
+
+function createInstrumentedLive2DRendererSpikeRuntime(
+  config: RuntimeDefaultDoudouLive2DRendererSpikeConfig
+): DoudouWebCubismRendererSpikeRuntime {
+  type InstrumentedMotion = {
+    emotionId: DefaultDoudouEmotionId;
+    id: string;
+  };
+  let nextExpressionIndex = 0;
+  let activeExpressionEmotionId: DefaultDoudouEmotionId = "calm_idle";
+
+  return {
+    CubismExpressionMotion: {
+      create(buffer, size) {
+        const expressionJson = JSON.parse(new TextDecoder().decode(buffer.slice(0, size))) as {
+          Parameters?: unknown;
+          Type?: unknown;
+        };
+        const request = config.library.loadRequests[nextExpressionIndex];
+        nextExpressionIndex += 1;
+        const emotionId = request?.emotionId ?? "calm_idle";
+        const parameterCount = Array.isArray(expressionJson.Parameters) ? expressionJson.Parameters.length : 0;
+        live2DRendererSpikeSdkCalls.push(
+          `CubismExpressionMotion.create:${String(expressionJson.Type)}:${parameterCount}`
+        );
+        return {
+          emotionId,
+          id: `renderer-motion:${emotionId}`
+        };
+      }
+    },
+    expressionManager: {
+      startMotionPriority(motion, autoDelete, priority) {
+        const expressionMotion = motion as InstrumentedMotion;
+        activeExpressionEmotionId = expressionMotion.emotionId;
+        live2DRendererSpikeSdkCalls.push(
+          `CubismMotionManager.startMotionPriority:${expressionMotion.id}:${autoDelete}:${priority}`
+        );
+      },
+      updateMotion(_model, deltaTimeSeconds) {
+        live2DRendererSpikeSdkCalls.push(`CubismMotionManager.updateMotion:${deltaTimeSeconds.toFixed(3)}`);
+        return true;
+      }
+    },
+    model: {
+      update() {
+        live2DRendererSpikeSdkCalls.push("CubismModel.update");
+      }
+    },
+    renderer: {
+      drawModel() {
+        live2DRendererSpikeSdkCalls.push("CubismRenderer.drawModel");
+        drawLive2DExpressionOverlay(activeExpressionEmotionId);
+      }
+    }
+  };
+}
+
+function drawLive2DRendererSpikeFrame(timestamp: number): void {
+  if (!live2DRendererSpike) {
+    return;
+  }
+  live2DRendererSpike.renderFrame(timestamp);
+}
+
+function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmotionId): void {
+  const config = bundle.live2DRendererSpike;
+  if (!config || !live2DRendererSpike || targetEmotionId === live2DRendererSpikeActiveEmotionId) {
+    return;
+  }
+  const playback = live2DRendererSpike.switchExpression(
+    config.library,
+    live2DRendererSpikeActiveEmotionId,
+    targetEmotionId,
+    performance.now(),
+    "normal"
+  );
+  if (playback.ok) {
+    live2DRendererSpikeActiveEmotionId = targetEmotionId;
+  }
+}
+
+function live2DRendererSpikeSmokeResult(): RuntimeLive2DRendererSpikeSmokeResult | null {
+  if (!live2DRendererSpike) {
+    return null;
+  }
+  return {
+    ...live2DRendererSpike.evidence(),
+    enabled: true,
+    sdkCallsObserved: live2DRendererSpikeSdkCalls.slice(0, 96)
+  };
+}
+
+function drawLive2DExpressionOverlay(emotionId: DefaultDoudouEmotionId): void {
+  if (!bundle.live2DRendererSpike || emotionId === "calm_idle") {
+    return;
+  }
+  const color = live2DExpressionOverlayColor(emotionId);
+  drawingContext.save();
+  drawingContext.globalCompositeOperation = "source-over";
+  drawingContext.globalAlpha = 0.38;
+  drawingContext.fillStyle = color;
+  drawingContext.beginPath();
+  drawingContext.ellipse(78, 122, 18, 10, -0.18, 0, Math.PI * 2);
+  drawingContext.ellipse(178, 122, 18, 10, 0.18, 0, Math.PI * 2);
+  drawingContext.fill();
+  drawingContext.globalAlpha = 0.48;
+  drawingContext.beginPath();
+  drawingContext.arc(196, 72, 5, 0, Math.PI * 2);
+  drawingContext.arc(206, 88, 3, 0, Math.PI * 2);
+  drawingContext.fill();
+  drawingContext.restore();
+}
+
+function live2DExpressionOverlayColor(emotionId: DefaultDoudouEmotionId): string {
+  switch (emotionId) {
+    case "annoyed_pout":
+      return "#ff8a65";
+    case "comfort_soft":
+      return "#75d6b5";
+    case "curious_tilt":
+      return "#78a8ff";
+    case "delighted":
+    case "happy_smile":
+      return "#ffc857";
+    case "focused_working":
+      return "#72d1ff";
+    case "sad_soft":
+    case "teary":
+      return "#8ab4ff";
+    case "shy_blush":
+      return "#ff8fb3";
+    case "sleepy":
+      return "#b49cff";
+    case "surprised":
+      return "#ffdf7e";
+    case "calm_idle":
+      return "#ffffff";
+  }
 }

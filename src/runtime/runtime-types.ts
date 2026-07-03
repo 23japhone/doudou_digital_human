@@ -1,5 +1,7 @@
 import type { PetManifest } from "../pet_bundle/manifest.js";
 import type { DefaultDoudouEmotionId, DefaultDoudouEmotionScenario } from "./default-doudou-emotions.js";
+import type { DoudouLive2DPreviewLibrary } from "./default-doudou-live2d-preview.js";
+import type { DoudouWebCubismRendererSpikeEvidence } from "./default-doudou-live2d-web-renderer-spike.js";
 import type { ScreenPoint } from "./drag.js";
 import type { RuntimeScaleLimits } from "./scale.js";
 import type { RuntimePetMotionCue, RuntimePetState } from "./state.js";
@@ -27,6 +29,7 @@ export interface RuntimeCursorHitTestResult {
 export interface RuntimeBundle {
   manifest: PetManifest;
   atlases: RuntimeAtlas[];
+  live2DRendererSpike: RuntimeDefaultDoudouLive2DRendererSpikeConfig | null;
   previewUrl: string;
   scale: number;
   scaleLimits: RuntimeScaleLimits;
@@ -34,6 +37,17 @@ export interface RuntimeBundle {
   motionTuning: RuntimeMotionTuning;
   motionTuningEnabled: boolean;
   motionTuningPresets: RuntimeMotionTuningPreset[];
+}
+
+export interface RuntimeDefaultDoudouLive2DRendererSpikeConfig {
+  library: DoudouLive2DPreviewLibrary;
+  model3Json: "default-doudou.model3.json";
+  modelId: "default-doudou";
+}
+
+export interface RuntimeLive2DRendererSpikeSmokeResult extends DoudouWebCubismRendererSpikeEvidence {
+  enabled: boolean;
+  sdkCallsObserved: string[];
 }
 
 export interface PetRuntimeBridge {
@@ -92,4 +106,5 @@ export interface RuntimeSmokeResult {
   currentFrameIndex: number;
   frameHiddenByDefault: boolean;
   frameVisibleOnResizeEdge: boolean;
+  live2DRendererSpike: RuntimeLive2DRendererSpikeSmokeResult | null;
 }

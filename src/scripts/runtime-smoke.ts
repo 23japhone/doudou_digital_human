@@ -89,6 +89,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.idleAdvanced ||
     !smokeResult.frameHiddenByDefault ||
     !smokeResult.frameVisibleOnResizeEdge ||
+    !hasLive2DRendererSpike(smokeResult.live2DRendererSpike) ||
     !smokeResult.renderLoopAdvanced ||
     smokeResult.scale <= 1 ||
     smokeResult.drawCount < 2
@@ -146,6 +147,43 @@ function hasTapExpressionFrames(frames: number[]): boolean {
   return [4, 5, 6].every((frame) => frames.includes(frame));
 }
 
+function hasLive2DRendererSpike(spike: {
+  activeEmotionId: string;
+  drawModelCalls: number;
+  enabled: boolean;
+  expressionCount: number;
+  expressionOverlayApplied: boolean;
+  expressionSwitches: number;
+  frameLoopAdvanced: boolean;
+  modelId: string;
+  modelLoaded: boolean;
+  modelUpdateCalls: number;
+  sdkCallsObserved: string[];
+  updateMotionCalls: number;
+} | null): boolean {
+  if (!spike) {
+    return false;
+  }
+  return (
+    spike.enabled &&
+    spike.modelId === "default-doudou" &&
+    spike.modelLoaded &&
+    spike.expressionCount === 12 &&
+    spike.expressionSwitches > 0 &&
+    spike.expressionOverlayApplied &&
+    spike.frameLoopAdvanced &&
+    spike.updateMotionCalls >= 2 &&
+    spike.modelUpdateCalls >= 2 &&
+    spike.drawModelCalls >= 2 &&
+    spike.activeEmotionId !== "calm_idle" &&
+    spike.sdkCallsObserved.some((call) => call.startsWith("CubismExpressionMotion.create")) &&
+    spike.sdkCallsObserved.some((call) => call.startsWith("CubismMotionManager.startMotionPriority")) &&
+    spike.sdkCallsObserved.some((call) => call.startsWith("CubismMotionManager.updateMotion")) &&
+    spike.sdkCallsObserved.includes("CubismModel.update") &&
+    spike.sdkCallsObserved.includes("CubismRenderer.drawModel")
+  );
+}
+
 async function assertInvalidBundleFails(
   label: string,
   tempRoot: string,
@@ -187,7 +225,14 @@ function createSmokeSourcePng(): Buffer {
 function runRuntime(bundleDir: string): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
     const runtimeUserDataDir = path.join(tmpdir(), `runtime-smoke-user-data-${process.pid}-${Date.now()}`);
-    const child = spawn(electronBin, [runtimeMain, "--bundle", bundleDir, "--smoke", "--tuning"], {
+    const child = spawn(electronBin, [
+      runtimeMain,
+      "--bundle",
+      bundleDir,
+      "--smoke",
+      "--tuning",
+      "--live2d-renderer-spike"
+    ], {
       cwd: repoRoot,
       env: { ...process.env, DOUDOU_RUNTIME_USER_DATA_DIR: runtimeUserDataDir, NODE_OPTIONS: "" },
       stdio: ["ignore", "pipe", "pipe"]
@@ -259,6 +304,20 @@ function parseSmokeResult(output: string) {
     currentFrameIndex: number;
     frameHiddenByDefault: boolean;
     frameVisibleOnResizeEdge: boolean;
+    live2DRendererSpike: {
+      activeEmotionId: string;
+      drawModelCalls: number;
+      enabled: boolean;
+      expressionCount: number;
+      expressionOverlayApplied: boolean;
+      expressionSwitches: number;
+      frameLoopAdvanced: boolean;
+      modelId: string;
+      modelLoaded: boolean;
+      modelUpdateCalls: number;
+      sdkCallsObserved: string[];
+      updateMotionCalls: number;
+    } | null;
   };
 }
 

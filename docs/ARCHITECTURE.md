@@ -40,7 +40,7 @@ Current implementation layout:
 - `src/review/` for preview, QA, accept/install, and deletion workflows that consume already generated bundles.
 - `src/app/` for the guided desktop manager UI and app-level flow orchestration.
 - `src/runtime/` for desktop overlay and behavior state machine.
-- `src/runtime/default-doudou-exp3.ts`, `src/runtime/default-doudou-live2d-preview.ts`, `src/runtime/default-doudou-live2d-cubism-adapter.ts`, `src/runtime/default-doudou-live2d-web-cubism-backend.ts`, `src/cli/doudou-live2d-exp3.ts`, and `src/cli/doudou-live2d-preview.ts` for default 兜兜 Live2D `.exp3.json` research fixture generation, validation, preview switching, SDK-adapter boundary checks, and isolated Web SDK facade experiments. These files stay outside `pet bundle v0.1`.
+- `src/runtime/default-doudou-exp3.ts`, `src/runtime/default-doudou-live2d-preview.ts`, `src/runtime/default-doudou-live2d-cubism-adapter.ts`, `src/runtime/default-doudou-live2d-web-cubism-backend.ts`, `src/runtime/default-doudou-live2d-web-renderer-spike.ts`, `src/cli/doudou-live2d-exp3.ts`, and `src/cli/doudou-live2d-preview.ts` for default 兜兜 Live2D `.exp3.json` research fixture generation, validation, preview switching, SDK-adapter boundary checks, isolated Web SDK facade experiments, and renderer-side lifecycle smoke. These files stay outside `pet bundle v0.1`.
 - `tests/<domain>/` for tests mirroring source domains.
 - `fixtures/<domain>/` for small, rights-safe sample assets.
 
@@ -71,6 +71,7 @@ Root files should be limited to stable entrypoints, project config, and compatib
 - The guided app owns user workflow state and local workspace paths, but launch still hands only an accepted bundle path to the desktop runtime. When launched from the guided app, the app keeps the child-process handle so the user can stop that managed desktop pet, including during app quit, without changing the runtime or pet bundle contract.
 - The guided app's developer style comparison wraps `qa:stylizer:compare` as a manager-only preview surface. It writes local derived preview PNGs, a contact sheet, and a sanitized report under the app workspace; renderer state exposes only artifact URLs and never source paths. These artifacts are not pet bundles and are not consumed by the runtime.
 - Guided cloud mode supports `mock-provider` by default and an `openai-image` live provider only when `DOUDOU_ENABLE_OPENAI_LIVE=1` and `OPENAI_API_KEY` are set. Both cloud modes still require explicit upload confirmation before generation.
+- The Web Cubism renderer spike is runtime-only and flag-gated by `--live2d-renderer-spike` / `DOUDOU_LIVE2D_RENDERER_SPIKE=1`. Main injects a default 兜兜 preview library into the renderer; the renderer uses an official Web SDK-shaped runtime object to exercise expression creation, expression playback, `updateMotion`, model update, and draw lifecycle evidence without changing bundle schema or committing Cubism Core/model assets.
 
 ## Open Questions
 
