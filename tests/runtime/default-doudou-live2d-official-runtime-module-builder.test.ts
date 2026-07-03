@@ -90,6 +90,7 @@ describe("default doudou official Live2D runtime module builder", () => {
         updateCalls: 2
       });
       expect(calls).toContain("LAppModel.setSubdelegate:true");
+      expect(calls.filter((call) => call === "LAppPal.updateTime").length).toBeGreaterThanOrEqual(3);
       expect(calls).toContain("LAppModel.loadAssets:file:///models/:default-doudou.model3.json");
       expect(calls.filter((call) => call.startsWith("LAppModel.loadExpression:")).length).toBe(12);
       expect(calls.filter((call) => call.startsWith("LAppModel.expressionMap.setValue:")).length).toBe(12);
@@ -99,6 +100,10 @@ describe("default doudou official Live2D runtime module builder", () => {
       expect(calls).toContain("LAppModel.expressionUpdateMotion:0.033");
       expect(calls.filter((call) => call === "LAppModel.update").length).toBe(2);
       expect(calls.filter((call) => call === "LAppModel.draw:true").length).toBe(2);
+      const firstFrameTimeIndex = calls.indexOf("LAppPal.updateTime", calls.indexOf("LAppModel.setExpression:兜兜开心发光"));
+      const firstFrameUpdateIndex = calls.indexOf("LAppModel.update");
+      expect(firstFrameTimeIndex).toBeGreaterThanOrEqual(0);
+      expect(firstFrameTimeIndex).toBeLessThan(firstFrameUpdateIndex);
       expect(JSON.stringify(host.evidence())).not.toContain(tempRoot);
     } finally {
       delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
@@ -379,6 +384,18 @@ export class CubismMatrix44 {
 export class CubismExpressionUpdater {
   constructor(expressionManager) {
     this.expressionManager = expressionManager;
+  }
+}
+`,
+    "utf8"
+  );
+  await writeFile(
+    path.join(sdkDir, "Samples/TypeScript/Demo/src/lapppal.ts"),
+    `
+const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
+export class LAppPal {
+  static updateTime() {
+    calls().push("LAppPal.updateTime");
   }
 }
 `,

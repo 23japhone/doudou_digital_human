@@ -33,6 +33,7 @@ export interface BuildDoudouOfficialLive2DRendererRuntimeModuleInput {
 
 const FRAMEWORK_SOURCE = "Framework/src";
 const SAMPLE_LAPP_MODEL = "Samples/TypeScript/Demo/src/lappmodel.ts";
+const SAMPLE_LAPP_PAL = "Samples/TypeScript/Demo/src/lapppal.ts";
 const SAMPLE_SOURCE = "Samples/TypeScript/Demo/src";
 const REQUIRED_SAMPLE_RUNTIME_FILES = [
   "live2dcubismframework.ts",
@@ -193,7 +194,11 @@ async function missingRuntimeReasonForMode(options: {
   sampleSourceDir: string;
   sdkDir: string;
 }): Promise<DoudouOfficialLive2DRuntimeModuleBuildFailureReason | null> {
-  if (options.mode === "sample" && !await exists(path.join(options.sdkDir, SAMPLE_LAPP_MODEL))) {
+  if (
+    options.mode === "sample" &&
+    (!await exists(path.join(options.sdkDir, SAMPLE_LAPP_MODEL)) ||
+      !await exists(path.join(options.sdkDir, SAMPLE_LAPP_PAL)))
+  ) {
     return "sdk_sample_runtime_missing";
   }
   const requiredFrameworkFiles = options.mode === "sample"
@@ -255,6 +260,7 @@ import { CubismFramework, LogLevel, Option } from "@framework/live2dcubismframew
 import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
 import { CubismExpressionUpdater } from "@framework/motion/cubismexpressionupdater";
 import { LAppModel } from "@sample/lappmodel";
+import { LAppPal } from "@sample/lapppal";
 
 export function createDoudouOfficialLive2DRendererRuntime(options) {
   return new DefaultDoudouOfficialSampleLive2DRendererRuntime(options);
@@ -276,6 +282,7 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
     this.model.setSubdelegate(createSampleSubdelegate(this.canvas, this.gl));
     this.instrumentExpressionManager();
     ensureCubismFrameworkStarted();
+    updateSampleFrameTime();
   }
 
   evidence() {
@@ -317,6 +324,7 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
 
   update(deltaTimeSeconds) {
     this.instrumentExpressionManager();
+    updateSampleFrameTime();
     if (!this.model.__doudouExpressionUpdaterAttached && !this.model._updateScheduler?.onLateUpdate) {
       this.model._expressionManager?.updateMotion?.(this.model._model, deltaTimeSeconds);
     }
@@ -351,6 +359,12 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
       return updateMotion(...args);
     };
     expressionManager.__doudouUpdateMotionInstrumented = true;
+  }
+}
+
+function updateSampleFrameTime() {
+  if (typeof LAppPal?.updateTime === "function") {
+    LAppPal.updateTime();
   }
 }
 
