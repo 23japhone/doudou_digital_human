@@ -31,6 +31,13 @@
 - Fixture validation: `npm run validate:fixture`
 - Runtime smoke: `npm run smoke:runtime`
 
+## Local Official Live2D SDK Setup
+
+- Do not use third-party npm mirrors of `live2dcubismcore` as official renderer proof. The real smoke path expects Live2D's Cubism Core from the official Web SDK download or hosting-use Core package, kept only in local ignored storage.
+- If the full official SDK package is not already unpacked, the open-source official Samples/Framework half can be staged locally with `git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Live2D/CubismWebSamples.git local_live2d_sdk/CubismWebSamples`, then copy the official `live2dcubismcore.js` or `live2dcubismcore.min.js` into `local_live2d_sdk/CubismWebSamples/Core/`.
+- A Core-less GitHub clone is useful for preparing Mao Sample Data, but the real smoke should fail at preflight with `sdk_core_missing` until the official Core file is present. That failure is expected and means the model rewrite path was reached but the licensed runtime prerequisite is still missing.
+- To avoid overwriting older unmarked local model directories, use a fresh ignored output such as `local_live2d_models/default-doudou-sample-fresh` when testing a newly cloned SDK path.
+
 ## Test Strategy
 
 - Unit test image validation, manifest parsing, bundle validation, and behavior state transitions.
