@@ -321,10 +321,10 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
       modelUpdateCalls: 0,
       updateMotionCalls: 0
     };
+    ensureCubismFrameworkStarted();
     this.model = new LAppModel();
     this.model.setSubdelegate(createSampleSubdelegate(this.canvas, this.gl, this.model));
     this.instrumentExpressionManager();
-    ensureCubismFrameworkStarted();
     updateSampleFrameTime();
   }
 

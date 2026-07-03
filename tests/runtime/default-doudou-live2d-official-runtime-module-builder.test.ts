@@ -89,6 +89,14 @@ describe("default doudou official Live2D runtime module builder", () => {
         runtimeModuleProbe: "loaded",
         updateCalls: 2
       });
+      const frameworkStartIndex = calls.indexOf("CubismFramework.startUp");
+      const frameworkInitializeIndex = calls.indexOf("CubismFramework.initialize");
+      const modelConstructorIndex = calls.indexOf("LAppModel.constructor");
+      expect(frameworkStartIndex).toBeGreaterThanOrEqual(0);
+      expect(frameworkInitializeIndex).toBeGreaterThanOrEqual(0);
+      expect(modelConstructorIndex).toBeGreaterThanOrEqual(0);
+      expect(frameworkStartIndex).toBeLessThan(modelConstructorIndex);
+      expect(frameworkInitializeIndex).toBeLessThan(modelConstructorIndex);
       expect(calls).toContain("LAppModel.setSubdelegate:true");
       expect(calls.filter((call) => call === "LAppPal.updateTime").length).toBeGreaterThanOrEqual(3);
       expect(calls).toContain("LAppModel.loadAssets:file:///models/:default-doudou.model3.json");
@@ -1184,6 +1192,7 @@ async function writeSyntheticCubismSampleSdk(
   await writeFile(
     path.join(sdkDir, "Framework/src/live2dcubismframework.ts"),
     `
+const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
 export class Option {
   logFunction = () => {};
   loggingLevel = LogLevel.LogLevel_Off;
@@ -1193,9 +1202,12 @@ export enum LogLevel {
 }
 export class CubismFramework {
   static startUp() {
+    calls().push("CubismFramework.startUp");
     return true;
   }
-  static initialize() {}
+  static initialize() {
+    calls().push("CubismFramework.initialize");
+  }
   static isStarted() {
     return false;
   }
@@ -1255,6 +1267,7 @@ const readiness = ${JSON.stringify(readiness)};
 const setExpressionResult = ${JSON.stringify(setExpressionResult)};
 export class LAppModel {
   constructor() {
+    calls().push("LAppModel.constructor");
     this._model = {};
     if (expressionMap === "csmMap") {
       const values = new Map();
