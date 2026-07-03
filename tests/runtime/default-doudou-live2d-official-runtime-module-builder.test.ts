@@ -9,6 +9,88 @@ import { createDoudouOfficialLive2DRendererHost } from "../../src/runtime/defaul
 import { loadDefaultDoudouLive2DPreviewLibrary } from "../../src/runtime/default-doudou-live2d-preview.js";
 
 describe("default doudou official Live2D runtime module builder", () => {
+  test("bundles the official sample LAppModel runtime mode that the renderer host can drive", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-runtime-builder-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir);
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toEqual({
+        ok: true,
+        moduleFormat: "external_es_module",
+        outputFileName: "default-doudou-sample-runtime.mjs",
+        sdk: {
+          frameworkSource: "Framework/src",
+          sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
+        }
+      });
+      expect(await readFile(outputFile, "utf8")).not.toContain(tempRoot);
+
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async (coreScriptUrl) => {
+          calls.push(`loadCore:${coreScriptUrl}`);
+        }
+      });
+
+      await host.loadDefaultModel(library);
+      await host.switchExpression(library, "delighted");
+      host.renderFrame(1000);
+      host.renderFrame(1033);
+
+      expect(host.evidence()).toMatchObject({
+        activeEmotionId: "delighted",
+        drawCalls: 2,
+        expressionCount: 12,
+        expressionSwitches: 1,
+        frameLoopAdvanced: true,
+        modelLoaded: true,
+        runtimeModuleProbe: "loaded",
+        updateCalls: 2
+      });
+      expect(calls).toContain("LAppModel.setSubdelegate:true");
+      expect(calls).toContain("LAppModel.loadAssets:file:///models/:default-doudou.model3.json");
+      expect(calls.filter((call) => call.startsWith("LAppModel.loadExpression:")).length).toBe(12);
+      expect(calls).toContain("LAppModel.setExpression:兜兜开心发光");
+      expect(calls).toContain("LAppModel.expressionUpdateMotion:0.000");
+      expect(calls).toContain("LAppModel.expressionUpdateMotion:0.033");
+      expect(calls.filter((call) => call === "LAppModel.update").length).toBe(2);
+      expect(calls.filter((call) => call === "LAppModel.draw:true").length).toBe(2);
+      expect(JSON.stringify(host.evidence())).not.toContain(tempRoot);
+    } finally {
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("bundles a local Cubism Framework wrapper that the renderer host can drive", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-runtime-builder-"));
     const originalFetch = globalThis.fetch;
@@ -17,7 +99,11 @@ describe("default doudou official Live2D runtime module builder", () => {
       const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-official-runtime.mjs");
       await writeSyntheticCubismFrameworkSdk(sdkDir);
 
-      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({ outputFile, sdkDir });
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "framework",
+        outputFile,
+        sdkDir
+      });
 
       expect(buildResult).toEqual({
         ok: true,
@@ -104,6 +190,7 @@ describe("default doudou official Live2D runtime module builder", () => {
       await mkdir(path.join(sdkDir, "Framework/src"), { recursive: true });
 
       const result = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "framework",
         outputFile: path.join(tempRoot, "runtime.mjs"),
         sdkDir
       });
@@ -118,6 +205,98 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 });
+
+async function writeSyntheticCubismSampleSdk(sdkDir: string): Promise<void> {
+  await mkdir(path.join(sdkDir, "Framework/src/live2dcubismframework.ts", ".."), { recursive: true });
+  await mkdir(path.join(sdkDir, "Framework/src/math"), { recursive: true });
+  await mkdir(path.join(sdkDir, "Framework/src/motion"), { recursive: true });
+  await mkdir(path.join(sdkDir, "Samples/TypeScript/Demo/src"), { recursive: true });
+  await writeFile(
+    path.join(sdkDir, "Framework/src/live2dcubismframework.ts"),
+    `
+export class Option {
+  logFunction = () => {};
+  loggingLevel = LogLevel.LogLevel_Off;
+}
+export enum LogLevel {
+  LogLevel_Off = 5
+}
+export class CubismFramework {
+  static startUp() {
+    return true;
+  }
+  static initialize() {}
+  static isStarted() {
+    return false;
+  }
+  static isInitialized() {
+    return false;
+  }
+}
+`,
+    "utf8"
+  );
+  await writeFile(
+    path.join(sdkDir, "Framework/src/math/cubismmatrix44.ts"),
+    `
+export class CubismMatrix44 {
+  multiplyByMatrix() {}
+  scale() {}
+}
+`,
+    "utf8"
+  );
+  await writeFile(
+    path.join(sdkDir, "Framework/src/motion/cubismexpressionupdater.ts"),
+    `
+export class CubismExpressionUpdater {
+  constructor(expressionManager) {
+    this.expressionManager = expressionManager;
+  }
+}
+`,
+    "utf8"
+  );
+  await writeFile(
+    path.join(sdkDir, "Samples/TypeScript/Demo/src/lappmodel.ts"),
+    `
+import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
+const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
+export class LAppModel {
+  constructor() {
+    this._model = {};
+    this._expressionManager = {
+      updateMotion(_model, deltaTimeSeconds) {
+        calls().push("LAppModel.expressionUpdateMotion:" + deltaTimeSeconds.toFixed(3));
+      }
+    };
+  }
+  setSubdelegate(subdelegate) {
+    this.subdelegate = subdelegate;
+    calls().push("LAppModel.setSubdelegate:" + Boolean(subdelegate.getCanvas()));
+  }
+  loadAssets(dir, fileName) {
+    this.loaded = true;
+    calls().push("LAppModel.loadAssets:" + dir + ":" + fileName);
+  }
+  loadExpression(_buffer, size, name) {
+    calls().push("LAppModel.loadExpression:" + name + ":" + size);
+    return { name };
+  }
+  setExpression(name) {
+    calls().push("LAppModel.setExpression:" + name);
+  }
+  update() {
+    calls().push("LAppModel.update");
+  }
+  draw(matrix) {
+    calls().push("LAppModel.draw:" + (matrix instanceof CubismMatrix44));
+  }
+}
+`,
+    "utf8"
+  );
+}
 
 function createFakeCanvas(): HTMLCanvasElement {
   const gl = {

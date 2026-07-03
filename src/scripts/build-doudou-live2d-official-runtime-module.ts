@@ -5,7 +5,10 @@ import { build, type InlineConfig } from "vite";
 
 export type DoudouOfficialLive2DRuntimeModuleBuildFailureReason =
   | "build_failed"
-  | "sdk_framework_runtime_missing";
+  | "sdk_framework_runtime_missing"
+  | "sdk_sample_runtime_missing";
+
+export type DoudouOfficialLive2DRuntimeModuleBuildMode = "framework" | "sample";
 
 export type DoudouOfficialLive2DRuntimeModuleBuildResult =
   | {
@@ -14,6 +17,7 @@ export type DoudouOfficialLive2DRuntimeModuleBuildResult =
     outputFileName: string;
     sdk: {
       frameworkSource: "Framework/src";
+      sampleLAppModel?: "Samples/TypeScript/Demo/src/lappmodel.ts";
     };
   }
   | {
@@ -22,11 +26,19 @@ export type DoudouOfficialLive2DRuntimeModuleBuildResult =
   };
 
 export interface BuildDoudouOfficialLive2DRendererRuntimeModuleInput {
+  mode?: DoudouOfficialLive2DRuntimeModuleBuildMode;
   outputFile: string;
   sdkDir: string;
 }
 
 const FRAMEWORK_SOURCE = "Framework/src";
+const SAMPLE_LAPP_MODEL = "Samples/TypeScript/Demo/src/lappmodel.ts";
+const SAMPLE_SOURCE = "Samples/TypeScript/Demo/src";
+const REQUIRED_SAMPLE_RUNTIME_FILES = [
+  "live2dcubismframework.ts",
+  "math/cubismmatrix44.ts",
+  "motion/cubismexpressionupdater.ts"
+] as const;
 const REQUIRED_FRAMEWORK_RUNTIME_FILES = [
   "live2dcubismframework.ts",
   "cubismmodelsettingjson.ts",
@@ -41,13 +53,21 @@ const REQUIRED_FRAMEWORK_RUNTIME_FILES = [
 export async function buildDoudouOfficialLive2DRendererRuntimeModule(
   input: BuildDoudouOfficialLive2DRendererRuntimeModuleInput
 ): Promise<DoudouOfficialLive2DRuntimeModuleBuildResult> {
+  const mode = input.mode ?? "sample";
   const sdkDir = path.resolve(input.sdkDir);
   const outputFile = path.resolve(input.outputFile);
   const frameworkSourceDir = path.join(sdkDir, FRAMEWORK_SOURCE);
-  if (!await hasRequiredFrameworkRuntimeFiles(frameworkSourceDir)) {
+  const sampleSourceDir = path.join(sdkDir, SAMPLE_SOURCE);
+  const missingRuntimeReason = await missingRuntimeReasonForMode({
+    frameworkSourceDir,
+    mode,
+    sampleSourceDir,
+    sdkDir
+  });
+  if (missingRuntimeReason) {
     return {
       ok: false,
-      reason: "sdk_framework_runtime_missing"
+      reason: missingRuntimeReason
     };
   }
 
@@ -55,8 +75,10 @@ export async function buildDoudouOfficialLive2DRendererRuntimeModule(
     await mkdir(path.dirname(outputFile), { recursive: true });
     await build(createRuntimeModuleBuildConfig({
       frameworkSourceDir,
+      mode,
       outputDir: path.dirname(outputFile),
-      outputFileName: path.basename(outputFile)
+      outputFileName: path.basename(outputFile),
+      sampleSourceDir
     }));
     await stripBundlerPathComments(outputFile);
   } catch {
@@ -70,9 +92,14 @@ export async function buildDoudouOfficialLive2DRendererRuntimeModule(
     ok: true,
     moduleFormat: "external_es_module",
     outputFileName: path.basename(outputFile),
-    sdk: {
-      frameworkSource: FRAMEWORK_SOURCE
-    }
+    sdk: mode === "sample"
+      ? {
+        frameworkSource: FRAMEWORK_SOURCE,
+        sampleLAppModel: SAMPLE_LAPP_MODEL
+      }
+      : {
+        frameworkSource: FRAMEWORK_SOURCE
+      }
   };
 }
 
@@ -81,7 +108,9 @@ export async function runBuildDoudouOfficialLive2DRendererRuntimeModuleCli(
 ): Promise<number> {
   const options = parseArgs(argv.slice(2));
   if (!options.sdkDir || !options.outputFile) {
-    console.error("Usage: build-doudou-live2d-official-runtime-module --sdk-dir <sdk-dir> --out <module-file>");
+    console.error(
+      "Usage: build-doudou-live2d-official-runtime-module --sdk-dir <sdk-dir> --out <module-file> [--mode sample|framework]"
+    );
     return 2;
   }
 
@@ -100,9 +129,14 @@ export async function runBuildDoudouOfficialLive2DRendererRuntimeModuleCli(
 
 function createRuntimeModuleBuildConfig(options: {
   frameworkSourceDir: string;
+  mode: DoudouOfficialLive2DRuntimeModuleBuildMode;
   outputDir: string;
   outputFileName: string;
+  sampleSourceDir: string;
 }): InlineConfig {
+  const entrySource = options.mode === "sample"
+    ? DOUDOU_OFFICIAL_SAMPLE_RUNTIME_MODULE_SOURCE
+    : DOUDOU_OFFICIAL_FRAMEWORK_RUNTIME_MODULE_SOURCE;
   return {
     build: {
       emptyOutDir: false,
@@ -127,7 +161,7 @@ function createRuntimeModuleBuildConfig(options: {
               return source === "\0doudou-official-runtime-entry" ? source : null;
             },
             load(id) {
-              return id === "\0doudou-official-runtime-entry" ? DOUDOU_OFFICIAL_RUNTIME_MODULE_SOURCE : null;
+              return id === "\0doudou-official-runtime-entry" ? entrySource : null;
             }
           }
         ]
@@ -142,14 +176,39 @@ function createRuntimeModuleBuildConfig(options: {
         {
           find: "@framework",
           replacement: options.frameworkSourceDir
+        },
+        {
+          find: "@sample",
+          replacement: options.sampleSourceDir
         }
       ]
     }
   };
 }
 
-async function hasRequiredFrameworkRuntimeFiles(frameworkSourceDir: string): Promise<boolean> {
-  for (const relativeFile of REQUIRED_FRAMEWORK_RUNTIME_FILES) {
+async function missingRuntimeReasonForMode(options: {
+  frameworkSourceDir: string;
+  mode: DoudouOfficialLive2DRuntimeModuleBuildMode;
+  sampleSourceDir: string;
+  sdkDir: string;
+}): Promise<DoudouOfficialLive2DRuntimeModuleBuildFailureReason | null> {
+  if (options.mode === "sample" && !await exists(path.join(options.sdkDir, SAMPLE_LAPP_MODEL))) {
+    return "sdk_sample_runtime_missing";
+  }
+  const requiredFrameworkFiles = options.mode === "sample"
+    ? REQUIRED_SAMPLE_RUNTIME_FILES
+    : REQUIRED_FRAMEWORK_RUNTIME_FILES;
+  if (!await hasRequiredFrameworkRuntimeFiles(options.frameworkSourceDir, requiredFrameworkFiles)) {
+    return "sdk_framework_runtime_missing";
+  }
+  return null;
+}
+
+async function hasRequiredFrameworkRuntimeFiles(
+  frameworkSourceDir: string,
+  requiredFiles: readonly string[]
+): Promise<boolean> {
+  for (const relativeFile of requiredFiles) {
     if (!await exists(path.join(frameworkSourceDir, relativeFile))) {
       return false;
     }
@@ -179,6 +238,9 @@ function parseArgs(args: string[]): Partial<BuildDoudouOfficialLive2DRendererRun
     if (arg === "--sdk-dir") {
       options.sdkDir = args[index + 1];
       index += 1;
+    } else if (arg === "--mode") {
+      options.mode = args[index + 1] === "sample" ? "sample" : "framework";
+      index += 1;
     } else if (arg === "--out") {
       options.outputFile = args[index + 1];
       index += 1;
@@ -187,7 +249,194 @@ function parseArgs(args: string[]): Partial<BuildDoudouOfficialLive2DRendererRun
   return options;
 }
 
-const DOUDOU_OFFICIAL_RUNTIME_MODULE_SOURCE = `
+const DOUDOU_OFFICIAL_SAMPLE_RUNTIME_MODULE_SOURCE = `
+import { CubismFramework, LogLevel, Option } from "@framework/live2dcubismframework";
+import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
+import { CubismExpressionUpdater } from "@framework/motion/cubismexpressionupdater";
+import { LAppModel } from "@sample/lappmodel";
+
+export function createDoudouOfficialLive2DRendererRuntime(options) {
+  return new DefaultDoudouOfficialSampleLive2DRendererRuntime(options);
+}
+
+class DefaultDoudouOfficialSampleLive2DRendererRuntime {
+  constructor(options) {
+    this.canvas = options.canvas;
+    this.expressions = new Map();
+    this.gl = requireWebGlContext(options.canvas);
+    this.model = new LAppModel();
+    this.model.setSubdelegate(createSampleSubdelegate(this.canvas, this.gl));
+    ensureCubismFrameworkStarted();
+  }
+
+  async loadModel(input) {
+    this.model.loadAssets(ensureTrailingSlash(input.modelRootUrl), input.model3Json);
+    await waitForSampleModelReady(this.model);
+  }
+
+  async loadExpression(input) {
+    if (typeof this.model.loadExpression !== "function") {
+      return null;
+    }
+    const expressionJson = JSON.stringify(input.expressionJson);
+    const encoded = new TextEncoder().encode(expressionJson);
+    const buffer = encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength);
+    const expression = this.model.loadExpression(buffer, encoded.byteLength, input.expressionName);
+    this.expressions.set(input.emotionId, input.expressionName);
+    this.expressions.set(input.expressionName, input.expressionName);
+    const expressionMap = this.model._expressions;
+    if (expressionMap?.set && expression) {
+      expressionMap.set(input.expressionName, expression);
+    }
+    ensureSampleExpressionUpdater(this.model);
+    return expression;
+  }
+
+  async setExpression(input) {
+    if (!this.expressions.has(input.emotionId) && !this.expressions.has(input.expressionName)) {
+      await this.loadExpression(input);
+    }
+    this.model.setExpression(input.expressionName);
+  }
+
+  update(deltaTimeSeconds) {
+    if (!this.model.__doudouExpressionUpdaterAttached && !this.model._updateScheduler?.onLateUpdate) {
+      this.model._expressionManager?.updateMotion?.(this.model._model, deltaTimeSeconds);
+    }
+    this.model.update();
+  }
+
+  draw() {
+    const projection = new CubismMatrix44();
+    if (this.canvas.width > this.canvas.height) {
+      projection.scale(this.canvas.height / this.canvas.width, 1);
+    } else {
+      projection.scale(1, this.canvas.width / this.canvas.height);
+    }
+    this.model.draw(projection);
+  }
+}
+
+function ensureSampleExpressionUpdater(model) {
+  if (model.__doudouExpressionUpdaterAttached) {
+    return;
+  }
+  const bundledExpressionCount = model._modelSetting?.getExpressionCount?.();
+  if (typeof bundledExpressionCount === "number" && bundledExpressionCount > 0) {
+    model.__doudouExpressionUpdaterAttached = true;
+    return;
+  }
+  if (model._expressionManager && model._updateScheduler?.addUpdatableList) {
+    model._updateScheduler.addUpdatableList(new CubismExpressionUpdater(model._expressionManager));
+    model.__doudouExpressionUpdaterAttached = true;
+  }
+}
+
+function createSampleSubdelegate(canvas, gl) {
+  return {
+    getCanvas() {
+      return canvas;
+    },
+    getFrameBuffer() {
+      return gl.getParameter?.(gl.FRAMEBUFFER_BINDING) ?? null;
+    },
+    getGl() {
+      return gl;
+    },
+    getGlManager() {
+      return {
+        getGl() {
+          return gl;
+        }
+      };
+    },
+    getTextureManager() {
+      return {
+        createTextureFromPngFile(fileName, usePremultiply, callback) {
+          void loadImage(fileName).then((image) => {
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, usePremultiply ? 1 : 0);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            callback({
+              fileName,
+              height: image.height,
+              id: texture,
+              img: image,
+              usePremultply: usePremultiply,
+              width: image.width
+            });
+          });
+        }
+      };
+    }
+  };
+}
+
+async function waitForSampleModelReady(model) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    if (isSampleModelReady(model)) {
+      return;
+    }
+    await delay(16);
+  }
+  throw new Error("Live2D sample LAppModel did not finish loading.");
+}
+
+function isSampleModelReady(model) {
+  return model.loaded === true ||
+    model._state === 23 ||
+    (model._model && model._updating === false && model._initialized === true);
+}
+
+function delay(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function ensureCubismFrameworkStarted() {
+  if (!CubismFramework.isStarted?.()) {
+    const option = new Option();
+    option.logFunction = console.debug.bind(console);
+    option.loggingLevel = LogLevel.LogLevel_Off;
+    CubismFramework.startUp(option);
+  }
+  if (!CubismFramework.isInitialized?.()) {
+    CubismFramework.initialize();
+  }
+}
+
+function ensureTrailingSlash(value) {
+  return value.endsWith("/") ? value : value + "/";
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image), { once: true });
+    image.addEventListener("error", () => reject(new Error("Live2D runtime failed to load a texture.")), { once: true });
+    image.src = src;
+  });
+}
+
+function requireWebGlContext(canvas) {
+  const gl = canvas.getContext("webgl", { alpha: true, premultipliedAlpha: true })
+    ?? canvas.getContext("experimental-webgl", { alpha: true, premultipliedAlpha: true });
+  if (!gl) {
+    throw new Error("Live2D runtime requires a WebGL context.");
+  }
+  gl.enable?.(gl.BLEND);
+  gl.blendFunc?.(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  return gl;
+}
+
+`;
+
+const DOUDOU_OFFICIAL_FRAMEWORK_RUNTIME_MODULE_SOURCE = `
 import { CubismModelSettingJson } from "@framework/cubismmodelsettingjson";
 import { CubismFramework, LogLevel, Option } from "@framework/live2dcubismframework";
 import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
