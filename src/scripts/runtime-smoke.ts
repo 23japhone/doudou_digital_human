@@ -163,6 +163,13 @@ function hasLive2DRendererSpike(spike: {
     configured: boolean;
     reason?: string;
     rendererAssetProbe: string;
+    runtimeModule: {
+      drawCalls: number;
+      frameLoopAdvanced: boolean;
+      modelLoaded: boolean;
+      runtimeModuleProbe: string;
+      updateCalls: number;
+    };
   };
   sdkCallsObserved: string[];
   updateMotionCalls: number;
@@ -196,11 +203,33 @@ function hasOfficialLive2DRendererRuntimeEvidence(officialRuntime: {
   configured: boolean;
   reason?: string;
   rendererAssetProbe: string;
+  runtimeModule: {
+    drawCalls: number;
+    frameLoopAdvanced: boolean;
+    modelLoaded: boolean;
+    runtimeModuleProbe: string;
+    updateCalls: number;
+  };
 }): boolean {
   if (!officialRuntime.configured) {
-    return officialRuntime.reason === "not_configured" && officialRuntime.rendererAssetProbe === "not_configured";
+    return (
+      officialRuntime.reason === "not_configured" &&
+      officialRuntime.rendererAssetProbe === "not_configured" &&
+      officialRuntime.runtimeModule.runtimeModuleProbe === "not_configured"
+    );
   }
-  return officialRuntime.available && officialRuntime.rendererAssetProbe === "model3_fetched";
+  if (officialRuntime.runtimeModule.runtimeModuleProbe === "not_configured") {
+    return officialRuntime.available && officialRuntime.rendererAssetProbe === "model3_fetched";
+  }
+  return (
+    officialRuntime.available &&
+    officialRuntime.rendererAssetProbe === "model3_fetched" &&
+    officialRuntime.runtimeModule.runtimeModuleProbe === "loaded" &&
+    officialRuntime.runtimeModule.modelLoaded &&
+    officialRuntime.runtimeModule.frameLoopAdvanced &&
+    officialRuntime.runtimeModule.updateCalls >= 2 &&
+    officialRuntime.runtimeModule.drawCalls >= 2
+  );
 }
 
 async function assertInvalidBundleFails(
@@ -339,6 +368,13 @@ function parseSmokeResult(output: string) {
         configured: boolean;
         reason?: string;
         rendererAssetProbe: string;
+        runtimeModule: {
+          drawCalls: number;
+          frameLoopAdvanced: boolean;
+          modelLoaded: boolean;
+          runtimeModuleProbe: string;
+          updateCalls: number;
+        };
       };
       sdkCallsObserved: string[];
       updateMotionCalls: number;

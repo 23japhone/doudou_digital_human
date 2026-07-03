@@ -10,6 +10,7 @@ export type DoudouOfficialLive2DRendererRuntimeUnavailableReason =
   | "model3_missing"
   | "model3_invalid"
   | "model_asset_missing"
+  | "runtime_module_missing"
   | "unsafe_model_reference";
 
 type DoudouOfficialLive2DCoreScript = "Core/live2dcubismcore.js" | "Core/live2dcubismcore.min.js";
@@ -30,12 +31,17 @@ export interface DoudouOfficialLive2DRendererRuntimeEvidence {
     expressionCount: number;
     motionGroupCount: number;
   };
+  runtimeModule?: {
+    configured: boolean;
+    moduleFormat?: "external_es_module";
+  };
 }
 
 export interface DoudouOfficialLive2DRendererRuntimeAssets {
   coreScriptUrl: string;
   model3JsonUrl: string;
   modelRootUrl: string;
+  runtimeModuleUrl?: string;
 }
 
 export type DoudouOfficialLive2DRendererRuntimeResolution =
@@ -56,6 +62,7 @@ export type DoudouOfficialLive2DRendererRuntimeResolution =
 interface ResolveDoudouOfficialLive2DRendererRuntimeInput {
   sdkDir?: string;
   modelDir?: string;
+  runtimeModuleFile?: string;
 }
 
 interface DoudouModel3Json {
@@ -87,6 +94,7 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
 ): Promise<DoudouOfficialLive2DRendererRuntimeResolution> {
   const sdkDir = sanitizeConfiguredPath(input.sdkDir);
   const modelDir = sanitizeConfiguredPath(input.modelDir);
+  const runtimeModuleFile = sanitizeConfiguredPath(input.runtimeModuleFile);
   const configured = Boolean(sdkDir || modelDir);
   if (!sdkDir || !modelDir) {
     return unavailable("not_configured", configured);
@@ -122,6 +130,9 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
   if (!await allModelAssetsExist(modelDir, references)) {
     return unavailable("model_asset_missing", true);
   }
+  if (runtimeModuleFile && !await exists(runtimeModuleFile)) {
+    return unavailable("runtime_module_missing", true);
+  }
 
   const publicEvidence: DoudouOfficialLive2DRendererRuntimeEvidence = {
     available: true,
@@ -137,6 +148,14 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
       coreScript,
       frameworkSource: FRAMEWORK_SOURCE,
       sampleLAppModel: SAMPLE_LAPP_MODEL
+    },
+    runtimeModule: runtimeModuleFile
+      ? {
+        configured: true,
+        moduleFormat: "external_es_module"
+      }
+      : {
+        configured: false
     }
   };
 
@@ -147,7 +166,8 @@ export async function resolveDoudouOfficialLive2DRendererRuntime(
     rendererAssets: {
       coreScriptUrl: pathToFileURL(path.join(sdkDir, coreScript)).href,
       model3JsonUrl: pathToFileURL(model3Path).href,
-      modelRootUrl: directoryFileUrl(modelDir)
+      modelRootUrl: directoryFileUrl(modelDir),
+      runtimeModuleUrl: runtimeModuleFile ? pathToFileURL(runtimeModuleFile).href : undefined
     }
   };
 }

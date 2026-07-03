@@ -4,6 +4,7 @@ import type {
   DoudouOfficialLive2DRendererRuntimeAssets,
   DoudouOfficialLive2DRendererRuntimeEvidence
 } from "./default-doudou-live2d-official-sdk-resolver.js";
+import type { DoudouOfficialLive2DRendererHostEvidence } from "./default-doudou-live2d-official-renderer-host.js";
 import type { DoudouLive2DPreviewLibrary } from "./default-doudou-live2d-preview.js";
 import type { DoudouWebCubismRendererSpikeEvidence } from "./default-doudou-live2d-web-renderer-spike.js";
 import type { ScreenPoint } from "./drag.js";
@@ -62,8 +63,10 @@ export type RuntimeLive2DOfficialRendererAssetProbe =
   | "model3_fetched"
   | "model3_fetch_failed";
 
-export interface RuntimeLive2DOfficialRendererSmokeEvidence extends DoudouOfficialLive2DRendererRuntimeEvidence {
+export interface RuntimeLive2DOfficialRendererSmokeEvidence
+  extends Omit<DoudouOfficialLive2DRendererRuntimeEvidence, "runtimeModule"> {
   rendererAssetProbe: RuntimeLive2DOfficialRendererAssetProbe;
+  runtimeModule: DoudouOfficialLive2DRendererHostEvidence;
 }
 
 export interface RuntimeLive2DRendererSpikeSmokeResult extends DoudouWebCubismRendererSpikeEvidence {

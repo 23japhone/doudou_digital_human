@@ -28,10 +28,12 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
     try {
       const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
       const modelDir = path.join(tempRoot, "default-doudou-model");
+      const runtimeModuleFile = path.join(tempRoot, "default-doudou-official-runtime.mjs");
       await writeLocalOfficialSdkFixture(sdkDir);
       await writeDefaultDoudouModelFixture(modelDir);
+      await writeFile(runtimeModuleFile, "export function createDoudouOfficialLive2DRendererRuntime() {}\n", "utf8");
 
-      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, runtimeModuleFile, sdkDir });
 
       expect(result.available).toBe(true);
       expect(result.configured).toBe(true);
@@ -49,12 +51,17 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
           coreScript: "Core/live2dcubismcore.js",
           frameworkSource: "Framework/src",
           sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
+        },
+        runtimeModule: {
+          configured: true,
+          moduleFormat: "external_es_module"
         }
       } satisfies DoudouOfficialLive2DRendererRuntimeEvidence);
       expect(result.rendererAssets).toMatchObject({
         coreScriptUrl: expect.stringMatching(/^file:/),
         model3JsonUrl: expect.stringMatching(/^file:/),
-        modelRootUrl: expect.stringMatching(/^file:.*\/$/)
+        modelRootUrl: expect.stringMatching(/^file:.*\/$/),
+        runtimeModuleUrl: expect.stringMatching(/^file:.*default-doudou-official-runtime\.mjs$/)
       });
       expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
       expect(JSON.stringify(result.publicEvidence)).not.toContain("sourceImagePath");
@@ -96,6 +103,36 @@ describe("default doudou official Live2D Web SDK renderer resolver", () => {
           reason: "unsafe_model_reference"
         },
         reason: "unsafe_model_reference"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
+  test("rejects a configured runtime module path that is missing", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-missing-runtime-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      await writeLocalOfficialSdkFixture(sdkDir);
+      await writeDefaultDoudouModelFixture(modelDir);
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({
+        modelDir,
+        runtimeModuleFile: path.join(tempRoot, "missing-runtime.mjs"),
+        sdkDir
+      });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "runtime_module_missing"
+        },
+        reason: "runtime_module_missing"
       });
       expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
     } finally {

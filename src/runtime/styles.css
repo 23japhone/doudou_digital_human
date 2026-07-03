@@ -62,7 +62,8 @@ body {
   opacity: 1;
 }
 
-#pet-canvas {
+#pet-canvas,
+#live2d-canvas {
   position: absolute;
   left: var(--runtime-frame-padding);
   top: var(--runtime-frame-padding);
@@ -72,44 +73,67 @@ body {
   background: transparent;
   transform-origin: 50% 82%;
   transition:
+    opacity 140ms ease,
     filter 140ms ease,
     transform 140ms ease;
 }
 
-#pet-frame.runtime-state-waiting #pet-canvas {
+#live2d-canvas {
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#pet-frame[data-live2d-official-runtime="loaded"] #pet-canvas {
+  opacity: 0;
+}
+
+#pet-frame[data-live2d-official-runtime="loaded"] #live2d-canvas {
+  opacity: 1;
+}
+
+#pet-frame.runtime-state-waiting #pet-canvas,
+#pet-frame.runtime-state-waiting #live2d-canvas {
   animation: runtime-waiting-breathe 1800ms ease-in-out infinite;
 }
 
-#pet-frame.runtime-state-approaching #pet-canvas {
+#pet-frame.runtime-state-approaching #pet-canvas,
+#pet-frame.runtime-state-approaching #live2d-canvas {
   filter: drop-shadow(0 8px 8px rgba(28, 72, 92, 0.18));
   transform: translateY(var(--runtime-approach-lift)) rotate(var(--runtime-approach-rotate)) scale(var(--runtime-approach-scale));
 }
 
-#pet-frame.runtime-state-stopped #pet-canvas {
+#pet-frame.runtime-state-stopped #pet-canvas,
+#pet-frame.runtime-state-stopped #live2d-canvas {
   transform: translateY(var(--runtime-stop-drop)) scale(var(--runtime-stop-scale-x), var(--runtime-stop-scale-y));
 }
 
-#pet-frame.runtime-state-dodging #pet-canvas {
+#pet-frame.runtime-state-dodging #pet-canvas,
+#pet-frame.runtime-state-dodging #live2d-canvas {
   filter: drop-shadow(0 9px 10px rgba(28, 72, 92, 0.22));
   transform: translateX(var(--runtime-dodge-x)) translateY(-7px) rotate(var(--runtime-dodge-rotate)) scale(1.04);
 }
 
-#pet-frame.runtime-state-retreating #pet-canvas {
+#pet-frame.runtime-state-retreating #pet-canvas,
+#pet-frame.runtime-state-retreating #live2d-canvas {
   filter: drop-shadow(0 11px 12px rgba(28, 72, 92, 0.26));
   transform: translateX(var(--runtime-retreat-x)) translateY(-11px) rotate(var(--runtime-retreat-rotate)) scale(1.055);
 }
 
-#pet-frame.runtime-state-watching #pet-canvas {
+#pet-frame.runtime-state-watching #pet-canvas,
+#pet-frame.runtime-state-watching #live2d-canvas {
   filter: drop-shadow(0 8px 9px rgba(28, 72, 92, 0.2));
   transform: translateY(-4px) rotate(var(--runtime-watch-rotate)) scale(var(--runtime-watch-scale));
 }
 
-#pet-frame.runtime-state-poked #pet-canvas {
+#pet-frame.runtime-state-poked #pet-canvas,
+#pet-frame.runtime-state-poked #live2d-canvas {
   filter: drop-shadow(0 10px 10px rgba(70, 120, 255, 0.24));
   transform: translateY(-8px) scale(var(--runtime-click-pop));
 }
 
-#pet-frame.runtime-state-working #pet-canvas {
+#pet-frame.runtime-state-working #pet-canvas,
+#pet-frame.runtime-state-working #live2d-canvas {
   animation: runtime-working-pulse 720ms ease-in-out infinite;
   filter: drop-shadow(0 0 10px rgba(103, 178, 255, 0.42));
 }

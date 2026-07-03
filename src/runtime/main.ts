@@ -75,6 +75,7 @@ interface RuntimeOptions {
   bundleDir: string;
   live2dModelDir?: string;
   live2dRendererSpike: boolean;
+  live2dRuntimeModule?: string;
   live2dSdkDir?: string;
   readySignal: boolean;
   smoke: boolean;
@@ -127,7 +128,7 @@ async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   if (!options.bundleDir) {
     console.error(
-      "Usage: electron dist/src/runtime/main.js --bundle <bundle-dir> [--smoke] [--live2d-renderer-spike] [--live2d-sdk-dir <sdk-dir>] [--live2d-model-dir <model-dir>]"
+      "Usage: electron dist/src/runtime/main.js --bundle <bundle-dir> [--smoke] [--live2d-renderer-spike] [--live2d-sdk-dir <sdk-dir>] [--live2d-model-dir <model-dir>] [--live2d-runtime-module <module-file>]"
     );
     process.exit(2);
   }
@@ -140,6 +141,7 @@ async function main(): Promise<void> {
   if (live2DRendererSpikeEnabled) {
     live2DOfficialRuntimeResolution = await resolveDoudouOfficialLive2DRendererRuntime({
       modelDir: options.live2dModelDir ?? process.env.DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR,
+      runtimeModuleFile: options.live2dRuntimeModule ?? process.env.DOUDOU_CUBISM_WEB_RUNTIME_MODULE,
       sdkDir: options.live2dSdkDir ?? process.env.DOUDOU_CUBISM_WEB_SDK_DIR
     });
   }
@@ -190,6 +192,9 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
       index += 1;
     } else if (arg === "--live2d-model-dir") {
       options.live2dModelDir = args[index + 1];
+      index += 1;
+    } else if (arg === "--live2d-runtime-module") {
+      options.live2dRuntimeModule = args[index + 1];
       index += 1;
     }
   }

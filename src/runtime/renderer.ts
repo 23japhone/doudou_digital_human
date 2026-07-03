@@ -51,11 +51,21 @@ import {
   type DoudouWebCubismRendererSpike,
   type DoudouWebCubismRendererSpikeRuntime
 } from "./default-doudou-live2d-web-renderer-spike.js";
+import {
+  createDoudouOfficialLive2DRendererHost,
+  type DoudouOfficialLive2DRendererHost,
+  type DoudouOfficialLive2DRendererHostEvidence,
+  type DoudouOfficialLive2DRendererRuntimeModule
+} from "./default-doudou-live2d-official-renderer-host.js";
 import "./styles.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#pet-canvas");
 if (!canvas) {
   throw new Error("Missing pet canvas.");
+}
+const live2DCanvasElement = document.querySelector<HTMLCanvasElement>("#live2d-canvas");
+if (!live2DCanvasElement) {
+  throw new Error("Missing Live2D canvas.");
 }
 const frame = document.querySelector<HTMLElement>("#pet-frame");
 if (!frame) {
@@ -67,6 +77,7 @@ if (!context) {
   throw new Error("Unable to create 2D canvas context.");
 }
 const petCanvas: HTMLCanvasElement = canvas;
+const live2DCanvas: HTMLCanvasElement = live2DCanvasElement;
 const petFrame: HTMLElement = frame;
 const drawingContext: CanvasRenderingContext2D = context;
 const RESIZE_AFFORDANCE_CLASS = "is-resize-affordance-visible";
@@ -124,7 +135,9 @@ const defaultDoudouEmotionScenariosObserved = new Set<DefaultDoudouEmotionScenar
 let live2DRendererSpike: DoudouWebCubismRendererSpike | null = null;
 let live2DRendererSpikeActiveEmotionId: DefaultDoudouEmotionId = "calm_idle";
 let live2DRendererSpikeSdkCalls: string[] = [];
+let live2DOfficialRendererHost: DoudouOfficialLive2DRendererHost | null = null;
 let live2DOfficialRendererAssetProbe: RuntimeLive2DOfficialRendererAssetProbe = "not_configured";
+const loadedOfficialLive2DCoreScripts = new Set<string>();
 type RuntimeMotionTuningKey = keyof RuntimeMotionTuning;
 interface RuntimeTuningControl {
   key: RuntimeMotionTuningKey;
@@ -146,6 +159,8 @@ let tuningPresetStatus: HTMLElement | null = null;
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
+live2DCanvas.width = bundle.manifest.canvas.width;
+live2DCanvas.height = bundle.manifest.canvas.height;
 petFrame.style.setProperty("--runtime-frame-padding", `${RUNTIME_FRAME_PADDING}px`);
 setupLive2DRendererSpike();
 applyRuntimePetState(visualState);
@@ -474,7 +489,7 @@ function reportSmokeResultIfReady(): void {
     return;
   }
   const renderLoopAdvanced = drawCount >= 2 && currentFrameIndex !== initialFrameIndex;
-  if (!renderLoopAdvanced || live2DOfficialRendererAssetProbe === "model3_fetch_pending") {
+  if (!renderLoopAdvanced || isLive2DRendererSmokePending()) {
     return;
   }
   smokeResultReporting = true;
@@ -977,12 +992,56 @@ function setupLive2DRendererSpike(): void {
   live2DRendererSpikeSdkCalls = [];
   live2DRendererSpikeActiveEmotionId = "calm_idle";
   probeOfficialLive2DRendererAssets(config);
+  live2DOfficialRendererHost = createDoudouOfficialLive2DRendererHost({
+    canvas: live2DCanvas,
+    config: config.officialRuntime,
+    importRuntimeModule: importOfficialLive2DRendererRuntimeModule,
+    loadCoreScript: loadOfficialLive2DCoreScript
+  });
+  void live2DOfficialRendererHost.loadDefaultModel(config.library)
+    .then(updateOfficialLive2DCanvasRuntimeState)
+    .catch(() => {
+      updateOfficialLive2DCanvasRuntimeState();
+    });
   live2DRendererSpike = createDoudouWebCubismRendererSpike({
     modelId: config.modelId,
     model3Json: config.model3Json,
     runtime: createInstrumentedLive2DRendererSpikeRuntime(config)
   });
   live2DRendererSpike.loadDefaultModel(config.library);
+}
+
+async function importOfficialLive2DRendererRuntimeModule(
+  moduleUrl: string
+): Promise<DoudouOfficialLive2DRendererRuntimeModule> {
+  return await import(/* @vite-ignore */ moduleUrl) as DoudouOfficialLive2DRendererRuntimeModule;
+}
+
+function loadOfficialLive2DCoreScript(coreScriptUrl: string): Promise<void> {
+  if (loadedOfficialLive2DCoreScripts.has(coreScriptUrl)) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = coreScriptUrl;
+    script.onload = () => {
+      loadedOfficialLive2DCoreScripts.add(coreScriptUrl);
+      resolve();
+    };
+    script.onerror = () => {
+      reject(new Error("Failed to load Live2D Core script."));
+    };
+    document.head.append(script);
+  });
+}
+
+function updateOfficialLive2DCanvasRuntimeState(
+  evidence = live2DOfficialRendererHostEvidence()
+): void {
+  petFrame.dataset.live2dOfficialRuntime = evidence.runtimeModuleProbe === "loaded" && evidence.modelLoaded
+    ? "loaded"
+    : "fallback";
 }
 
 function probeOfficialLive2DRendererAssets(config: RuntimeDefaultDoudouLive2DRendererSpikeConfig): void {
@@ -1075,6 +1134,9 @@ function drawLive2DRendererSpikeFrame(timestamp: number): void {
     return;
   }
   live2DRendererSpike.renderFrame(timestamp);
+  if (live2DOfficialRendererHost) {
+    updateOfficialLive2DCanvasRuntimeState(live2DOfficialRendererHost.renderFrame(timestamp));
+  }
 }
 
 function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmotionId): void {
@@ -1092,6 +1154,11 @@ function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmoti
   if (playback.ok) {
     live2DRendererSpikeActiveEmotionId = targetEmotionId;
   }
+  if (live2DOfficialRendererHost) {
+    void live2DOfficialRendererHost.switchExpression(config.library, targetEmotionId)
+      .then(() => updateOfficialLive2DCanvasRuntimeState())
+      .catch(() => updateOfficialLive2DCanvasRuntimeState());
+  }
 }
 
 function live2DRendererSpikeSmokeResult(): RuntimeLive2DRendererSpikeSmokeResult | null {
@@ -1104,10 +1171,37 @@ function live2DRendererSpikeSmokeResult(): RuntimeLive2DRendererSpikeSmokeResult
     enabled: true,
     officialRuntime: {
       ...config.officialRuntime.publicEvidence,
-      rendererAssetProbe: live2DOfficialRendererAssetProbe
+      rendererAssetProbe: live2DOfficialRendererAssetProbe,
+      runtimeModule: live2DOfficialRendererHostEvidence()
     },
     sdkCallsObserved: live2DRendererSpikeSdkCalls.slice(0, 96)
   };
+}
+
+function live2DOfficialRendererHostEvidence(): DoudouOfficialLive2DRendererHostEvidence {
+  const config = bundle.live2DRendererSpike;
+  if (live2DOfficialRendererHost) {
+    return live2DOfficialRendererHost.evidence();
+  }
+  return {
+    activeEmotionId: "calm_idle",
+    drawCalls: 0,
+    expressionCount: 0,
+    expressionSwitches: 0,
+    frameLoopAdvanced: false,
+    modelLoaded: false,
+    runtimeModuleProbe: config?.officialRuntime.publicEvidence.runtimeModule?.configured
+      ? "load_pending"
+      : "not_configured",
+    updateCalls: 0
+  };
+}
+
+function isLive2DRendererSmokePending(): boolean {
+  return (
+    live2DOfficialRendererAssetProbe === "model3_fetch_pending" ||
+    live2DOfficialRendererHostEvidence().runtimeModuleProbe === "load_pending"
+  );
 }
 
 function drawLive2DExpressionOverlay(emotionId: DefaultDoudouEmotionId): void {
