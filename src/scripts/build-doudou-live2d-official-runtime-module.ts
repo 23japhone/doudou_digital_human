@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { build, type InlineConfig } from "vite";
@@ -244,7 +244,7 @@ async function missingRuntimeReasonForMode(options: {
 
 async function hasRequiredSampleSourceFiles(sampleSourceDir: string): Promise<boolean> {
   for (const relativeFile of REQUIRED_SAMPLE_SOURCE_FILES) {
-    if (!await exists(path.join(sampleSourceDir, relativeFile))) {
+    if (!await isFile(path.join(sampleSourceDir, relativeFile))) {
       return false;
     }
   }
@@ -256,17 +256,16 @@ async function hasRequiredFrameworkRuntimeFiles(
   requiredFiles: readonly string[]
 ): Promise<boolean> {
   for (const relativeFile of requiredFiles) {
-    if (!await exists(path.join(frameworkSourceDir, relativeFile))) {
+    if (!await isFile(path.join(frameworkSourceDir, relativeFile))) {
       return false;
     }
   }
   return true;
 }
 
-async function exists(filePath: string): Promise<boolean> {
+async function isFile(filePath: string): Promise<boolean> {
   try {
-    await access(filePath);
-    return true;
+    return (await stat(filePath)).isFile();
   } catch {
     return false;
   }

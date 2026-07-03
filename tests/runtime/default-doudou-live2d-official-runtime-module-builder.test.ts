@@ -549,6 +549,31 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("rejects sample mode when an official sample support file path resolves to a directory", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-runtime-directory-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const sampleSourceFile = path.join(sdkDir, "Samples/TypeScript/Demo/src/lappview.ts");
+      await writeSyntheticCubismSampleSdk(sdkDir);
+      await rm(sampleSourceFile, { force: true, recursive: true });
+      await mkdir(sampleSourceFile, { recursive: true });
+
+      const result = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile: path.join(tempRoot, "runtime.mjs"),
+        sdkDir
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        reason: "sdk_sample_runtime_missing"
+      });
+      expect(JSON.stringify(result)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("rejects sample mode when official sample Framework dependencies are missing", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-framework-missing-"));
     try {
@@ -557,6 +582,31 @@ describe("default doudou official Live2D runtime module builder", () => {
 
       const result = await buildDoudouOfficialLive2DRendererRuntimeModule({
         mode: "sample",
+        outputFile: path.join(tempRoot, "runtime.mjs"),
+        sdkDir
+      });
+
+      expect(result).toEqual({
+        ok: false,
+        reason: "sdk_framework_runtime_missing"
+      });
+      expect(JSON.stringify(result)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
+  test("rejects framework mode when a Framework runtime file path resolves to a directory", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-framework-runtime-directory-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const frameworkSourceFile = path.join(sdkDir, "Framework/src/motion/cubismexpressionmotion.ts");
+      await writeSyntheticCubismFrameworkSdk(sdkDir);
+      await rm(frameworkSourceFile, { force: true, recursive: true });
+      await mkdir(frameworkSourceFile, { recursive: true });
+
+      const result = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "framework",
         outputFile: path.join(tempRoot, "runtime.mjs"),
         sdkDir
       });
