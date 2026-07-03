@@ -363,7 +363,10 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
     if (!this.expressions.has(input.emotionId) && !this.expressions.has(input.expressionName)) {
       await this.loadExpression(input);
     }
-    this.model.setExpression(input.expressionName);
+    const switchAccepted = this.model.setExpression(input.expressionName);
+    if (switchAccepted === false) {
+      throw new Error("Live2D sample LAppModel rejected expression playback.");
+    }
     this.lifecycle.expressionSetCalls += 1;
     return true;
   }

@@ -111,6 +111,72 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("rejects sample mode expression switches when LAppModel refuses setExpression", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-expression-rejected-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir, { setExpressionResult: "rejected" });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-expression-rejected-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async (coreScriptUrl) => {
+          calls.push(`loadCore:${coreScriptUrl}`);
+        }
+      });
+
+      await host.loadDefaultModel(library);
+      const switched = await host.switchExpression(library, "delighted");
+
+      expect(switched).toBe(false);
+      expect(host.evidence()).toMatchObject({
+        activeEmotionId: "calm_idle",
+        expressionSwitches: 0,
+        pendingExpressionSwitches: 0,
+        runtimeFailureReason: "expression_switch_rejected",
+        runtimeLifecycle: {
+          expressionLoadCalls: 12,
+          expressionSetCalls: 0
+        },
+        runtimeModuleProbe: "model_failed"
+      });
+      expect(calls).toContain("LAppModel.setExpression:兜兜开心发光");
+      expect(calls).toContain("LAppModel.setExpressionResult:false");
+    } finally {
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("bundles a local Cubism Framework wrapper that the renderer host can drive", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-runtime-builder-"));
     const originalFetch = globalThis.fetch;
@@ -832,12 +898,14 @@ async function writeSyntheticCubismSampleSdk(
     readiness?: "loadedFlag" | "delayedCompleteSetup" | "textureCallbackCompleteSetup";
     sampleFrameworkFiles?: boolean;
     sampleSupportFiles?: boolean;
+    setExpressionResult?: "accepted" | "rejected";
   } = {}
 ): Promise<void> {
   const expressionMap = options.expressionMap ?? "csmMap";
   const readiness = options.readiness ?? "loadedFlag";
   const sampleFrameworkFiles = options.sampleFrameworkFiles ?? true;
   const sampleSupportFiles = options.sampleSupportFiles ?? true;
+  const setExpressionResult = options.setExpressionResult ?? "accepted";
   await mkdir(path.join(sdkDir, "Framework/src/live2dcubismframework.ts", ".."), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/math"), { recursive: true });
   await mkdir(path.join(sdkDir, "Framework/src/motion"), { recursive: true });
@@ -913,6 +981,7 @@ import { CubismMatrix44 } from "@framework/math/cubismmatrix44";
 const calls = () => globalThis.__doudouOfficialRuntimeFixtureCalls ?? [];
 const expressionMap = ${JSON.stringify(expressionMap)};
 const readiness = ${JSON.stringify(readiness)};
+const setExpressionResult = ${JSON.stringify(setExpressionResult)};
 export class LAppModel {
   constructor() {
     this._model = {};
@@ -1011,6 +1080,10 @@ export class LAppModel {
   }
   setExpression(name) {
     calls().push("LAppModel.setExpression:" + name);
+    if (setExpressionResult === "rejected") {
+      calls().push("LAppModel.setExpressionResult:false");
+      return false;
+    }
   }
   update() {
     calls().push("LAppModel.update");
