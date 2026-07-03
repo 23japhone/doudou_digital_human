@@ -127,6 +127,46 @@ describe("default doudou official Live2D renderer host", () => {
     expect(calls).toEqual([]);
   });
 
+  test("reports model_failed when the official runtime does not load every expression", async () => {
+    const calls: string[] = [];
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => createFakeOfficialRuntimeModule(calls, { expressionLoadResult: null }),
+      loadCoreScript: async () => undefined
+    });
+
+    await host.loadDefaultModel(library);
+
+    expect(host.evidence()).toMatchObject({
+      expressionCount: 0,
+      modelLoaded: false,
+      runtimeModuleProbe: "model_failed"
+    });
+    expect(calls).toEqual([
+      "create:default-doudou:file:///models/",
+      "loadModel:default-doudou.model3.json:file:///models/default-doudou.model3.json",
+      "loadExpression:calm_idle:expressions/doudou_calm_idle.exp3.json"
+    ]);
+    expect(JSON.stringify(host.evidence())).not.toContain("/models/");
+  });
+
   test("records distinct official runtime expression emotions observed through desktop switches", async () => {
     const calls: string[] = [];
     const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
@@ -265,6 +305,7 @@ describe("default doudou official Live2D renderer host", () => {
 });
 
 interface FakeOfficialRuntimeModuleOptions {
+  expressionLoadResult?: unknown;
   onDraw?: () => void;
   setExpressionDelay?: Promise<unknown>;
 }
@@ -282,6 +323,10 @@ function createFakeOfficialRuntimeModule(
         },
         async loadExpression(input) {
           calls.push(`loadExpression:${input.emotionId}:${input.expressionFile}`);
+          if ("expressionLoadResult" in fakeOptions) {
+            return fakeOptions.expressionLoadResult;
+          }
+          return { expressionName: input.expressionName };
         },
         async setExpression(input) {
           calls.push(`setExpression:${input.emotionId}:${input.expressionFile}`);

@@ -146,9 +146,7 @@ export function createDoudouOfficialLive2DRendererHost(
           modelId: "default-doudou",
           modelRootUrl: assets.modelRootUrl
         });
-        for (const request of library.loadRequests) {
-          await runtime.loadExpression?.(request);
-        }
+        await loadAllExpressions(runtime, library);
       } catch {
         runtime = null;
         runtimeModuleProbe = "model_failed";
@@ -286,6 +284,21 @@ export function createDoudouOfficialLive2DRendererHost(
       return emptyRuntimeLifecycleEvidence();
     }
     return emptyRuntimeLifecycleEvidence();
+  }
+}
+
+async function loadAllExpressions(
+  runtime: DoudouOfficialLive2DRendererRuntime,
+  library: DoudouLive2DPreviewLibrary
+): Promise<void> {
+  if (typeof runtime.loadExpression !== "function") {
+    throw new Error("Official Live2D runtime does not expose expression loading.");
+  }
+  for (const request of library.loadRequests) {
+    const loadedExpression = await runtime.loadExpression(request);
+    if (!loadedExpression) {
+      throw new Error("Official Live2D runtime failed to load an expression.");
+    }
   }
 }
 
