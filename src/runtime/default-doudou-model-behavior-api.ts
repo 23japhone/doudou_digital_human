@@ -16,6 +16,7 @@ import {
   type DoudouSafeModelIntent,
   type DoudouLive2DExpressionSpec
 } from "./default-doudou-live2d.js";
+import type { DoudouLive2DPreviewLibrary } from "./default-doudou-live2d-preview.js";
 
 export type DoudouModelBehaviorCommand =
   | {
@@ -36,9 +37,16 @@ export interface DoudouModelBehaviorCommandInput {
   suggestion: DoudouModelEmotionSuggestion;
 }
 
+export interface DoudouEmotionModelVisionInput {
+  dataBase64: string;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+  purpose: "qa_artifact" | "user_selected_asset";
+}
+
 export interface DoudouEmotionModelBehaviorInput extends DoudouModelArbitrationContext {
   source: DoudouModelSuggestionSource;
   text: string;
+  visionInput?: DoudouEmotionModelVisionInput;
 }
 
 export interface QueryDoudouEmotionModelBehaviorInput {
@@ -48,6 +56,21 @@ export interface QueryDoudouEmotionModelBehaviorInput {
   input: DoudouEmotionModelBehaviorInput;
   model: string | undefined;
   temperature?: number;
+}
+
+export interface DoudouEmotionModelBehaviorConfig {
+  apiKey: string | undefined;
+  endpoint: string | undefined;
+  model: string | undefined;
+  publicEvidence: DoudouEmotionModelBehaviorConfigPublicEvidence;
+}
+
+export interface DoudouEmotionModelBehaviorConfigPublicEvidence {
+  apiKeyConfigured: boolean;
+  configured: boolean;
+  endpointConfigured: boolean;
+  model?: string;
+  modelConfigured: boolean;
 }
 
 export type DoudouEmotionModelBehaviorFailureCode =
@@ -78,6 +101,57 @@ type DoudouRejectedModelArbitrationDecision = DoudouModelArbitrationDecision & {
   reason: Exclude<DoudouModelArbitrationReason, "accepted">;
 };
 
+export interface DoudouModelBehaviorRuntimeExpressionInput {
+  emotionId: DefaultDoudouEmotionId;
+  motionCue: DoudouLive2DExpressionSpec["motionCue"];
+  ttlMs: number;
+}
+
+export interface DoudouModelBehaviorRuntimeTarget {
+  applyMotionCue?: (
+    motionCue: DoudouLive2DExpressionSpec["motionCue"],
+    emotionId: DefaultDoudouEmotionId,
+    command: DoudouModelBehaviorCommand
+  ) => Promise<boolean> | boolean;
+  setExpression: (input: DoudouModelBehaviorRuntimeExpressionInput) => Promise<boolean> | boolean;
+}
+
+export interface DoudouLive2DBehaviorRuntimeTargetInput {
+  applyMotionCue?: DoudouModelBehaviorRuntimeTarget["applyMotionCue"];
+  library: DoudouLive2DPreviewLibrary;
+  switchExpression: (
+    library: DoudouLive2DPreviewLibrary,
+    emotionId: DefaultDoudouEmotionId
+  ) => Promise<boolean> | boolean;
+}
+
+export type DoudouModelBehaviorRuntimeApplyResult =
+  | {
+    applied: true;
+    emotionId: DefaultDoudouEmotionId;
+    expiresAtMs: number;
+    expressionApplied: true;
+    motionCueApplied: boolean;
+    ok: true;
+    reason: "accepted";
+  }
+  | {
+    applied: false;
+    emotionId: DefaultDoudouEmotionId;
+    expressionApplied: false;
+    motionCueApplied: false;
+    ok: true;
+    reason: Exclude<DoudouModelArbitrationReason, "accepted">;
+  }
+  | {
+    applied: false;
+    code: "runtime_expression_rejected";
+    emotionId: DefaultDoudouEmotionId;
+    expressionApplied: false;
+    motionCueApplied: false;
+    ok: false;
+  };
+
 const DOUDOU_MODEL_SUGGESTION_KEYS = [
   "confidence",
   "intent",
@@ -97,6 +171,26 @@ const DOUDOU_MODEL_REASON_CODES: readonly DoudouModelSuggestionReasonCode[] = [
   "user_selected_asset_quality",
   "safety_refusal"
 ] as const;
+
+export function resolveDoudouEmotionModelBehaviorConfig(
+  env: Partial<Record<string, string | undefined>> = defaultDoudouEmotionModelEnv()
+): DoudouEmotionModelBehaviorConfig {
+  const apiKey = nonEmptyEnvValue(env.DOUDOU_EMOTION_MODEL_API_KEY);
+  const endpoint = nonEmptyEnvValue(env.DOUDOU_EMOTION_MODEL_ENDPOINT);
+  const model = nonEmptyEnvValue(env.DOUDOU_EMOTION_MODEL_ID);
+  return {
+    apiKey,
+    endpoint,
+    model,
+    publicEvidence: {
+      apiKeyConfigured: Boolean(apiKey),
+      configured: Boolean(apiKey && endpoint && model),
+      endpointConfigured: Boolean(endpoint),
+      ...(model ? { model } : {}),
+      modelConfigured: Boolean(model)
+    }
+  };
+}
 
 export function createDoudouModelBehaviorCommand(
   input: DoudouModelBehaviorCommandInput
@@ -180,6 +274,77 @@ export async function queryDoudouEmotionModelBehavior(
   };
 }
 
+export async function applyDoudouModelBehaviorCommandToRuntime(input: {
+  command: DoudouModelBehaviorCommand;
+  nowMs: number;
+  target: DoudouModelBehaviorRuntimeTarget;
+}): Promise<DoudouModelBehaviorRuntimeApplyResult> {
+  if (input.command.kind === "keep_current") {
+    return {
+      applied: false,
+      emotionId: input.command.emotionId,
+      expressionApplied: false,
+      motionCueApplied: false,
+      ok: true,
+      reason: input.command.reason
+    };
+  }
+
+  let expressionAccepted = false;
+  try {
+    expressionAccepted = await input.target.setExpression({
+      emotionId: input.command.emotionId,
+      motionCue: input.command.motionCue,
+      ttlMs: input.command.ttlMs
+    });
+  } catch {
+    expressionAccepted = false;
+  }
+
+  if (!expressionAccepted) {
+    return {
+      applied: false,
+      code: "runtime_expression_rejected",
+      emotionId: input.command.emotionId,
+      expressionApplied: false,
+      motionCueApplied: false,
+      ok: false
+    };
+  }
+
+  let motionCueApplied = false;
+  if (input.command.motionCue !== "none" && input.target.applyMotionCue) {
+    try {
+      motionCueApplied = await input.target.applyMotionCue(
+        input.command.motionCue,
+        input.command.emotionId,
+        input.command
+      );
+    } catch {
+      motionCueApplied = false;
+    }
+  }
+
+  return {
+    applied: true,
+    emotionId: input.command.emotionId,
+    expiresAtMs: input.nowMs + input.command.ttlMs,
+    expressionApplied: true,
+    motionCueApplied,
+    ok: true,
+    reason: "accepted"
+  };
+}
+
+export function createDoudouLive2DBehaviorRuntimeTarget(
+  input: DoudouLive2DBehaviorRuntimeTargetInput
+): DoudouModelBehaviorRuntimeTarget {
+  return {
+    ...(input.applyMotionCue ? { applyMotionCue: input.applyMotionCue } : {}),
+    setExpression: async ({ emotionId }) => await input.switchExpression(input.library, emotionId)
+  };
+}
+
 function preflightModelBehaviorDecision(
   input: DoudouEmotionModelBehaviorInput
 ): DoudouRejectedModelArbitrationDecision | null {
@@ -227,13 +392,7 @@ function createEmotionModelRequestBody(input: QueryDoudouEmotionModelBehaviorInp
         role: "system"
       },
       {
-        content: JSON.stringify({
-          allowedEmotionIds: DEFAULT_DOUDOU_EMOTION_IDS,
-          allowedIntents: DEFAULT_DOUDOU_SAFE_MODEL_INTENTS,
-          currentEmotionId: input.input.currentEmotionId,
-          source: input.input.source,
-          text: input.input.text
-        }),
+        content: createEmotionModelUserMessageContent(input.input),
         role: "user"
       }
     ],
@@ -241,6 +400,37 @@ function createEmotionModelRequestBody(input: QueryDoudouEmotionModelBehaviorInp
     response_format: DEFAULT_DOUDOU_MODEL_ARBITRATION_RESPONSE_FORMAT,
     temperature: input.temperature ?? 0.2
   };
+}
+
+function createEmotionModelUserMessageContent(input: DoudouEmotionModelBehaviorInput): unknown {
+  const text = JSON.stringify({
+    allowedEmotionIds: DEFAULT_DOUDOU_EMOTION_IDS,
+    allowedIntents: DEFAULT_DOUDOU_SAFE_MODEL_INTENTS,
+    currentEmotionId: input.currentEmotionId,
+    source: input.source,
+    text: input.text,
+    ...(input.source === "vlm" && input.visionInput
+      ? { visionPurpose: input.visionInput.purpose }
+      : {})
+  });
+
+  if (input.source !== "vlm" || !input.userVisionConsent || !input.visionInput) {
+    return text;
+  }
+
+  return [
+    {
+      text,
+      type: "text"
+    },
+    {
+      image_url: {
+        detail: "low",
+        url: `data:${input.visionInput.mimeType};base64,${input.visionInput.dataBase64}`
+      },
+      type: "image_url"
+    }
+  ];
 }
 
 async function parseEmotionSuggestionFromChatCompletionResponse(
@@ -253,7 +443,7 @@ async function parseEmotionSuggestionFromChatCompletionResponse(
     if (!content) {
       return null;
     }
-    return sanitizeEmotionSuggestion(JSON.parse(content) as unknown, expectedSource);
+    return sanitizeEmotionSuggestion(JSON.parse(stripJsonCodeFence(content)) as unknown, expectedSource);
   } catch {
     return null;
   }
@@ -267,7 +457,18 @@ function chatCompletionContent(payload: unknown): string | null {
   if (!isRecord(firstChoice) || !isRecord(firstChoice.message)) {
     return null;
   }
-  return typeof firstChoice.message.content === "string" ? firstChoice.message.content : null;
+  const content = firstChoice.message.content;
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    for (const contentPart of content) {
+      if (isRecord(contentPart) && typeof contentPart.text === "string") {
+        return contentPart.text;
+      }
+    }
+  }
+  return null;
 }
 
 function sanitizeEmotionSuggestion(
@@ -331,6 +532,21 @@ function isReasonCode(value: unknown): value is DoudouModelSuggestionReasonCode 
 
 function isFiniteRangeNumber(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function stripJsonCodeFence(content: string): string {
+  const trimmed = content.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  return fenced?.[1] ?? trimmed;
+}
+
+function nonEmptyEnvValue(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function defaultDoudouEmotionModelEnv(): Partial<Record<string, string | undefined>> {
+  return typeof process === "undefined" ? {} : process.env;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
