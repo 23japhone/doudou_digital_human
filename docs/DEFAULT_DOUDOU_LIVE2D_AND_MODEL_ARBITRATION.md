@@ -1,13 +1,13 @@
 # 默认兜兜 Live2D 与模型仲裁规格
 
-Status: Stage E Cubism runtime adapter stub
+Status: Stage F Web Cubism backend facade
 Date: 2026-07-03
 
 ## Scope
 
-Stage B 把 Stage A 的 12 个默认 emotion ids 映射成可落地的 Live2D Cubism 表情规格，并定义 LLM/VLM 的安全仲裁边界。Stage C 把这些规格导出为真实 `.exp3.json` fixture，并提供生成/校验 CLI，方便后续接 Live2D SDK 前保持表情资产可复现。Stage D 增加最小 preview adapter spike：读取这 12 个 `.exp3.json`，形成未来 Cubism SDK 可消费的 expression load request，并验证直接切换和模型仲裁后的切换接口。Stage E 增加 Cubism runtime adapter stub：把 Stage D 的 load request 映射到 `CubismExpressionMotion.create` 边界，把 transition payload 映射到 `CubismMotionManager.startMotionPriority` 边界，并用可替换 mock backend 验证调用。当前仍不引入真实 Live2D SDK 包、不渲染真实 Cubism 模型、不接入 LLM/VLM、屏幕读取、摄像头、麦克风或新的 `pet bundle v0.1` schema 字段。
+Stage B 把 Stage A 的 12 个默认 emotion ids 映射成可落地的 Live2D Cubism 表情规格，并定义 LLM/VLM 的安全仲裁边界。Stage C 把这些规格导出为真实 `.exp3.json` fixture，并提供生成/校验 CLI，方便后续接 Live2D SDK 前保持表情资产可复现。Stage D 增加最小 preview adapter spike：读取这 12 个 `.exp3.json`，形成未来 Cubism SDK 可消费的 expression load request，并验证直接切换和模型仲裁后的切换接口。Stage E 增加 Cubism runtime adapter stub：把 Stage D 的 load request 映射到 `CubismExpressionMotion.create` 边界，把 transition payload 映射到 `CubismMotionManager.startMotionPriority` 边界，并用可替换 mock backend 验证调用。Stage F 增加隔离 Web Cubism backend facade：保持 `DoudouCubismExpressionBackend` 不变，通过注入官方 Web SDK 形状的 `CubismExpressionMotion.create(buffer,size)` 和 `motionManager.startMotionPriority(motion,true,priority)` 来替换 Stage E mock backend。当前仍不把真实 SDK/Core 包加入依赖、不渲染真实 Cubism 模型、不接入 LLM/VLM、屏幕读取、摄像头、麦克风或新的 `pet bundle v0.1` schema 字段。
 
-代码契约位于 `src/runtime/default-doudou-live2d.ts`，`.exp3.json` 导出/校验位于 `src/runtime/default-doudou-exp3.ts` 和 `src/cli/doudou-live2d-exp3.ts`，preview adapter spike 位于 `src/runtime/default-doudou-live2d-preview.ts` 和 `src/cli/doudou-live2d-preview.ts`，Cubism backend boundary stub 位于 `src/runtime/default-doudou-live2d-cubism-adapter.ts`。自动测试位于 `tests/runtime/default-doudou-live2d.test.ts`、`tests/runtime/default-doudou-exp3.test.ts`、`tests/runtime/default-doudou-live2d-preview.test.ts` 和 `tests/runtime/default-doudou-live2d-cubism-adapter.test.ts`。
+代码契约位于 `src/runtime/default-doudou-live2d.ts`，`.exp3.json` 导出/校验位于 `src/runtime/default-doudou-exp3.ts` 和 `src/cli/doudou-live2d-exp3.ts`，preview adapter spike 位于 `src/runtime/default-doudou-live2d-preview.ts` 和 `src/cli/doudou-live2d-preview.ts`，Cubism backend boundary stub 位于 `src/runtime/default-doudou-live2d-cubism-adapter.ts`，Web backend facade 位于 `src/runtime/default-doudou-live2d-web-cubism-backend.ts`。自动测试位于 `tests/runtime/default-doudou-live2d.test.ts`、`tests/runtime/default-doudou-exp3.test.ts`、`tests/runtime/default-doudou-live2d-preview.test.ts`、`tests/runtime/default-doudou-live2d-cubism-adapter.test.ts` 和 `tests/runtime/default-doudou-live2d-web-cubism-backend.test.ts`。
 
 ## Research Sources
 
@@ -19,6 +19,9 @@ Stage B 把 Stage A 的 12 个默认 emotion ids 映射成可落地的 Live2D Cu
   `https://docs.live2d.com/en/cubism-sdk-manual/expression/`
 - Live2D SDK Motion Playback: `CubismExpressionMotion` 继承 `ACubismMotion`，可交给 `CubismMotionManager.startMotionPriority` 管理播放；调用包含 motion 实例、auto-delete 和 priority。
   `https://docs.live2d.com/en/cubism-sdk-manual/motion/`
+- Live2D SDK for Web: 官方 Web SDK 可在 Live2D 官网下载，Web samples/framework 在 GitHub 提供；Cubism Core 按专有软件许可随 SDK 包分发，不直接在 GitHub 管理。
+  `https://docs.live2d.com/en/cubism-sdk-manual/cubism-sdk-for-web/`
+  `https://github.com/Live2D/CubismWebSamples`
 - Live2D SDK Unity Expression: `.exp3.json` 包含 `Type`、fade 时间、参数 ID、值和计算方法；播放时有 expression weight。
   `https://docs.live2d.com/en/cubism-sdk-manual/expression-unity/`
 - Live2D File Types and Extensions: `.moc3`、`.model3.json`、`.motion3.json`、`.exp3.json` 的文件职责。
@@ -38,6 +41,7 @@ Stage B 把 Stage A 的 12 个默认 emotion ids 映射成可落地的 Live2D Cu
 - 生成后的默认 fixture 位于 `fixtures/live2d/default_doudou_expressions/expressions/`，文件内容只保留 Cubism expression 字段，不包含研究备注、模型仲裁字段、绝对路径、prompt 或 provider payload。
 - Stage D preview adapter 会把每个 `.exp3.json` 转成 `emotionId`、`expressionFile`、`expressionName`、`motionCue`、fade 时间、参数数量和原始 Cubism expression JSON 组成的 load request；后续真实 SDK adapter 可以用同一 shape 挂载 `ACubismMotion`/ExpressionMotion 层。
 - Stage E Cubism adapter stub 定义可替换 backend interface。当前 mock backend 记录两类 SDK 边界调用：`CubismExpressionMotion.create` 和 `CubismMotionManager.startMotionPriority`。播放调用固定 `autoDelete:true`，`normal` priority 映射为 `2`，`force` priority 映射为 `3`，后续真实 SDK adapter 应在这里完成平台差异映射。
+- Stage F Web backend facade 接收一个 Web SDK runtime object，而不是直接 import SDK 包。它把 expression JSON 编码为 `ArrayBuffer`，调用 `CubismExpressionMotion.create(buffer, size)`，并在播放时调用 `motionManager.startMotionPriority(motion, true, priorityValue)`。这样可以先接 Web samples 或真实 SDK 实例，同时保持 Stage E 的 backend interface 稳定。
 - 眼睛开合参数 `ParamEyeLOpen` / `ParamEyeROpen` 使用 `Multiply`，保留自然眨眼。
 - 标准脸部、眉毛、嘴、视线、身体和呼吸参数使用 `Add`，值按 Live2D 标准参数范围约束。
 - 可选贴片参数使用项目命名空间 `ParamDoudou*` 并用 `Overwrite`，只表达明确开关，例如星星、泪光、困意气泡。
@@ -100,12 +104,14 @@ JSON schema 约束：
 - `npm run preview:doudou-live2d -- <expressions-dir> <from-emotion-id> <to-emotion-id>` 会构建 CLI，读取默认 `.exp3.json` 目录，输出一次直接切换和一次通过现有模型仲裁 gate 的 accepted probe。输出只包含稳定 JSON、相对 expression 文件路径、fade/参数数量和仲裁结果。
 - CLI 输出稳定 JSON，成功输出包含 `ok`、`expressionCount` 和相对文件路径；失败输出只包含脱敏问题列表，不打印本机绝对路径。
 - Stage E 当前没有新增用户 CLI；真实 SDK 集成应消费 `createDoudouLive2DCubismAdapter()`，并通过 backend interface 注入平台实现。
+- Stage F 当前也没有新增用户 CLI 或生产依赖；Web 实验代码通过 `createDoudouWebCubismExpressionBackend(runtime)` 注入 SDK facade。
 
 ## Future Integration Notes
 
 - Live2D SDK 接入时，优先复用 `DEFAULT_DOUDOU_LIVE2D_EXPRESSION_SPECS` 和 `.exp3.json` 生成/校验器，而不是手写散落参数。
 - 真实 SDK adapter 应消费 Stage D load request 和 transition payload，而不是重新解析模型建议或绕过安全仲裁。
 - 真正接 Native/Web/Unity SDK 时，只替换 `DoudouCubismExpressionBackend`，不要让 provider payload、LLM/VLM 输出或源图数据进入 Cubism backend。
+- Web SDK 包或 samples 接入时，优先在 app/runtime integration 层构造 Web SDK runtime object，再交给 Stage F facade；不要从通用 adapter 中直接 import SDK/Core。
 - VLM 只用于用户显式选择的源图、生成资产或 QA 截图，不用于默认桌面环境理解。
 - LLM 只做低频、可忽略的陪伴意图建议；用户直接互动和安全状态永远优先。
 - 真实模型接入必须继续经过 cloud opt-in、moderation、安全标识、日志脱敏和 source-image retention 检查。
@@ -117,3 +123,4 @@ JSON schema 约束：
 - `tests/runtime/default-doudou-exp3.test.ts` 校验 Stage B 规格能序列化为真实 Cubism expression JSON、提交的 fixture 与序列化结果一致、CLI 可生成/校验默认目录并对损坏文件返回脱敏错误。
 - `tests/runtime/default-doudou-live2d-preview.test.ts` 校验 Stage D 能加载 12 个 `.exp3.json` fixture、生成未来 SDK 需要的 load request、直接切换到目标表情、在现有安全仲裁通过后切换，并通过 CLI 输出脱敏的 preview report。
 - `tests/runtime/default-doudou-live2d-cubism-adapter.test.ts` 校验 Stage E 能把 12 个 load requests 映射到 mock `CubismExpressionMotion.create` 调用，把已加载 transition 映射到 mock `CubismMotionManager.startMotionPriority` 调用，并拒绝未加载 expression 的播放。
+- `tests/runtime/default-doudou-live2d-web-cubism-backend.test.ts` 校验 Stage F 能把 Stage D load request 编码为 Web SDK `CubismExpressionMotion.create(buffer,size)` 输入，并在不改 Stage E adapter 的前提下通过 Web SDK facade 调用 `startMotionPriority`。

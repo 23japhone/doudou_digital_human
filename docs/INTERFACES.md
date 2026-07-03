@@ -38,6 +38,7 @@ Potential developer interfaces:
 - `fixtures/live2d/default_doudou_expressions/` is the committed Stage C fixture snapshot for the default 兜兜 `.exp3.json` expressions. It is research/runtime fixture data only and is not part of `pet bundle v0.1`.
 - `npm run preview:doudou-live2d -- <expressions-dir> <from-emotion-id> <to-emotion-id>` builds the Stage D preview CLI, loads the 12 default `.exp3.json` files as future Cubism SDK expression load requests, reports a direct expression switch, then reports an accepted model-arbitration probe through the existing safe emotion gate. Output is stable JSON and uses only relative expression file paths.
 - `src/runtime/default-doudou-live2d-cubism-adapter.ts` is the Stage E Cubism backend boundary. It maps preview load requests to a replaceable backend's `createExpressionMotion` call and maps preview transitions to `startExpressionMotion` playback with `autoDelete:true` and Cubism-style priority values. The committed mock backend records `CubismExpressionMotion.create` and `CubismMotionManager.startMotionPriority` calls for tests; it does not load a real SDK or model.
+- `src/runtime/default-doudou-live2d-web-cubism-backend.ts` is the Stage F Web Cubism facade. It implements the unchanged Stage E backend interface by accepting an injected Web SDK-shaped runtime object with `CubismExpressionMotion.create(buffer,size)` and `motionManager.startMotionPriority(motion,autoDelete,priority)`. This keeps Web SDK/Core import and license handling outside the shared adapter.
 
 ## Compatibility
 
