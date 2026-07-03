@@ -766,18 +766,18 @@ function setupEmotionDebugPanel(): void {
 
   const panel = document.createElement("section");
   panel.id = "runtime-emotion-debug-panel";
-  panel.setAttribute("aria-label", "情绪调试");
+  panel.setAttribute("aria-label", "兜兜回应");
   panel.className = "runtime-emotion-debug-panel";
 
   const title = document.createElement("h2");
-  title.textContent = "情绪调试";
+  title.textContent = "兜兜回应";
   panel.append(title);
 
   emotionDebugInput = document.createElement("textarea");
   emotionDebugInput.id = "runtime-emotion-debug-input";
   emotionDebugInput.maxLength = 240;
-  emotionDebugInput.placeholder = "输入一句想让兜兜感知的话";
-  emotionDebugInput.setAttribute("aria-label", "情绪输入");
+  emotionDebugInput.placeholder = "想对兜兜说点什么";
+  emotionDebugInput.setAttribute("aria-label", "给兜兜的话");
   panel.append(emotionDebugInput);
 
   const controlRow = document.createElement("div");
@@ -789,19 +789,19 @@ function setupEmotionDebugPanel(): void {
   emotionDebugConsent.id = "runtime-emotion-debug-consent";
   emotionDebugConsent.type = "checkbox";
   const consentText = document.createElement("span");
-  consentText.textContent = "授权本次调用";
+  consentText.textContent = "仅本次授权";
   consentLabel.append(emotionDebugConsent, consentText);
 
   emotionDebugSubmit = document.createElement("button");
   emotionDebugSubmit.id = "runtime-emotion-debug-submit";
   emotionDebugSubmit.type = "button";
-  emotionDebugSubmit.textContent = "触发";
+  emotionDebugSubmit.textContent = "告诉兜兜";
   emotionDebugSubmit.addEventListener("click", () => {
     emotionDebugPanelSubmitPromise = submitEmotionDebugPanel().catch((error: unknown) => {
       logRuntimeError(error);
       updateEmotionDebugPanelStatus({
-        details: ["调用：否", "错误：面板提交失败"],
-        heading: "未应用表情",
+        details: ["稍后再试一次"],
+        heading: "兜兜这次没听清",
         tone: "error"
       });
     });

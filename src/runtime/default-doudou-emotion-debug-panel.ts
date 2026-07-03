@@ -1,7 +1,4 @@
-import {
-  doudouLive2DExpressionForEmotion,
-  type DoudouLive2DExpressionSpec
-} from "./default-doudou-live2d.js";
+import { doudouLive2DExpressionForEmotion } from "./default-doudou-live2d.js";
 import type {
   DoudouRuntimeEmotionBehaviorApplyResult,
   DoudouRuntimeEmotionBehaviorTriggerResult
@@ -22,7 +19,7 @@ export interface CreateDoudouEmotionDebugPanelStatusInput {
 }
 
 export const DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT =
-  "我刚刚把兜兜的情绪调试面板跑通了，请给一个轻快但不打扰的反馈。";
+  "我想让兜兜给一个轻快但不打扰的表情反馈。";
 
 export function resolveDoudouEmotionDebugPanelEnabled(input: {
   env: Partial<Record<string, string | undefined>>;
@@ -40,9 +37,17 @@ export function resolveDoudouEmotionDebugPanelSmokeConsent(
 export function isDoudouEmotionDebugPanelSmokeStatusSanitized(statusText: string): boolean {
   return ![
     DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT,
+    "应用：",
+    "调用",
     "choices",
+    "keep_current",
     "http",
+    "模型",
+    "命令",
+    "Qwen",
     "sk-",
+    "set_expression",
+    "unit-test-model",
     "user_positive_text"
   ].some((blockedFragment) => statusText.includes(blockedFragment));
 }
@@ -52,128 +57,71 @@ export function createDoudouEmotionDebugPanelStatus(
 ): DoudouEmotionDebugPanelStatus {
   if (input.pending) {
     return {
-      details: ["调用：等待中", "命令：等待中"],
-      heading: "正在请求",
+      details: ["本次授权只用于这次回应"],
+      heading: "兜兜在感受",
       tone: "pending"
     };
   }
   if (!input.result) {
     return {
-      details: ["调用：未开始", "命令：无"],
-      heading: "等待输入",
+      details: ["说一句想告诉兜兜的话"],
+      heading: "兜兜在听",
       tone: "idle"
     };
   }
   if (!input.result.ok) {
     return {
-      details: [
-        `调用：${input.result.provider.called ? "是" : "否"}`,
-        ...(input.result.provider.called ? [`模型：${input.result.provider.model}`] : []),
-        `错误：${failureCodeLabel(input.result.code)}`
-      ],
-      heading: "未应用表情",
+      details: ["稍后再试一次"],
+      heading: failureHeading(input.result.code),
       tone: "error"
     };
   }
   if (input.result.skipped) {
     return {
-      details: [
-        "调用：否",
-        `原因：${skipReasonLabel(input.result.reason)}`,
-        "命令：无"
-      ],
+      details: skippedDetails(input.result.reason),
       heading: skippedHeading(input.result.reason),
       tone: input.result.reason === "empty_user_input" ? "idle" : "warning"
     };
   }
   if (input.result.command.kind === "keep_current") {
     return {
-      details: [
-        `调用：${input.result.provider.called ? "是" : "否"}`,
-        ...(input.result.provider.called ? [`模型：${input.result.provider.model}`] : []),
-        "命令：keep_current",
-        `原因：${keepCurrentReasonLabel(input.result.command.reason)}`,
-        `应用：${applyResultLabel(input.applyResult)}`
-      ],
-      heading: "保持当前表情",
+      details: ["兜兜会先安静陪着你"],
+      heading: "兜兜先保持现在的状态",
       tone: "warning"
     };
   }
 
   const expression = doudouLive2DExpressionForEmotion(input.result.command.emotionId);
+  if (input.applyResult?.ok === false) {
+    return {
+      details: ["稍后再试一次"],
+      heading: "兜兜这次没切换成功",
+      tone: "error"
+    };
+  }
   return {
     details: [
-      `调用：${input.result.provider.called ? "是" : "否"}`,
-      ...(input.result.provider.called ? [`模型：${input.result.provider.model}`] : []),
-      "命令：set_expression",
-      `表情：${expression.expressionName}`,
-      `动作：${motionCueLabel(input.result.command.motionCue)}`,
-      `应用：${applyResultLabel(input.applyResult)}`
+      `表情反馈：${expression.expressionName}`,
+      "兜兜已经切换状态"
     ],
-    heading: `已触发：${expression.expressionName}`,
-    tone: input.applyResult?.ok === false ? "error" : "success"
+    heading: `兜兜回应了：${expression.expressionName}`,
+    tone: "success"
   };
 }
 
 function skippedHeading(reason: "empty_user_input" | "user_consent_required"): string {
-  return reason === "empty_user_input" ? "请输入内容" : "未授权，模型未调用";
+  return reason === "empty_user_input" ? "写一句想告诉兜兜的话" : "需要本次授权";
 }
 
-function skipReasonLabel(reason: "empty_user_input" | "user_consent_required"): string {
-  return reason === "empty_user_input" ? "没有输入内容" : "需要勾选授权";
+function skippedDetails(reason: "empty_user_input" | "user_consent_required"): string[] {
+  return reason === "empty_user_input"
+    ? ["兜兜需要先听到你的话"]
+    : ["勾选本次授权后再告诉兜兜"];
 }
 
-function failureCodeLabel(code: "model_output_invalid" | "provider_error" | "provider_not_configured"): string {
+function failureHeading(code: "model_output_invalid" | "provider_error" | "provider_not_configured"): string {
   if (code === "provider_not_configured") {
-    return "模型未配置";
+    return "兜兜暂时还不能回应";
   }
-  if (code === "provider_error") {
-    return "模型调用失败";
-  }
-  return "模型输出无效";
-}
-
-function keepCurrentReasonLabel(reason: string): string {
-  if (reason === "confidence_too_low") {
-    return "置信度不足";
-  }
-  if (reason === "ttl_too_long") {
-    return "持续时间过长";
-  }
-  if (reason === "runtime_state_locked") {
-    return "运行状态锁定";
-  }
-  if (reason === "safety_blocked") {
-    return "安全策略拦截";
-  }
-  if (reason === "vision_without_consent") {
-    return "缺少视觉授权";
-  }
-  return "保持当前";
-}
-
-function motionCueLabel(motionCue: DoudouLive2DExpressionSpec["motionCue"]): string {
-  if (motionCue === "small_pop") {
-    return "轻快弹一下";
-  }
-  if (motionCue === "soft_breath") {
-    return "轻轻呼吸";
-  }
-  if (motionCue === "short_retreat") {
-    return "小退一步";
-  }
-  if (motionCue === "sleepy_sway") {
-    return "困困摇晃";
-  }
-  return "无";
-}
-
-function applyResultLabel(result: DoudouRuntimeEmotionBehaviorApplyResult | null | undefined): string {
-  if (!result) {
-    return "未应用";
-  }
-  if (!result.ok) {
-    return "应用失败";
-  }
-  return result.applied ? "已应用" : "未应用";
+  return "兜兜这次没听清";
 }

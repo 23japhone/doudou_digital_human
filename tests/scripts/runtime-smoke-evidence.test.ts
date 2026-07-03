@@ -13,7 +13,7 @@ describe("runtime smoke evidence", () => {
       panelVisible: true,
       providerCalled: true,
       statusSanitized: true,
-      statusText: "已触发：兜兜轻快微笑调用：是模型：Qwen3.6-27B命令：set_expression应用：已应用"
+      statusText: "兜兜回应了：兜兜轻快微笑表情反馈：兜兜轻快微笑兜兜已经切换状态"
     }, { expectConsented: true })).toBe(true);
     expect(hasRuntimeEmotionModelPanelSmokeEvidence({
       buttonSubmitted: true,
@@ -22,7 +22,7 @@ describe("runtime smoke evidence", () => {
       panelVisible: true,
       providerCalled: false,
       statusSanitized: true,
-      statusText: "未授权，模型未调用"
+      statusText: "需要本次授权勾选本次授权后再告诉兜兜"
     }, { expectConsented: true })).toBe(false);
   });
 
@@ -34,7 +34,7 @@ describe("runtime smoke evidence", () => {
       panelVisible: true,
       providerCalled: false,
       statusSanitized: true,
-      statusText: "未授权，模型未调用调用：否原因：需要勾选授权命令：无"
+      statusText: "需要本次授权勾选本次授权后再告诉兜兜"
     }, { expectConsented: false })).toBe(true);
     expect(hasRuntimeEmotionModelPanelSmokeEvidence({
       buttonSubmitted: true,
@@ -43,7 +43,7 @@ describe("runtime smoke evidence", () => {
       panelVisible: true,
       providerCalled: true,
       statusSanitized: true,
-      statusText: "已触发：兜兜轻快微笑调用：是应用：已应用"
+      statusText: "兜兜回应了：兜兜轻快微笑表情反馈：兜兜轻快微笑兜兜已经切换状态"
     }, { expectConsented: false })).toBe(false);
   });
 
@@ -66,7 +66,7 @@ describe("runtime smoke evidence", () => {
         panelVisible: true,
         providerCalled: true,
         statusSanitized: true,
-        statusText: "已触发：兜兜轻快微笑调用：是模型：Qwen3.6-27B命令：set_expression应用：已应用"
+        statusText: "兜兜回应了：兜兜轻快微笑表情反馈：兜兜轻快微笑兜兜已经切换状态"
       }
     })).toBe(true);
   });

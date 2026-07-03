@@ -51,14 +51,10 @@ describe("default doudou emotion debug panel", () => {
 
     expect(status).toEqual({
       details: [
-        "调用：是",
-        "模型：unit-test-model",
-        "命令：set_expression",
-        "表情：兜兜轻快微笑",
-        "动作：轻快弹一下",
-        "应用：已应用"
+        "表情反馈：兜兜轻快微笑",
+        "兜兜已经切换状态"
       ],
-      heading: "已触发：兜兜轻快微笑",
+      heading: "兜兜回应了：兜兜轻快微笑",
       tone: "success"
     });
     expectStatusToBeSanitized(status);
@@ -85,11 +81,9 @@ describe("default doudou emotion debug panel", () => {
 
     expect(status).toEqual({
       details: [
-        "调用：否",
-        "原因：需要勾选授权",
-        "命令：无"
+        "勾选本次授权后再告诉兜兜"
       ],
-      heading: "未授权，模型未调用",
+      heading: "需要本次授权",
       tone: "warning"
     });
     expectStatusToBeSanitized(status);
@@ -117,12 +111,57 @@ describe("default doudou emotion debug panel", () => {
 
     expect(status).toEqual({
       details: [
-        "调用：是",
-        "模型：unit-test-model",
-        "错误：模型输出无效"
+        "稍后再试一次"
       ],
-      heading: "未应用表情",
+      heading: "兜兜这次没听清",
       tone: "error"
+    });
+    expectStatusToBeSanitized(status);
+  });
+
+  test("formats keep-current arbitration as a user-facing doudou state", () => {
+    const status = createDoudouEmotionDebugPanelStatus({
+      applyResult: {
+        applied: false,
+        emotionId: "calm_idle",
+        expressionApplied: false,
+        motionCueApplied: false,
+        ok: true,
+        reason: "confidence_too_low"
+      },
+      result: {
+        command: {
+          emotionId: "happy_smile",
+          kind: "keep_current",
+          reason: "confidence_too_low"
+        },
+        decision: {
+          accepted: false,
+          emotionId: "happy_smile",
+          reason: "confidence_too_low"
+        },
+        ok: true,
+        provider: {
+          called: true,
+          model: "unit-test-model"
+        },
+        providerConfig: {
+          apiKeyConfigured: true,
+          configured: true,
+          endpointConfigured: true,
+          model: "unit-test-model",
+          modelConfigured: true
+        },
+        skipped: false
+      }
+    });
+
+    expect(status).toEqual({
+      details: [
+        "兜兜会先安静陪着你"
+      ],
+      heading: "兜兜先保持现在的状态",
+      tone: "warning"
     });
     expectStatusToBeSanitized(status);
   });
@@ -156,8 +195,12 @@ describe("default doudou emotion debug panel", () => {
 
   test("rejects smoke status text that leaks live prompt or provider details", () => {
     expect(isDoudouEmotionDebugPanelSmokeStatusSanitized(
-      "已触发：兜兜轻快微笑调用：是模型：unit-test-model命令：set_expression应用：已应用"
+      "兜兜回应了：兜兜轻快微笑表情反馈：兜兜轻快微笑兜兜已经切换状态"
     )).toBe(true);
+    expect(isDoudouEmotionDebugPanelSmokeStatusSanitized(
+      "已触发：兜兜轻快微笑调用：是模型：unit-test-model命令：set_expression应用：已应用"
+    )).toBe(false);
+    expect(isDoudouEmotionDebugPanelSmokeStatusSanitized("兜兜回应了：Qwen3.6-27B")).toBe(false);
     expect(isDoudouEmotionDebugPanelSmokeStatusSanitized(
       `已触发：兜兜轻快微笑${DOUDOU_EMOTION_DEBUG_PANEL_SMOKE_TEXT}`
     )).toBe(false);
@@ -174,4 +217,12 @@ function expectStatusToBeSanitized(status: DoudouEmotionDebugPanelStatus): void 
   expect(serialized).not.toContain("今天有点累");
   expect(serialized).not.toContain("choices");
   expect(serialized).not.toContain("user_positive_text");
+  expect(serialized).not.toContain("调用");
+  expect(serialized).not.toContain("模型");
+  expect(serialized).not.toContain("命令");
+  expect(serialized).not.toContain("应用：");
+  expect(serialized).not.toContain("set_expression");
+  expect(serialized).not.toContain("keep_current");
+  expect(serialized).not.toContain("unit-test-model");
+  expect(serialized).not.toContain("Qwen");
 }

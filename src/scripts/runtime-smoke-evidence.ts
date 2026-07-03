@@ -38,15 +38,15 @@ export function hasRuntimeEmotionModelPanelSmokeEvidence(
       panel.consented &&
       panel.providerCalled === true &&
       panel.commandApplied === true &&
-      panel.statusText.includes("已触发") &&
-      panel.statusText.includes("应用：已应用")
+      panel.statusText.includes("兜兜回应了") &&
+      panel.statusText.includes("表情反馈")
     );
   }
   return (
     !panel.consented &&
     panel.providerCalled === false &&
     panel.commandApplied === null &&
-    panel.statusText.includes("未授权")
+    panel.statusText.includes("需要本次授权")
   );
 }
 
