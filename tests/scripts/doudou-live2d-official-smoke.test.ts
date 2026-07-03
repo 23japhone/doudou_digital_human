@@ -84,7 +84,10 @@ describe("runDoudouOfficialLive2DSmoke", () => {
         });
         return {
           exitCode: 0,
-          output: "runtime smoke fixture bundle: {\"live2DRendererSpike\":{\"officialRuntime\":{\"runtimeModule\":{\"runtimeModuleProbe\":\"loaded\"}}}}\n"
+          output: [
+            `runtime smoke fixture bundle: ${JSON.stringify(createRuntimeSmokeResult("delighted", 13, 21))}`,
+            `runtime smoke generated bundle: ${JSON.stringify(createRuntimeSmokeResult("focused_working", 17, 29))}`
+          ].join("\n")
         };
       }
     });
@@ -123,7 +126,31 @@ describe("runDoudouOfficialLive2DSmoke", () => {
         }
       },
       runtimeSmoke: {
-        exitCode: 0
+        exitCode: 0,
+        officialRenderer: {
+          fixtureBundle: {
+            activeEmotionId: "delighted",
+            drawCalls: 21,
+            expressionCount: 12,
+            expressionSwitches: 13,
+            frameLoopAdvanced: true,
+            modelLoaded: true,
+            rendererAssetProbe: "model3_fetched",
+            runtimeModuleProbe: "loaded",
+            updateCalls: 21
+          },
+          generatedBundle: {
+            activeEmotionId: "focused_working",
+            drawCalls: 29,
+            expressionCount: 12,
+            expressionSwitches: 17,
+            frameLoopAdvanced: true,
+            modelLoaded: true,
+            rendererAssetProbe: "model3_fetched",
+            runtimeModuleProbe: "loaded",
+            updateCalls: 29
+          }
+        }
       }
     });
     expect(result.output).not.toContain(sdkDir);
@@ -179,3 +206,23 @@ describe("runDoudouOfficialLive2DSmoke", () => {
     expect(result.output).not.toContain(modelDir);
   });
 });
+
+function createRuntimeSmokeResult(activeEmotionId: string, expressionSwitches: number, frameCalls: number) {
+  return {
+    live2DRendererSpike: {
+      officialRuntime: {
+        rendererAssetProbe: "model3_fetched",
+        runtimeModule: {
+          activeEmotionId,
+          drawCalls: frameCalls,
+          expressionCount: 12,
+          expressionSwitches,
+          frameLoopAdvanced: true,
+          modelLoaded: true,
+          runtimeModuleProbe: "loaded",
+          updateCalls: frameCalls
+        }
+      }
+    }
+  };
+}

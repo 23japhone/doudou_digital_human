@@ -54,6 +54,18 @@ interface ParsedOfficialSmokeArgs {
   sdkDir?: string;
 }
 
+interface SanitizedOfficialRuntimeSmokeEvidence {
+  activeEmotionId: string;
+  drawCalls: number;
+  expressionCount: number;
+  expressionSwitches: number;
+  frameLoopAdvanced: boolean;
+  modelLoaded: boolean;
+  rendererAssetProbe: string;
+  runtimeModuleProbe: string;
+  updateCalls: number;
+}
+
 export async function runDoudouOfficialLive2DSmoke(
   options: DoudouOfficialLive2DSmokeOptions = {}
 ): Promise<DoudouOfficialLive2DSmokeResult> {
@@ -135,7 +147,8 @@ export async function runDoudouOfficialLive2DSmoke(
     mode: args.mode,
     runtimeModule: sanitizeBuildResult(buildResult),
     runtimeSmoke: {
-      exitCode: 0
+      exitCode: 0,
+      officialRenderer: parseOfficialRendererSmokeEvidence(runtimeSmoke.output)
     }
   });
 }
@@ -160,6 +173,71 @@ function sanitizeBuildResult(result: Extract<DoudouOfficialLive2DRuntimeModuleBu
     outputFileName: result.outputFileName,
     sdk: result.sdk
   };
+}
+
+function parseOfficialRendererSmokeEvidence(output: string): {
+  fixtureBundle?: SanitizedOfficialRuntimeSmokeEvidence;
+  generatedBundle?: SanitizedOfficialRuntimeSmokeEvidence;
+} {
+  return {
+    fixtureBundle: parseOfficialRendererSmokeLine(output, "runtime smoke fixture bundle: "),
+    generatedBundle: parseOfficialRendererSmokeLine(output, "runtime smoke generated bundle: ")
+  };
+}
+
+function parseOfficialRendererSmokeLine(
+  output: string,
+  prefix: string
+): SanitizedOfficialRuntimeSmokeEvidence | undefined {
+  const line = output.split(/\r?\n/).find((candidate) => candidate.startsWith(prefix));
+  if (!line) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(line.slice(prefix.length)) as unknown;
+    return sanitizeOfficialRuntimeSmokeEvidence(parsed);
+  } catch {
+    return undefined;
+  }
+}
+
+function sanitizeOfficialRuntimeSmokeEvidence(value: unknown): SanitizedOfficialRuntimeSmokeEvidence | undefined {
+  if (!isRecord(value) || !isRecord(value.live2DRendererSpike)) {
+    return undefined;
+  }
+  const officialRuntime = value.live2DRendererSpike.officialRuntime;
+  if (!isRecord(officialRuntime) || !isRecord(officialRuntime.runtimeModule)) {
+    return undefined;
+  }
+  const runtimeModule = officialRuntime.runtimeModule;
+  if (
+    typeof officialRuntime.rendererAssetProbe !== "string" ||
+    typeof runtimeModule.activeEmotionId !== "string" ||
+    typeof runtimeModule.drawCalls !== "number" ||
+    typeof runtimeModule.expressionCount !== "number" ||
+    typeof runtimeModule.expressionSwitches !== "number" ||
+    typeof runtimeModule.frameLoopAdvanced !== "boolean" ||
+    typeof runtimeModule.modelLoaded !== "boolean" ||
+    typeof runtimeModule.runtimeModuleProbe !== "string" ||
+    typeof runtimeModule.updateCalls !== "number"
+  ) {
+    return undefined;
+  }
+  return {
+    activeEmotionId: runtimeModule.activeEmotionId,
+    drawCalls: runtimeModule.drawCalls,
+    expressionCount: runtimeModule.expressionCount,
+    expressionSwitches: runtimeModule.expressionSwitches,
+    frameLoopAdvanced: runtimeModule.frameLoopAdvanced,
+    modelLoaded: runtimeModule.modelLoaded,
+    rendererAssetProbe: officialRuntime.rendererAssetProbe,
+    runtimeModuleProbe: runtimeModule.runtimeModuleProbe,
+    updateCalls: runtimeModule.updateCalls
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function parseArgs(args: string[]): ParsedOfficialSmokeArgs {
