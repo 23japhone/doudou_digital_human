@@ -61,6 +61,9 @@ export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
   if (evidence.runtimeModuleProbe !== "loaded") {
     failures.push(`${label}.runtimeModuleProbe`);
   }
+  if (evidence.runtimeModuleProbe === "loaded" && evidence.runtimeFailureReason !== null) {
+    failures.push(`${label}.runtimeFailureReason`);
+  }
   if (!evidence.modelLoaded) {
     failures.push(`${label}.modelLoaded`);
   }

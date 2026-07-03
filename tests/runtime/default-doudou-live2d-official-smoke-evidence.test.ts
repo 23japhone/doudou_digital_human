@@ -147,6 +147,17 @@ describe("default doudou official Live2D smoke evidence", () => {
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(true);
   });
 
+  test("rejects loaded official runtime evidence that still carries a failure reason", () => {
+    const evidence = createOfficialRuntimeEvidence({
+      runtimeFailureReason: "frame_failed"
+    });
+
+    expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([
+      "officialRuntime.runtimeFailureReason"
+    ]);
+    expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(false);
+  });
+
   test("preserves sanitized official runtime failure reason for diagnosis", () => {
     const parsed = parseDoudouOfficialLive2DRendererSmokeEvidence(`runtime smoke fixture bundle: ${JSON.stringify(
       createRuntimeSmokeResult(createOfficialRuntimeEvidence({
@@ -159,6 +170,25 @@ describe("default doudou official Live2D smoke evidence", () => {
       runtimeFailureReason: "expression_switch_rejected",
       runtimeModuleProbe: "model_failed"
     });
+  });
+
+  test("drops unsanitized official runtime failure reason strings", () => {
+    const parsed = parseDoudouOfficialLive2DRendererSmokeEvidence(`runtime smoke fixture bundle: ${JSON.stringify({
+      live2DRendererSpike: {
+        officialRuntime: {
+          canvasLayerVisible: true,
+          canvasNonTransparentPixel: true,
+          rendererAssetProbe: "model3_fetched",
+          runtimeModule: {
+            ...createRuntimeSmokeResult(createOfficialRuntimeEvidence()).live2DRendererSpike.officialRuntime.runtimeModule,
+            runtimeFailureReason: "/local/model/default-doudou.model3.json failed"
+          }
+        }
+      }
+    })}`);
+
+    expect(parsed.fixtureBundle?.runtimeFailureReason).toBeNull();
+    expect(JSON.stringify(parsed)).not.toContain("/local/model");
   });
 
   test("parses fixture and generated bundle official runtime smoke output", () => {
