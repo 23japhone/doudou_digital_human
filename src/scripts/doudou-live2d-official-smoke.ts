@@ -142,13 +142,28 @@ export async function runDoudouOfficialLive2DSmoke(
     });
   }
 
+  const officialRenderer = parseOfficialRendererSmokeEvidence(runtimeSmoke.output);
+  const failedChecks = officialRendererEvidenceFailures(officialRenderer);
+  if (failedChecks.length > 0) {
+    return jsonResult(1, {
+      ok: false,
+      code: "OFFICIAL_LIVE2D_EVIDENCE_INCOMPLETE",
+      mode: args.mode,
+      runtimeModule: sanitizeBuildResult(buildResult),
+      runtimeSmoke: {
+        exitCode: 0,
+        failedChecks
+      }
+    });
+  }
+
   return jsonResult(0, {
     ok: true,
     mode: args.mode,
     runtimeModule: sanitizeBuildResult(buildResult),
     runtimeSmoke: {
       exitCode: 0,
-      officialRenderer: parseOfficialRendererSmokeEvidence(runtimeSmoke.output)
+      officialRenderer
     }
   });
 }
@@ -183,6 +198,54 @@ function parseOfficialRendererSmokeEvidence(output: string): {
     fixtureBundle: parseOfficialRendererSmokeLine(output, "runtime smoke fixture bundle: "),
     generatedBundle: parseOfficialRendererSmokeLine(output, "runtime smoke generated bundle: ")
   };
+}
+
+function officialRendererEvidenceFailures(evidence: {
+  fixtureBundle?: SanitizedOfficialRuntimeSmokeEvidence;
+  generatedBundle?: SanitizedOfficialRuntimeSmokeEvidence;
+}): string[] {
+  return [
+    ...officialRendererBundleEvidenceFailures("fixtureBundle", evidence.fixtureBundle),
+    ...officialRendererBundleEvidenceFailures("generatedBundle", evidence.generatedBundle)
+  ];
+}
+
+function officialRendererBundleEvidenceFailures(
+  label: "fixtureBundle" | "generatedBundle",
+  evidence: SanitizedOfficialRuntimeSmokeEvidence | undefined
+): string[] {
+  if (!evidence) {
+    return [`${label}.missing`];
+  }
+  const failures: string[] = [];
+  if (evidence.rendererAssetProbe !== "model3_fetched") {
+    failures.push(`${label}.rendererAssetProbe`);
+  }
+  if (evidence.runtimeModuleProbe !== "loaded") {
+    failures.push(`${label}.runtimeModuleProbe`);
+  }
+  if (!evidence.modelLoaded) {
+    failures.push(`${label}.modelLoaded`);
+  }
+  if (evidence.expressionCount !== 12) {
+    failures.push(`${label}.expressionCount`);
+  }
+  if (evidence.expressionSwitches <= 0) {
+    failures.push(`${label}.expressionSwitches`);
+  }
+  if (!evidence.frameLoopAdvanced) {
+    failures.push(`${label}.frameLoopAdvanced`);
+  }
+  if (evidence.drawCalls < 2) {
+    failures.push(`${label}.drawCalls`);
+  }
+  if (evidence.updateCalls < 2) {
+    failures.push(`${label}.updateCalls`);
+  }
+  if (evidence.activeEmotionId.length === 0 || evidence.activeEmotionId === "calm_idle") {
+    failures.push(`${label}.activeEmotionId`);
+  }
+  return failures;
 }
 
 function parseOfficialRendererSmokeLine(

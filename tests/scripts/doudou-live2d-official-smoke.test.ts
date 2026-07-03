@@ -205,6 +205,75 @@ describe("runDoudouOfficialLive2DSmoke", () => {
     expect(result.output).not.toContain(sdkDir);
     expect(result.output).not.toContain(modelDir);
   });
+
+  test("fails when runtime smoke exits zero without complete official renderer proof", async () => {
+    const sdkDir = "fixture-cubism-sdk";
+    const modelDir = "fixture-default-doudou-model";
+
+    const result = await runDoudouOfficialLive2DSmoke({
+      argv: [
+        "node",
+        "doudou-live2d-official-smoke",
+        "--sdk-dir",
+        sdkDir,
+        "--model-dir",
+        modelDir
+      ],
+      buildRuntimeModule: async () => ({
+        ok: true,
+        moduleFormat: "external_es_module",
+        outputFileName: "default-doudou-official-runtime.mjs",
+        sdk: {
+          frameworkSource: "Framework/src",
+          sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
+        }
+      }),
+      env: {},
+      resolveOfficialRuntime: async () => ({
+        available: true,
+        configured: true,
+        publicEvidence: {
+          available: true,
+          configured: true
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/"
+        }
+      }),
+      runRuntimeSmoke: async () => ({
+        exitCode: 0,
+        output: `runtime smoke fixture bundle: ${JSON.stringify(createRuntimeSmokeResult("calm_idle", 1, 1))}\n`
+      })
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.output)).toEqual({
+      ok: false,
+      code: "OFFICIAL_LIVE2D_EVIDENCE_INCOMPLETE",
+      mode: "sample",
+      runtimeModule: {
+        moduleFormat: "external_es_module",
+        outputFileName: "default-doudou-official-runtime.mjs",
+        sdk: {
+          frameworkSource: "Framework/src",
+          sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
+        }
+      },
+      runtimeSmoke: {
+        exitCode: 0,
+        failedChecks: [
+          "fixtureBundle.drawCalls",
+          "fixtureBundle.updateCalls",
+          "fixtureBundle.activeEmotionId",
+          "generatedBundle.missing"
+        ]
+      }
+    });
+    expect(result.output).not.toContain(sdkDir);
+    expect(result.output).not.toContain(modelDir);
+  });
 });
 
 function createRuntimeSmokeResult(activeEmotionId: string, expressionSwitches: number, frameCalls: number) {
