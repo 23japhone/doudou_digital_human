@@ -342,6 +342,74 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("reports sample model failure promptly when official texture loading fails", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-texture-error-"));
+    const restoreImage = installFakeImage({ result: "error" });
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-sample-runtime.mjs");
+      await writeSyntheticCubismSampleSdk(sdkDir, { readiness: "textureCallbackCompleteSetup" });
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "sample",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=sample-texture-error-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async () => undefined
+      });
+
+      const settled = await Promise.race([
+        host.loadDefaultModel(library).then(() => "settled" as const),
+        new Promise<"timeout">((resolve) => {
+          setTimeout(() => resolve("timeout"), 100);
+        })
+      ]);
+
+      expect(settled).toBe("settled");
+      expect(host.evidence()).toMatchObject({
+        expressionCount: 0,
+        modelLoaded: false,
+        runtimeFailureReason: "model_or_expression_load_failed",
+        runtimeLifecycle: {
+          expressionLoadCalls: 0
+        },
+        runtimeModuleProbe: "model_failed"
+      });
+      expect(calls).toContain("Image.error:file:///models/textures/default-doudou.png");
+      expect(calls.some((call) => call.startsWith("LAppModel.loadExpression:"))).toBe(false);
+    } finally {
+      restoreImage();
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("rejects sample mode evidence when loaded expressions cannot be registered", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-expression-map-missing-"));
     try {
@@ -989,8 +1057,9 @@ function createFakeCanvas(): HTMLCanvasElement {
   } as unknown as HTMLCanvasElement;
 }
 
-function installFakeImage(): () => void {
+function installFakeImage(options: { result?: "error" | "load" } = {}): () => void {
   const originalImage = globalThis.Image;
+  const result = options.result ?? "load";
   class FixtureImage {
     height = 32;
     width = 64;
@@ -1007,7 +1076,13 @@ function installFakeImage(): () => void {
         `Image.src:${value}`
       );
       setTimeout(() => {
-        for (const listener of this.listeners.get("load") ?? []) {
+        const eventName = result === "error" ? "error" : "load";
+        if (eventName === "error") {
+          (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls?.push(
+            `Image.error:${value}`
+          );
+        }
+        for (const listener of this.listeners.get(eventName) ?? []) {
           listener();
         }
       }, 0);

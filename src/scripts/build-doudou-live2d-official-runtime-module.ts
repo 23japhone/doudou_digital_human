@@ -322,7 +322,7 @@ class DefaultDoudouOfficialSampleLive2DRendererRuntime {
       updateMotionCalls: 0
     };
     this.model = new LAppModel();
-    this.model.setSubdelegate(createSampleSubdelegate(this.canvas, this.gl));
+    this.model.setSubdelegate(createSampleSubdelegate(this.canvas, this.gl, this.model));
     this.instrumentExpressionManager();
     ensureCubismFrameworkStarted();
     updateSampleFrameTime();
@@ -447,7 +447,7 @@ function ensureSampleExpressionUpdater(model) {
   }
 }
 
-function createSampleSubdelegate(canvas, gl) {
+function createSampleSubdelegate(canvas, gl, model) {
   return {
     getCanvas() {
       return canvas;
@@ -484,6 +484,8 @@ function createSampleSubdelegate(canvas, gl) {
               usePremultply: usePremultiply,
               width: image.width
             });
+          }).catch(() => {
+            model.__doudouTextureLoadFailed = true;
           });
         }
       };
@@ -493,6 +495,9 @@ function createSampleSubdelegate(canvas, gl) {
 
 async function waitForSampleModelReady(model) {
   for (let attempt = 0; attempt < 300; attempt += 1) {
+    if (model.__doudouTextureLoadFailed) {
+      throw new Error("Live2D sample LAppModel failed to load a texture.");
+    }
     if (isSampleModelReady(model)) {
       return;
     }
