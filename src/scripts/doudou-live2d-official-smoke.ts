@@ -111,17 +111,31 @@ export async function runDoudouOfficialLive2DSmoke(
   }
 
   const runRuntimeSmoke = options.runRuntimeSmoke ?? runRuntimeSmokeProcess;
-  const runtimeSmoke = await runRuntimeSmoke({
-    cwd,
-    env: {
-      ...env,
-      DOUDOU_CUBISM_WEB_RUNTIME_MODULE: outputFile,
-      DOUDOU_CUBISM_WEB_SDK_DIR: configuredSdkDir,
-      DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR: configuredModelDir,
-      DOUDOU_LIVE2D_RENDERER_SPIKE: "1",
-      NODE_OPTIONS: ""
-    }
-  });
+  let runtimeSmoke: RuntimeSmokeRunResult;
+  try {
+    runtimeSmoke = await runRuntimeSmoke({
+      cwd,
+      env: {
+        ...env,
+        DOUDOU_CUBISM_WEB_RUNTIME_MODULE: outputFile,
+        DOUDOU_CUBISM_WEB_SDK_DIR: configuredSdkDir,
+        DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR: configuredModelDir,
+        DOUDOU_LIVE2D_RENDERER_SPIKE: "1",
+        NODE_OPTIONS: ""
+      }
+    });
+  } catch {
+    return jsonResult(1, {
+      ok: false,
+      code: "OFFICIAL_LIVE2D_RUNTIME_SMOKE_FAILED",
+      mode: args.mode,
+      runtimeModule: sanitizeBuildResult(buildResult),
+      runtimeSmoke: {
+        exitCode: null,
+        reason: "runtime_smoke_error"
+      }
+    });
+  }
   if (runtimeSmoke.exitCode !== 0) {
     return jsonResult(1, {
       ok: false,
