@@ -136,6 +136,7 @@ export async function runDoudouOfficialLive2DSmoke(
       }
     });
   }
+  const officialRenderer = parseDoudouOfficialLive2DRendererSmokeEvidence(runtimeSmoke.output);
   if (runtimeSmoke.exitCode !== 0) {
     return jsonResult(1, {
       ok: false,
@@ -143,12 +144,12 @@ export async function runDoudouOfficialLive2DSmoke(
       mode: args.mode,
       runtimeModule: sanitizeBuildResult(buildResult),
       runtimeSmoke: {
-        exitCode: runtimeSmoke.exitCode
+        exitCode: runtimeSmoke.exitCode,
+        ...officialRendererOutput(officialRenderer)
       }
     });
   }
 
-  const officialRenderer = parseDoudouOfficialLive2DRendererSmokeEvidence(runtimeSmoke.output);
   const failedChecks = doudouOfficialLive2DRendererSmokeEvidenceFailures(officialRenderer);
   if (failedChecks.length > 0) {
     return jsonResult(1, {
@@ -195,6 +196,14 @@ function sanitizeBuildResult(result: Extract<DoudouOfficialLive2DRuntimeModuleBu
     outputFileName: result.outputFileName,
     sdk: result.sdk
   };
+}
+
+function officialRendererOutput(
+  officialRenderer: ReturnType<typeof parseDoudouOfficialLive2DRendererSmokeEvidence>
+): Record<string, unknown> {
+  return officialRenderer.fixtureBundle || officialRenderer.generatedBundle
+    ? { officialRenderer }
+    : {};
 }
 
 function parseArgs(args: string[]): ParsedOfficialSmokeArgs {

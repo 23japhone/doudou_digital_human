@@ -400,6 +400,98 @@ describe("runDoudouOfficialLive2DSmoke", () => {
     expect(result.output).not.toContain(modelDir);
     expect(result.output).not.toContain(outputFile);
   });
+
+  test("keeps sanitized official renderer evidence when runtime smoke exits nonzero", async () => {
+    const sdkDir = "fixture-cubism-sdk";
+    const modelDir = "fixture-default-doudou-model";
+
+    const result = await runDoudouOfficialLive2DSmoke({
+      argv: [
+        "node",
+        "doudou-live2d-official-smoke",
+        "--sdk-dir",
+        sdkDir,
+        "--model-dir",
+        modelDir
+      ],
+      buildRuntimeModule: async () => ({
+        ok: true,
+        moduleFormat: "external_es_module",
+        outputFileName: "default-doudou-official-runtime.mjs",
+        sdk: {
+          frameworkSource: "Framework/src",
+          sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
+        }
+      }),
+      env: {},
+      resolveOfficialRuntime: async () => ({
+        available: true,
+        configured: true,
+        publicEvidence: {
+          available: true,
+          configured: true
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/"
+        }
+      }),
+      runRuntimeSmoke: async () => ({
+        exitCode: 1,
+        output: [
+          "runtime smoke negative: missing manifest failed with MISSING_MANIFEST",
+          `runtime smoke fixture bundle: ${JSON.stringify(createRuntimeSmokeResult("delighted", 13, 21))}`
+        ].join("\n")
+      })
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.output)).toEqual({
+      ok: false,
+      code: "OFFICIAL_LIVE2D_RUNTIME_SMOKE_FAILED",
+      mode: "sample",
+      runtimeModule: {
+        moduleFormat: "external_es_module",
+        outputFileName: "default-doudou-official-runtime.mjs",
+        sdk: {
+          frameworkSource: "Framework/src",
+          sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
+        }
+      },
+      runtimeSmoke: {
+        exitCode: 1,
+        officialRenderer: {
+          fixtureBundle: {
+            activeEmotionId: "delighted",
+            canvasLayerVisible: true,
+            canvasNonTransparentPixel: true,
+            drawCalls: 21,
+            expressionAppliedAfterFrame: true,
+            expressionCanvasChangedAfterFrame: true,
+            expressionCount: 12,
+            expressionEmotionIdsObserved: ["delighted", "focused_working"],
+            expressionSwitches: 13,
+            frameLoopAdvanced: true,
+            modelLoaded: true,
+            pendingExpressionSwitches: 0,
+            rendererAssetProbe: "model3_fetched",
+            runtimeLifecycle: {
+              drawCalls: 21,
+              expressionLoadCalls: 12,
+              expressionSetCalls: 13,
+              modelUpdateCalls: 21,
+              updateMotionCalls: 21
+            },
+            runtimeModuleProbe: "loaded",
+            updateCalls: 21
+          }
+        }
+      }
+    });
+    expect(result.output).not.toContain(sdkDir);
+    expect(result.output).not.toContain(modelDir);
+  });
 });
 
 function createRuntimeSmokeResult(activeEmotionId: string, expressionSwitches: number, frameCalls: number) {
