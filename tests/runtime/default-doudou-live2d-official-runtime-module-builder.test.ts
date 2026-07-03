@@ -213,6 +213,80 @@ describe("default doudou official Live2D runtime module builder", () => {
     }
   });
 
+  test("rejects framework mode when a model asset fetch returns a non-ok response", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-runtime-fetch-failure-"));
+    const originalFetch = globalThis.fetch;
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-official-runtime.mjs");
+      await writeSyntheticCubismFrameworkSdk(sdkDir);
+
+      const buildResult = await buildDoudouOfficialLive2DRendererRuntimeModule({
+        mode: "framework",
+        outputFile,
+        sdkDir
+      });
+
+      expect(buildResult).toMatchObject({ ok: true });
+      const calls: string[] = [];
+      globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+        calls.push(`fetch:${String(url)}`);
+        return {
+          ok: false,
+          status: 0,
+          arrayBuffer: async () => new TextEncoder().encode("fixture").buffer
+        } as Response;
+      }) as typeof fetch;
+      (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls = calls;
+
+      const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+      const runtimeModuleUrl = `${pathToFileURL(outputFile).href}?case=framework-fetch-failure-${Date.now()}`;
+      const host = createDoudouOfficialLive2DRendererHost({
+        canvas: createFakeCanvas(),
+        config: {
+          publicEvidence: {
+            available: true,
+            configured: true,
+            runtimeModule: {
+              configured: true,
+              moduleFormat: "external_es_module"
+            }
+          },
+          rendererAssets: {
+            coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+            model3JsonUrl: "file:///models/default-doudou.model3.json",
+            modelRootUrl: "file:///models/",
+            runtimeModuleUrl
+          }
+        },
+        importRuntimeModule: async (moduleUrl) => await import(moduleUrl),
+        loadCoreScript: async (coreScriptUrl) => {
+          calls.push(`loadCore:${coreScriptUrl}`);
+        }
+      });
+
+      await host.loadDefaultModel(library);
+
+      expect(host.evidence()).toMatchObject({
+        expressionCount: 0,
+        modelLoaded: false,
+        runtimeFailureReason: "model_or_expression_load_failed",
+        runtimeLifecycle: {
+          expressionLoadCalls: 0,
+          expressionSetCalls: 0
+        },
+        runtimeModuleProbe: "model_failed"
+      });
+      expect(calls).toContain("fetch:file:///models/default-doudou.model3.json");
+      expect(calls.some((call) => call.startsWith("CubismModelSettingJson:"))).toBe(false);
+      expect(calls.some((call) => call.startsWith("CubismMoc.create:"))).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
   test("waits for the official sample CompleteSetup state before loading expressions", async () => {
     const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-sample-ready-"));
     try {

@@ -753,7 +753,7 @@ function ensureTrailingSlash(value) {
 
 async function fetchArrayBuffer(url) {
   const response = await fetch(url);
-  if (!response.ok && response.status >= 400) {
+  if (!response.ok) {
     throw new Error("Live2D runtime failed to fetch an asset.");
   }
   return await response.arrayBuffer();
