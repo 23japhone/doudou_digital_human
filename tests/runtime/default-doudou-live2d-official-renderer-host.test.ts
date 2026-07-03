@@ -129,6 +129,56 @@ describe("default doudou official Live2D renderer host", () => {
     expect(calls).toEqual([]);
   });
 
+  test("reports load_failed when the official runtime factory returns a malformed runtime object", async () => {
+    const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);
+    const calls: string[] = [];
+    const host = createDoudouOfficialLive2DRendererHost({
+      canvas: { id: "live2d-canvas" } as HTMLCanvasElement,
+      config: {
+        publicEvidence: {
+          available: true,
+          configured: true,
+          runtimeModule: {
+            configured: true,
+            moduleFormat: "external_es_module"
+          }
+        },
+        rendererAssets: {
+          coreScriptUrl: "file:///sdk/Core/live2dcubismcore.js",
+          model3JsonUrl: "file:///models/default-doudou.model3.json",
+          modelRootUrl: "file:///models/",
+          runtimeModuleUrl: "file:///runtime/default-doudou-official-runtime.mjs"
+        }
+      },
+      importRuntimeModule: async () => ({
+        async createDoudouOfficialLive2DRendererRuntime() {
+          calls.push("create-malformed-runtime");
+          return { loadModel: "not-a-function" };
+        }
+      }) as unknown as DoudouOfficialLive2DRendererRuntimeModule,
+      loadCoreScript: async () => {
+        calls.push("loadCore");
+      }
+    });
+
+    await host.loadDefaultModel(library);
+    host.renderFrame(1000);
+
+    expect(host.evidence()).toMatchObject({
+      drawCalls: 0,
+      expressionCount: 0,
+      modelLoaded: false,
+      runtimeFailureReason: "core_or_module_load_failed",
+      runtimeModuleProbe: "load_failed",
+      updateCalls: 0
+    });
+    expect(calls).toEqual([
+      "loadCore",
+      "create-malformed-runtime"
+    ]);
+    expect(JSON.stringify(host.evidence())).not.toContain("/models/");
+  });
+
   test("reports model_failed when the official runtime does not load every expression", async () => {
     const calls: string[] = [];
     const library = await loadDefaultDoudouLive2DPreviewLibrary(DEFAULT_DOUDOU_EXP3_FIXTURE_DIR);

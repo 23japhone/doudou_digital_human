@@ -141,13 +141,20 @@ export function createDoudouOfficialLive2DRendererHost(
           runtimeModuleProbe = "load_failed";
           return evidence();
         }
-        runtime = await module.createDoudouOfficialLive2DRendererRuntime({
+        const createdRuntime: unknown = await module.createDoudouOfficialLive2DRendererRuntime({
           assets,
           canvas: options.canvas,
           library,
           model3Json: "default-doudou.model3.json",
           modelId: "default-doudou"
         });
+        if (!isDoudouOfficialLive2DRendererRuntime(createdRuntime)) {
+          runtime = null;
+          runtimeFailureReason = "core_or_module_load_failed";
+          runtimeModuleProbe = "load_failed";
+          return evidence();
+        }
+        runtime = createdRuntime;
       } catch {
         runtimeFailureReason = "core_or_module_load_failed";
         runtimeModuleProbe = "load_failed";
@@ -348,4 +355,17 @@ function initialRuntimeModuleProbe(
 
 function isNonNegativeFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isDoudouOfficialLive2DRendererRuntime(
+  value: unknown
+): value is DoudouOfficialLive2DRendererRuntime {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const runtime = value as Partial<Record<keyof DoudouOfficialLive2DRendererRuntime, unknown>>;
+  return typeof runtime.loadModel === "function" &&
+    typeof runtime.setExpression === "function" &&
+    typeof runtime.update === "function" &&
+    typeof runtime.draw === "function";
 }
