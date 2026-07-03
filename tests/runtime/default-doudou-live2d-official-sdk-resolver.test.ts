@@ -1,0 +1,139 @@
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { describe, expect, test } from "vitest";
+import {
+  resolveDoudouOfficialLive2DRendererRuntime,
+  type DoudouOfficialLive2DRendererRuntimeEvidence
+} from "../../src/runtime/default-doudou-live2d-official-sdk-resolver.js";
+
+describe("default doudou official Live2D Web SDK renderer resolver", () => {
+  test("reports a sanitized skip when no local SDK or model paths are configured", async () => {
+    const result = await resolveDoudouOfficialLive2DRendererRuntime({});
+
+    expect(result).toEqual({
+      available: false,
+      configured: false,
+      publicEvidence: {
+        available: false,
+        configured: false,
+        reason: "not_configured"
+      },
+      reason: "not_configured"
+    });
+  });
+
+  test("detects a local official SDK layout and default doudou model without leaking absolute paths", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      await writeLocalOfficialSdkFixture(sdkDir);
+      await writeDefaultDoudouModelFixture(modelDir);
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+
+      expect(result.available).toBe(true);
+      expect(result.configured).toBe(true);
+      expect(result.publicEvidence).toEqual({
+        available: true,
+        configured: true,
+        model: {
+          expressionCount: 1,
+          moc: "default-doudou.moc3",
+          model3Json: "default-doudou.model3.json",
+          motionGroupCount: 1,
+          textureCount: 1
+        },
+        sdk: {
+          coreScript: "Core/live2dcubismcore.js",
+          frameworkSource: "Framework/src",
+          sampleLAppModel: "Samples/TypeScript/Demo/src/lappmodel.ts"
+        }
+      } satisfies DoudouOfficialLive2DRendererRuntimeEvidence);
+      expect(result.rendererAssets).toMatchObject({
+        coreScriptUrl: expect.stringMatching(/^file:/),
+        model3JsonUrl: expect.stringMatching(/^file:/),
+        modelRootUrl: expect.stringMatching(/^file:.*\/$/)
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+      expect(JSON.stringify(result.publicEvidence)).not.toContain("sourceImagePath");
+      expect(JSON.stringify(result.publicEvidence)).not.toContain("rawPrompt");
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
+  test("rejects model3.json references that escape the local model directory", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-cubism-sdk-bad-model-"));
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const modelDir = path.join(tempRoot, "default-doudou-model");
+      await writeLocalOfficialSdkFixture(sdkDir);
+      await mkdir(modelDir, { recursive: true });
+      await writeFile(
+        path.join(modelDir, "default-doudou.model3.json"),
+        JSON.stringify({
+          Version: 3,
+          FileReferences: {
+            Moc: "default-doudou.moc3",
+            Textures: ["../secret.png"],
+            Expressions: [],
+            Motions: {}
+          }
+        }),
+        "utf8"
+      );
+
+      const result = await resolveDoudouOfficialLive2DRendererRuntime({ modelDir, sdkDir });
+
+      expect(result).toMatchObject({
+        available: false,
+        configured: true,
+        publicEvidence: {
+          available: false,
+          configured: true,
+          reason: "unsafe_model_reference"
+        },
+        reason: "unsafe_model_reference"
+      });
+      expect(JSON.stringify(result.publicEvidence)).not.toContain(tempRoot);
+    } finally {
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+});
+
+async function writeLocalOfficialSdkFixture(sdkDir: string): Promise<void> {
+  await mkdir(path.join(sdkDir, "Core"), { recursive: true });
+  await mkdir(path.join(sdkDir, "Framework/src"), { recursive: true });
+  await mkdir(path.join(sdkDir, "Samples/TypeScript/Demo/src"), { recursive: true });
+  await writeFile(path.join(sdkDir, "Core/live2dcubismcore.js"), "window.Live2DCubismCore = {};\n", "utf8");
+  await writeFile(path.join(sdkDir, "Framework/src/live2dcubismframework.ts"), "export {};\n", "utf8");
+  await writeFile(path.join(sdkDir, "Samples/TypeScript/Demo/src/lappmodel.ts"), "export class LAppModel {}\n", "utf8");
+}
+
+async function writeDefaultDoudouModelFixture(modelDir: string): Promise<void> {
+  await mkdir(path.join(modelDir, "textures"), { recursive: true });
+  await mkdir(path.join(modelDir, "expressions"), { recursive: true });
+  await mkdir(path.join(modelDir, "motions"), { recursive: true });
+  await writeFile(path.join(modelDir, "default-doudou.moc3"), "moc3", "utf8");
+  await writeFile(path.join(modelDir, "textures/default-doudou.png"), "png", "utf8");
+  await writeFile(path.join(modelDir, "expressions/doudou_delighted.exp3.json"), "{}", "utf8");
+  await writeFile(path.join(modelDir, "motions/idle.motion3.json"), "{}", "utf8");
+  await writeFile(
+    path.join(modelDir, "default-doudou.model3.json"),
+    JSON.stringify({
+      Version: 3,
+      FileReferences: {
+        Moc: "default-doudou.moc3",
+        Textures: ["textures/default-doudou.png"],
+        Expressions: [{ Name: "delighted", File: "expressions/doudou_delighted.exp3.json" }],
+        Motions: {
+          Idle: [{ File: "motions/idle.motion3.json" }]
+        }
+      }
+    }),
+    "utf8"
+  );
+}

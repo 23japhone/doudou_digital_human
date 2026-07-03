@@ -1,5 +1,9 @@
 import type { PetManifest } from "../pet_bundle/manifest.js";
 import type { DefaultDoudouEmotionId, DefaultDoudouEmotionScenario } from "./default-doudou-emotions.js";
+import type {
+  DoudouOfficialLive2DRendererRuntimeAssets,
+  DoudouOfficialLive2DRendererRuntimeEvidence
+} from "./default-doudou-live2d-official-sdk-resolver.js";
 import type { DoudouLive2DPreviewLibrary } from "./default-doudou-live2d-preview.js";
 import type { DoudouWebCubismRendererSpikeEvidence } from "./default-doudou-live2d-web-renderer-spike.js";
 import type { ScreenPoint } from "./drag.js";
@@ -43,10 +47,28 @@ export interface RuntimeDefaultDoudouLive2DRendererSpikeConfig {
   library: DoudouLive2DPreviewLibrary;
   model3Json: "default-doudou.model3.json";
   modelId: "default-doudou";
+  officialRuntime: RuntimeOfficialLive2DRendererRuntimeConfig;
+}
+
+export interface RuntimeOfficialLive2DRendererRuntimeConfig {
+  publicEvidence: DoudouOfficialLive2DRendererRuntimeEvidence;
+  rendererAssets?: DoudouOfficialLive2DRendererRuntimeAssets;
+}
+
+export type RuntimeLive2DOfficialRendererAssetProbe =
+  | "not_configured"
+  | "unavailable"
+  | "model3_fetch_pending"
+  | "model3_fetched"
+  | "model3_fetch_failed";
+
+export interface RuntimeLive2DOfficialRendererSmokeEvidence extends DoudouOfficialLive2DRendererRuntimeEvidence {
+  rendererAssetProbe: RuntimeLive2DOfficialRendererAssetProbe;
 }
 
 export interface RuntimeLive2DRendererSpikeSmokeResult extends DoudouWebCubismRendererSpikeEvidence {
   enabled: boolean;
+  officialRuntime: RuntimeLive2DOfficialRendererSmokeEvidence;
   sdkCallsObserved: string[];
 }
 

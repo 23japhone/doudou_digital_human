@@ -158,6 +158,12 @@ function hasLive2DRendererSpike(spike: {
   modelId: string;
   modelLoaded: boolean;
   modelUpdateCalls: number;
+  officialRuntime: {
+    available: boolean;
+    configured: boolean;
+    reason?: string;
+    rendererAssetProbe: string;
+  };
   sdkCallsObserved: string[];
   updateMotionCalls: number;
 } | null): boolean {
@@ -176,12 +182,25 @@ function hasLive2DRendererSpike(spike: {
     spike.modelUpdateCalls >= 2 &&
     spike.drawModelCalls >= 2 &&
     spike.activeEmotionId !== "calm_idle" &&
+    hasOfficialLive2DRendererRuntimeEvidence(spike.officialRuntime) &&
     spike.sdkCallsObserved.some((call) => call.startsWith("CubismExpressionMotion.create")) &&
     spike.sdkCallsObserved.some((call) => call.startsWith("CubismMotionManager.startMotionPriority")) &&
     spike.sdkCallsObserved.some((call) => call.startsWith("CubismMotionManager.updateMotion")) &&
     spike.sdkCallsObserved.includes("CubismModel.update") &&
     spike.sdkCallsObserved.includes("CubismRenderer.drawModel")
   );
+}
+
+function hasOfficialLive2DRendererRuntimeEvidence(officialRuntime: {
+  available: boolean;
+  configured: boolean;
+  reason?: string;
+  rendererAssetProbe: string;
+}): boolean {
+  if (!officialRuntime.configured) {
+    return officialRuntime.reason === "not_configured" && officialRuntime.rendererAssetProbe === "not_configured";
+  }
+  return officialRuntime.available && officialRuntime.rendererAssetProbe === "model3_fetched";
 }
 
 async function assertInvalidBundleFails(
@@ -315,6 +334,12 @@ function parseSmokeResult(output: string) {
       modelId: string;
       modelLoaded: boolean;
       modelUpdateCalls: number;
+      officialRuntime: {
+        available: boolean;
+        configured: boolean;
+        reason?: string;
+        rendererAssetProbe: string;
+      };
       sdkCallsObserved: string[];
       updateMotionCalls: number;
     } | null;

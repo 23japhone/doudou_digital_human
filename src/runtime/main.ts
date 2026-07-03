@@ -6,6 +6,10 @@ import { DEFAULT_DOUDOU_EMOTION_IDS } from "./default-doudou-emotions.js";
 import { toDoudouLive2DExp3Json } from "./default-doudou-exp3.js";
 import { doudouLive2DExpressionForEmotion } from "./default-doudou-live2d.js";
 import {
+  resolveDoudouOfficialLive2DRendererRuntime,
+  type DoudouOfficialLive2DRendererRuntimeResolution
+} from "./default-doudou-live2d-official-sdk-resolver.js";
+import {
   calculateDraggedWindowPosition,
   createWindowDragSession,
   type ScreenPoint,
@@ -69,7 +73,9 @@ const RUNTIME_CLIPBOARD_TEXT_MAX_LENGTH = 512;
 
 interface RuntimeOptions {
   bundleDir: string;
+  live2dModelDir?: string;
   live2dRendererSpike: boolean;
+  live2dSdkDir?: string;
   readySignal: boolean;
   smoke: boolean;
   tuning: boolean;
@@ -94,6 +100,16 @@ let runtimeMotionTuning = RUNTIME_MOTION_TUNING_DEFAULTS;
 let runtimeMotionTuningEnabled = false;
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = [];
 let live2DRendererSpikeEnabled = false;
+let live2DOfficialRuntimeResolution: DoudouOfficialLive2DRendererRuntimeResolution = {
+  available: false,
+  configured: false,
+  publicEvidence: {
+    available: false,
+    configured: false,
+    reason: "not_configured"
+  },
+  reason: "not_configured"
+};
 let smokeTimeout: NodeJS.Timeout | null = null;
 let cursorFollowTimer: NodeJS.Timeout | null = null;
 let cursorFollowPausedUntil = 0;
@@ -110,7 +126,9 @@ let runtimeEmotionMemory = createRuntimeEmotionMemory();
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   if (!options.bundleDir) {
-    console.error("Usage: electron dist/src/runtime/main.js --bundle <bundle-dir> [--smoke]");
+    console.error(
+      "Usage: electron dist/src/runtime/main.js --bundle <bundle-dir> [--smoke] [--live2d-renderer-spike] [--live2d-sdk-dir <sdk-dir>] [--live2d-model-dir <model-dir>]"
+    );
     process.exit(2);
   }
 
@@ -119,6 +137,12 @@ async function main(): Promise<void> {
   live2DRendererSpikeEnabled = Boolean(options.live2dRendererSpike || process.env.DOUDOU_LIVE2D_RENDERER_SPIKE === "1");
   runtimeMotionTuningEnabled = Boolean(options.tuning || process.env.DOUDOU_RUNTIME_TUNING === "1");
   runtimeMotionTuning = runtimeMotionTuningFromEnv(process.env);
+  if (live2DRendererSpikeEnabled) {
+    live2DOfficialRuntimeResolution = await resolveDoudouOfficialLive2DRendererRuntime({
+      modelDir: options.live2dModelDir ?? process.env.DOUDOU_DEFAULT_DOUDOU_LIVE2D_MODEL_DIR,
+      sdkDir: options.live2dSdkDir ?? process.env.DOUDOU_CUBISM_WEB_SDK_DIR
+    });
+  }
   applyRuntimeUserDataDirFromEnv(process.env);
 
   try {
@@ -161,6 +185,12 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
       options.tuning = true;
     } else if (arg === "--live2d-renderer-spike") {
       options.live2dRendererSpike = true;
+    } else if (arg === "--live2d-sdk-dir") {
+      options.live2dSdkDir = args[index + 1];
+      index += 1;
+    } else if (arg === "--live2d-model-dir") {
+      options.live2dModelDir = args[index + 1];
+      index += 1;
     }
   }
   return options;
@@ -283,7 +313,11 @@ function createRuntimeDefaultDoudouLive2DRendererSpikeConfig(): RuntimeDefaultDo
       byEmotion
     },
     model3Json: "default-doudou.model3.json",
-    modelId: "default-doudou"
+    modelId: "default-doudou",
+    officialRuntime: {
+      publicEvidence: live2DOfficialRuntimeResolution.publicEvidence,
+      rendererAssets: live2DOfficialRuntimeResolution.rendererAssets
+    }
   };
 }
 

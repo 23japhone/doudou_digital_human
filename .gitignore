@@ -1,5 +1,7 @@
 node_modules/
 dist/
 output/
+local_live2d_models/
+local_live2d_sdk/
 .DS_Store
 npm-debug.log*

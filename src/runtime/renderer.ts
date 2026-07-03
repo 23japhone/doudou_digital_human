@@ -3,6 +3,7 @@ import type { PetAtlas } from "../pet_bundle/manifest.js";
 import type {
   RuntimeBundle,
   RuntimeDefaultDoudouLive2DRendererSpikeConfig,
+  RuntimeLive2DOfficialRendererAssetProbe,
   RuntimeLive2DRendererSpikeSmokeResult,
   RuntimeScaleSource,
   RuntimeSmokeResult
@@ -123,6 +124,7 @@ const defaultDoudouEmotionScenariosObserved = new Set<DefaultDoudouEmotionScenar
 let live2DRendererSpike: DoudouWebCubismRendererSpike | null = null;
 let live2DRendererSpikeActiveEmotionId: DefaultDoudouEmotionId = "calm_idle";
 let live2DRendererSpikeSdkCalls: string[] = [];
+let live2DOfficialRendererAssetProbe: RuntimeLive2DOfficialRendererAssetProbe = "not_configured";
 type RuntimeMotionTuningKey = keyof RuntimeMotionTuning;
 interface RuntimeTuningControl {
   key: RuntimeMotionTuningKey;
@@ -472,7 +474,7 @@ function reportSmokeResultIfReady(): void {
     return;
   }
   const renderLoopAdvanced = drawCount >= 2 && currentFrameIndex !== initialFrameIndex;
-  if (!renderLoopAdvanced) {
+  if (!renderLoopAdvanced || live2DOfficialRendererAssetProbe === "model3_fetch_pending") {
     return;
   }
   smokeResultReporting = true;
@@ -974,12 +976,41 @@ function setupLive2DRendererSpike(): void {
   }
   live2DRendererSpikeSdkCalls = [];
   live2DRendererSpikeActiveEmotionId = "calm_idle";
+  probeOfficialLive2DRendererAssets(config);
   live2DRendererSpike = createDoudouWebCubismRendererSpike({
     modelId: config.modelId,
     model3Json: config.model3Json,
     runtime: createInstrumentedLive2DRendererSpikeRuntime(config)
   });
   live2DRendererSpike.loadDefaultModel(config.library);
+}
+
+function probeOfficialLive2DRendererAssets(config: RuntimeDefaultDoudouLive2DRendererSpikeConfig): void {
+  const officialRuntime = config.officialRuntime.publicEvidence;
+  const rendererAssets = config.officialRuntime.rendererAssets;
+  if (!officialRuntime.configured) {
+    live2DOfficialRendererAssetProbe = "not_configured";
+    return;
+  }
+  if (!officialRuntime.available || !rendererAssets) {
+    live2DOfficialRendererAssetProbe = "unavailable";
+    return;
+  }
+  live2DOfficialRendererAssetProbe = "model3_fetch_pending";
+  void fetch(rendererAssets.model3JsonUrl)
+    .then(async (response) => {
+      if (!response.ok) {
+        live2DOfficialRendererAssetProbe = "model3_fetch_failed";
+        return;
+      }
+      const model3Json = await response.json() as unknown;
+      live2DOfficialRendererAssetProbe = isRecord(model3Json) && model3Json.Version === 3
+        ? "model3_fetched"
+        : "model3_fetch_failed";
+    })
+    .catch(() => {
+      live2DOfficialRendererAssetProbe = "model3_fetch_failed";
+    });
 }
 
 function createInstrumentedLive2DRendererSpikeRuntime(
@@ -1064,12 +1095,17 @@ function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmoti
 }
 
 function live2DRendererSpikeSmokeResult(): RuntimeLive2DRendererSpikeSmokeResult | null {
-  if (!live2DRendererSpike) {
+  const config = bundle.live2DRendererSpike;
+  if (!live2DRendererSpike || !config) {
     return null;
   }
   return {
     ...live2DRendererSpike.evidence(),
     enabled: true,
+    officialRuntime: {
+      ...config.officialRuntime.publicEvidence,
+      rendererAssetProbe: live2DOfficialRendererAssetProbe
+    },
     sdkCallsObserved: live2DRendererSpikeSdkCalls.slice(0, 96)
   };
 }
@@ -1120,4 +1156,8 @@ function live2DExpressionOverlayColor(emotionId: DefaultDoudouEmotionId): string
     case "calm_idle":
       return "#ffffff";
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
