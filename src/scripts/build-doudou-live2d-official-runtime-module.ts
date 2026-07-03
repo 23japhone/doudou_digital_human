@@ -115,6 +115,7 @@ export async function runBuildDoudouOfficialLive2DRendererRuntimeModuleCli(
   }
 
   const result = await buildDoudouOfficialLive2DRendererRuntimeModule({
+    mode: options.mode,
     outputFile: options.outputFile,
     sdkDir: options.sdkDir
   });

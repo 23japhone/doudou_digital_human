@@ -28,6 +28,7 @@
     "dev": "npm run build && NODE_OPTIONS= electron dist/src/runtime/main.js --bundle fixtures/pet_bundles/valid_minimal_atlas_pet",
     "dev:app": "npm run build && NODE_OPTIONS= electron dist/src/app/main.js",
     "smoke:runtime": "npm run build && NODE_OPTIONS= node dist/src/scripts/runtime-smoke.js",
+    "smoke:doudou-live2d:official": "npm run build && NODE_OPTIONS= node dist/src/scripts/doudou-live2d-official-smoke.js",
     "smoke:app": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-smoke.js",
     "smoke:app:live": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-live-smoke.js",
     "qa:app:visual": "npm run build && NODE_OPTIONS= node dist/src/scripts/app-visual-qa.js",

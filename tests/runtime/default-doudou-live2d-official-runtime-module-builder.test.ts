@@ -3,7 +3,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, test, vi } from "vitest";
-import { buildDoudouOfficialLive2DRendererRuntimeModule } from "../../src/scripts/build-doudou-live2d-official-runtime-module.js";
+import {
+  buildDoudouOfficialLive2DRendererRuntimeModule,
+  runBuildDoudouOfficialLive2DRendererRuntimeModuleCli
+} from "../../src/scripts/build-doudou-live2d-official-runtime-module.js";
 import { DEFAULT_DOUDOU_EXP3_FIXTURE_DIR } from "../../src/runtime/default-doudou-exp3.js";
 import { createDoudouOfficialLive2DRendererHost } from "../../src/runtime/default-doudou-live2d-official-renderer-host.js";
 import { loadDefaultDoudouLive2DPreviewLibrary } from "../../src/runtime/default-doudou-live2d-preview.js";
@@ -179,6 +182,44 @@ describe("default doudou official Live2D runtime module builder", () => {
     } finally {
       globalThis.fetch = originalFetch;
       delete (globalThis as { __doudouOfficialRuntimeFixtureCalls?: string[] }).__doudouOfficialRuntimeFixtureCalls;
+      await rm(tempRoot, { force: true, recursive: true });
+    }
+  });
+
+  test("passes framework mode through the CLI instead of falling back to sample mode", async () => {
+    const tempRoot = await mkdtemp(path.join(tmpdir(), "doudou-official-runtime-cli-mode-"));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const sdkDir = path.join(tempRoot, "CubismSdkForWeb");
+      const outputFile = path.join(tempRoot, "local_live2d_runtime", "default-doudou-framework-runtime.mjs");
+      await writeSyntheticCubismFrameworkSdk(sdkDir);
+
+      const exitCode = await runBuildDoudouOfficialLive2DRendererRuntimeModuleCli([
+        "node",
+        "build-doudou-live2d-official-runtime-module",
+        "--sdk-dir",
+        sdkDir,
+        "--out",
+        outputFile,
+        "--mode",
+        "framework"
+      ]);
+
+      expect(exitCode).toBe(0);
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(JSON.parse(String(logSpy.mock.calls[0]?.[0]))).toEqual({
+        ok: true,
+        moduleFormat: "external_es_module",
+        outputFileName: "default-doudou-framework-runtime.mjs",
+        sdk: {
+          frameworkSource: "Framework/src"
+        }
+      });
+      expect(await readFile(outputFile, "utf8")).not.toContain(tempRoot);
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
       await rm(tempRoot, { force: true, recursive: true });
     }
   });
