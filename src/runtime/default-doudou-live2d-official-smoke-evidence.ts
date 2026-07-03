@@ -29,6 +29,19 @@ export interface DoudouOfficialLive2DRendererSmokeEvidenceSet {
   generatedBundle?: DoudouOfficialLive2DRendererRuntimeSmokeEvidence;
 }
 
+export type DoudouOfficialLive2DRendererSmokeFailureCategory =
+  | "asset"
+  | "canvas"
+  | "expression"
+  | "frameLoop"
+  | "missing"
+  | "model"
+  | "runtime";
+
+export type DoudouOfficialLive2DRendererSmokeFailureSummary = Partial<
+  Record<DoudouOfficialLive2DRendererSmokeFailureCategory, string[]>
+>;
+
 export function parseDoudouOfficialLive2DRendererSmokeEvidence(
   output: string
 ): DoudouOfficialLive2DRendererSmokeEvidenceSet {
@@ -45,6 +58,26 @@ export function doudouOfficialLive2DRendererSmokeEvidenceFailures(
     ...doudouOfficialLive2DRendererRuntimeEvidenceFailures("fixtureBundle", evidence.fixtureBundle),
     ...doudouOfficialLive2DRendererRuntimeEvidenceFailures("generatedBundle", evidence.generatedBundle)
   ];
+}
+
+export function doudouOfficialLive2DRendererSmokeFailureSummary(
+  failedChecks: readonly string[]
+): DoudouOfficialLive2DRendererSmokeFailureSummary {
+  const grouped = new Map<DoudouOfficialLive2DRendererSmokeFailureCategory, string[]>();
+  for (const failedCheck of failedChecks) {
+    const category = smokeFailureCategory(failedCheck);
+    const checks = grouped.get(category) ?? [];
+    checks.push(failedCheck);
+    grouped.set(category, checks);
+  }
+  const summary: DoudouOfficialLive2DRendererSmokeFailureSummary = {};
+  for (const category of FAILURE_CATEGORY_ORDER) {
+    const checks = grouped.get(category);
+    if (checks && checks.length > 0) {
+      summary[category] = checks;
+    }
+  }
+  return summary;
 }
 
 export function doudouOfficialLive2DRendererRuntimeEvidenceFailures(
@@ -225,4 +258,58 @@ function sanitizeRuntimeFailureReason(value: unknown): string | null {
     return value;
   }
   return null;
+}
+
+const FAILURE_CATEGORY_ORDER: DoudouOfficialLive2DRendererSmokeFailureCategory[] = [
+  "asset",
+  "canvas",
+  "expression",
+  "frameLoop",
+  "missing",
+  "model",
+  "runtime"
+];
+
+function smokeFailureCategory(failedCheck: string): DoudouOfficialLive2DRendererSmokeFailureCategory {
+  if (failedCheck.endsWith(".missing")) {
+    return "missing";
+  }
+  if (failedCheck.endsWith(".rendererAssetProbe")) {
+    return "asset";
+  }
+  if (
+    failedCheck.endsWith(".canvasLayerVisible") ||
+    failedCheck.endsWith(".canvasNonTransparentPixel")
+  ) {
+    return "canvas";
+  }
+  if (
+    failedCheck.endsWith(".modelLoaded")
+  ) {
+    return "model";
+  }
+  if (
+    failedCheck.endsWith(".frameLoopAdvanced") ||
+    failedCheck.endsWith(".drawCalls") ||
+    failedCheck.endsWith(".updateCalls") ||
+    failedCheck.endsWith(".runtimeLifecycle.updateMotionCalls") ||
+    failedCheck.endsWith(".runtimeLifecycle.modelUpdateCalls") ||
+    failedCheck.endsWith(".runtimeLifecycle.drawCalls")
+  ) {
+    return "frameLoop";
+  }
+  if (
+    failedCheck.endsWith(".activeEmotionId") ||
+    failedCheck.endsWith(".expressionAppliedAfterFrame") ||
+    failedCheck.endsWith(".expressionCanvasChangedAfterFrame") ||
+    failedCheck.endsWith(".expressionCount") ||
+    failedCheck.endsWith(".expressionEmotionIdsObserved") ||
+    failedCheck.endsWith(".expressionSwitches") ||
+    failedCheck.endsWith(".pendingExpressionSwitches") ||
+    failedCheck.endsWith(".runtimeLifecycle.expressionLoadCalls") ||
+    failedCheck.endsWith(".runtimeLifecycle.expressionSetCalls")
+  ) {
+    return "expression";
+  }
+  return "runtime";
 }

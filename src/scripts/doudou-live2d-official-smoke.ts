@@ -7,6 +7,7 @@ import {
 } from "../runtime/default-doudou-live2d-official-sdk-resolver.js";
 import {
   doudouOfficialLive2DRendererSmokeEvidenceFailures,
+  doudouOfficialLive2DRendererSmokeFailureSummary,
   parseDoudouOfficialLive2DRendererSmokeEvidence
 } from "../runtime/default-doudou-live2d-official-smoke-evidence.js";
 import {
@@ -160,6 +161,7 @@ export async function runDoudouOfficialLive2DSmoke(
       runtimeSmoke: {
         exitCode: 0,
         failedChecks,
+        failedCheckSummary: doudouOfficialLive2DRendererSmokeFailureSummary(failedChecks),
         officialRenderer
       }
     });

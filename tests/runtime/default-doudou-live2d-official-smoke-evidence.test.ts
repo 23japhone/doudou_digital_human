@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  doudouOfficialLive2DRendererSmokeFailureSummary,
   doudouOfficialLive2DRendererRuntimeEvidenceFailures,
   hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence,
   parseDoudouOfficialLive2DRendererSmokeEvidence,
@@ -145,6 +146,50 @@ describe("default doudou official Live2D smoke evidence", () => {
 
     expect(doudouOfficialLive2DRendererRuntimeEvidenceFailures("officialRuntime", evidence)).toEqual([]);
     expect(hasCompleteDoudouOfficialLive2DRendererRuntimeEvidence(evidence)).toBe(true);
+  });
+
+  test("groups official runtime smoke failures into diagnostic areas", () => {
+    expect(doudouOfficialLive2DRendererSmokeFailureSummary([
+      "fixtureBundle.rendererAssetProbe",
+      "fixtureBundle.runtimeModuleProbe",
+      "fixtureBundle.modelLoaded",
+      "fixtureBundle.canvasLayerVisible",
+      "fixtureBundle.canvasNonTransparentPixel",
+      "fixtureBundle.expressionAppliedAfterFrame",
+      "fixtureBundle.expressionCanvasChangedAfterFrame",
+      "fixtureBundle.expressionEmotionIdsObserved",
+      "fixtureBundle.runtimeLifecycle.expressionSetCalls",
+      "fixtureBundle.runtimeLifecycle.updateMotionCalls",
+      "fixtureBundle.runtimeLifecycle.modelUpdateCalls",
+      "fixtureBundle.runtimeLifecycle.drawCalls",
+      "fixtureBundle.drawCalls",
+      "fixtureBundle.updateCalls",
+      "fixtureBundle.activeEmotionId",
+      "generatedBundle.missing"
+    ])).toEqual({
+      asset: ["fixtureBundle.rendererAssetProbe"],
+      canvas: [
+        "fixtureBundle.canvasLayerVisible",
+        "fixtureBundle.canvasNonTransparentPixel"
+      ],
+      expression: [
+        "fixtureBundle.expressionAppliedAfterFrame",
+        "fixtureBundle.expressionCanvasChangedAfterFrame",
+        "fixtureBundle.expressionEmotionIdsObserved",
+        "fixtureBundle.runtimeLifecycle.expressionSetCalls",
+        "fixtureBundle.activeEmotionId"
+      ],
+      frameLoop: [
+        "fixtureBundle.runtimeLifecycle.updateMotionCalls",
+        "fixtureBundle.runtimeLifecycle.modelUpdateCalls",
+        "fixtureBundle.runtimeLifecycle.drawCalls",
+        "fixtureBundle.drawCalls",
+        "fixtureBundle.updateCalls"
+      ],
+      missing: ["generatedBundle.missing"],
+      model: ["fixtureBundle.modelLoaded"],
+      runtime: ["fixtureBundle.runtimeModuleProbe"]
+    });
   });
 
   test("rejects loaded official runtime evidence that still carries a failure reason", () => {

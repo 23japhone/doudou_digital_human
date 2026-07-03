@@ -304,6 +304,23 @@ describe("runDoudouOfficialLive2DSmoke", () => {
           "fixtureBundle.activeEmotionId",
           "generatedBundle.missing"
         ],
+        failedCheckSummary: {
+          expression: [
+            "fixtureBundle.expressionAppliedAfterFrame",
+            "fixtureBundle.expressionCanvasChangedAfterFrame",
+            "fixtureBundle.expressionEmotionIdsObserved",
+            "fixtureBundle.runtimeLifecycle.expressionSetCalls",
+            "fixtureBundle.activeEmotionId"
+          ],
+          frameLoop: [
+            "fixtureBundle.runtimeLifecycle.updateMotionCalls",
+            "fixtureBundle.runtimeLifecycle.modelUpdateCalls",
+            "fixtureBundle.runtimeLifecycle.drawCalls",
+            "fixtureBundle.drawCalls",
+            "fixtureBundle.updateCalls"
+          ],
+          missing: ["generatedBundle.missing"]
+        },
         officialRenderer: {
           fixtureBundle: {
             activeEmotionId: "calm_idle",
