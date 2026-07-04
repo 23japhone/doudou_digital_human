@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "doudou.interaction-replay.v0.1",
+  "id": "working-session",
+  "titleZh": "显式工作会话",
+  "initial": {
+    "state": "waiting",
+    "wariness": 0,
+    "atMs": 0
+  },
+  "events": [
+    { "atMs": 0, "type": "runtime_started", "target": "runtime" },
+    { "atMs": 1000, "type": "work_started", "target": "runtime" },
+    {
+      "atMs": 1080,
+      "type": "motion_cue",
+      "target": "runtime",
+      "state": "approaching",
+      "direction": "left",
+      "motionIntensity": 0.72
+    },
+    { "atMs": 1180, "type": "work_ended", "target": "runtime" },
+    {
+      "atMs": 1260,
+      "type": "motion_cue",
+      "target": "runtime",
+      "state": "stopped",
+      "direction": "left",
+      "motionIntensity": 0.44
+    },
+    { "atMs": 2200, "type": "advance_time", "target": "runtime" }
+  ],
+  "expect": {
+    "statesInclude": ["working", "stopped"],
+    "scenariosInclude": ["working", "motion_stop"],
+    "emotionIdsInclude": ["focused_working", "happy_smile"],
+    "reactionActsInclude": ["work_hold", "motion_stop_rebound"],
+    "finalState": "waiting",
+    "maxWarinessAtMost": 0,
+    "stateStolenDuringWorking": false,
+    "passiveCursorMovedWindow": false,
+    "privacySanitized": true
+  }
+}

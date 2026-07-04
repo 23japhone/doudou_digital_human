@@ -66,8 +66,8 @@ describe("runtime interaction replay", () => {
     expect(recoveryResult.final.wariness).toBeLessThan(0.2);
   });
 
-  test("keeps drag and scale in working without wariness or motion stealing", async () => {
-    for (const fixtureId of ["working-drag", "working-scale"] as const) {
+  test("keeps drag, scale, and explicit work sessions in working without wariness or motion stealing", async () => {
+    for (const fixtureId of ["working-drag", "working-scale", "working-session"] as const) {
       const result = runPetInteractionReplay(await readFixture(fixtureId));
 
       expect(result.observed.states, fixtureId).toContain("working");
@@ -78,6 +78,17 @@ describe("runtime interaction replay", () => {
       expect(result.failedChecks, fixtureId).not.toContain("state_stolen_during_working");
       expect(result.final.state, fixtureId).toBe("waiting");
     }
+  });
+
+  test("lets explicit work-ended release working before the next motion cue", async () => {
+    const result = runPetInteractionReplay(await readFixture("working-session"));
+
+    expect(result.observed.states).toEqual(expect.arrayContaining(["working", "stopped"]));
+    expect(result.observed.scenarios).toEqual(expect.arrayContaining(["working", "motion_stop"]));
+    expect(result.observed.emotionIds).toEqual(expect.arrayContaining(["focused_working", "happy_smile"]));
+    expect(result.observed.reactionActs).toEqual(expect.arrayContaining(["work_hold", "motion_stop_rebound"]));
+    expect(result.failedChecks).not.toContain("state_stolen_during_working");
+    expect(result.final.state).toBe("waiting");
   });
 
   test("keeps replay fixtures and results privacy-safe", async () => {

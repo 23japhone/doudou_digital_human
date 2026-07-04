@@ -76,7 +76,7 @@ export function hasRuntimeSmokeSyntheticReplayEvidence(
     evidence.domEventsDispatched > 0 &&
     evidence.ipcEventsDispatched > 0 &&
     hasSameFixtureIds(evidence.fixtureIds, plan.fixtureIds) &&
-    ["poke", "motion_cue", "drag_started", "drag_ended", "scale_changed"].every((eventType) =>
+    ["poke", "motion_cue", "drag_started", "drag_ended", "scale_changed", "work_started", "work_ended"].every((eventType) =>
       evidence.appliedEventTypes.includes(eventType as RuntimeSmokeSyntheticReplayEvent["type"])
     )
   );

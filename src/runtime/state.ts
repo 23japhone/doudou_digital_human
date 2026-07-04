@@ -52,6 +52,7 @@ export interface RuntimePetVisualPose {
 export interface RuntimePetStateMachine {
   advance(deltaMs: number, nowMs?: number): RuntimePetState;
   current(): RuntimePetState;
+  endWorking(nowMs?: number): RuntimePetState;
   motion(cue: RuntimeMotionPetState | RuntimePetMotionCue, nowMs?: number): RuntimePetState;
   observed(): RuntimePetState[];
   pose(): RuntimePetVisualPose;
@@ -123,6 +124,12 @@ export function createRuntimePetStateMachine(
   return {
     advance,
     current: () => state,
+    endWorking: (nowMs = stateEnteredAtMs) => {
+      if (state !== "working") {
+        return state;
+      }
+      return setState("waiting", nowMs, createNeutralPose());
+    },
     motion: (cue, nowMs = stateEnteredAtMs) => {
       if (state === "poked" || state === "working") {
         return state;

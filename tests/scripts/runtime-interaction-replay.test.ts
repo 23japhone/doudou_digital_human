@@ -58,7 +58,7 @@ describe("runtime interaction replay script", () => {
     expect(line.startsWith(RUNTIME_INTERACTION_REPLAY_OUTPUT_PREFIX)).toBe(true);
     expect(JSON.parse(line.slice(RUNTIME_INTERACTION_REPLAY_OUTPUT_PREFIX.length))).toMatchObject({
       ok: true,
-      fixtureCount: 6,
+      fixtureCount: RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS.length,
       failedFixtures: []
     });
     expect(line).not.toContain("/Users/");

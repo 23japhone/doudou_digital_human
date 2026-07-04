@@ -335,6 +335,7 @@ Trace 推荐保留：
 | `quiet-recovery` | repeat poke then quiet ticks | `recovering`、`quiet_recovery`、`comfort_soft`、wariness decay |
 | `working-drag` | `drag_started`、motion cues、`drag_ended` | `working` holds, ordinary motion cue does not steal state |
 | `working-scale` | `scale_started`、`scale_changed`、`scale_ended` | `focused_working`、low motion budget、no wariness increase |
+| `working-session` | `work_started`、motion cues、`work_ended` | explicit work hold releases after `work_ended` |
 | `privacy-trace` | any above replay | trace contains no path, prompt, provider, secret or source payload |
 
 ## 测试要求

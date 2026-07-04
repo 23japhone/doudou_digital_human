@@ -20,6 +20,7 @@ const requiredFixtureIds = [
   "quiet-recovery",
   "working-drag",
   "working-scale",
+  "working-session",
   "privacy-trace"
 ];
 

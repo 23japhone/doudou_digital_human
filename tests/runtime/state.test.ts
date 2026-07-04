@@ -141,6 +141,21 @@ describe("runtime pet state machine", () => {
     expect(machine.current()).toBe("waiting");
   });
 
+  test("ends explicit working state before accepting the next motion cue", () => {
+    const machine = createRuntimePetStateMachine();
+
+    machine.working(3000);
+    machine.motion(motionCue("approaching", 0.72), 3060);
+    expect(machine.current()).toBe("working");
+
+    machine.endWorking(3120);
+    expect(machine.current()).toBe("waiting");
+
+    machine.motion(motionCue("stopped", 0.44), 3180);
+    expect(machine.current()).toBe("stopped");
+    expect(machine.pose().stopRebound).toBeCloseTo(0.44, 5);
+  });
+
   test("records observed states in first-seen order without duplicates", () => {
     const machine = createRuntimePetStateMachine();
 

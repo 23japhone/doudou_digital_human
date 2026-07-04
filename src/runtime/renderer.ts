@@ -769,8 +769,12 @@ async function applyRuntimeSyntheticReplayEvent(
     await waitForSmokeMotion(30);
     return;
   }
-  if (event.type === "scale_ended" || event.type === "work_ended") {
+  if (event.type === "scale_ended") {
     applyRuntimePetState(stateMachine.advance(260, performance.now() + 260));
+    return;
+  }
+  if (event.type === "work_ended") {
+    applyRuntimePetState(stateMachine.endWorking(performance.now()));
     return;
   }
   if (event.type === "motion_cue" && event.state) {

@@ -41,6 +41,8 @@ describe("runtime smoke synthetic replay adapter", () => {
       "drag_started",
       "drag_ended",
       "scale_changed",
+      "work_started",
+      "work_ended",
       "cursor_alpha_entered",
       "quiet_tick"
     ]));
@@ -58,7 +60,16 @@ describe("runtime smoke synthetic replay adapter", () => {
   test("validates DOM and IPC evidence against the synthetic replay plan", async () => {
     const plan = createRuntimeSmokeSyntheticReplayPlan(await readFixtures());
     const evidence: RuntimeSmokeSyntheticReplayEvidence = {
-      appliedEventTypes: ["runtime_started", "poke", "motion_cue", "drag_started", "drag_ended", "scale_changed"],
+      appliedEventTypes: [
+        "runtime_started",
+        "poke",
+        "motion_cue",
+        "drag_started",
+        "drag_ended",
+        "scale_changed",
+        "work_started",
+        "work_ended"
+      ],
       completed: true,
       domEventsDispatched: 2,
       enabled: true,
@@ -76,6 +87,10 @@ describe("runtime smoke synthetic replay adapter", () => {
     expect(hasRuntimeSmokeSyntheticReplayEvidence({
       ...evidence,
       ipcEventsDispatched: 0
+    }, plan)).toBe(false);
+    expect(hasRuntimeSmokeSyntheticReplayEvidence({
+      ...evidence,
+      appliedEventTypes: evidence.appliedEventTypes.filter((eventType) => eventType !== "work_started")
     }, plan)).toBe(false);
   });
 

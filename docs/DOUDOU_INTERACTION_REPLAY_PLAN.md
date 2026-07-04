@@ -19,9 +19,10 @@ Owning domain: `src/runtime/`, `tests/runtime/`, `fixtures/runtime/`
 - `quiet-recovery`: 安静后从委屈或鼓脸自然恢复。
 - `working-drag`: 拖拽期间进入低干扰工作态。
 - `working-scale`: 缩放期间进入低干扰工作态。
+- `working-session`: 显式工作会话期间进入低干扰工作态，`work_ended` 后释放普通 motion cue。
 - `privacy-trace`: 任何 replay trace 都不得泄漏路径、prompt、provider payload 或秘密。
 
-首个 pure runner 已落在 `src/runtime/interaction-replay.ts`，六个最小 JSON fixtures 已落在 `fixtures/runtime/interaction_replay/`，测试入口是 `tests/runtime/interaction-replay.test.ts`。团队快速入口是 `npm run replay:runtime`；`npm run smoke:runtime` 已在启动 Electron 证据前复用同一批 fixtures 做 replay preflight，并可通过 `--synthetic-replay` 启用更接近 renderer DOM/IPC 的可选回放 adapter。
+首个 pure runner 已落在 `src/runtime/interaction-replay.ts`，七个最小 JSON fixtures 已落在 `fixtures/runtime/interaction_replay/`，测试入口是 `tests/runtime/interaction-replay.test.ts`。团队快速入口是 `npm run replay:runtime`；`npm run smoke:runtime` 已在启动 Electron 证据前复用同一批 fixtures 做 replay preflight，并可通过 `--synthetic-replay` 启用更接近 renderer DOM/IPC 的可选回放 adapter。
 
 ## 非目标
 
@@ -313,7 +314,40 @@ export type PetInteractionReplayFailureCode =
 - 缩放中的 cursor contact 被当成 `poke`。
 - 缩放期间普通 cursor cue 抢占 `working`。
 
-### 6. `privacy-trace`
+### 6. `working-session`
+
+目的：证明显式工作会话也进入低干扰工作态，并且 `work_ended` 后普通 motion cue 可以重新生效。
+
+输入事件：
+
+```json
+[
+  { "atMs": 0, "type": "runtime_started", "target": "runtime" },
+  { "atMs": 1000, "type": "work_started", "target": "runtime" },
+  { "atMs": 1080, "type": "motion_cue", "target": "runtime", "state": "approaching", "direction": "left", "motionIntensity": 0.72 },
+  { "atMs": 1180, "type": "work_ended", "target": "runtime" },
+  { "atMs": 1260, "type": "motion_cue", "target": "runtime", "state": "stopped", "direction": "left", "motionIntensity": 0.44 },
+  { "atMs": 2200, "type": "advance_time", "target": "runtime" }
+]
+```
+
+必须观察到：
+
+- states include `working` and post-end `stopped`。
+- scenarios include `working` and `motion_stop`。
+- emotion ids include `focused_working` and `happy_smile`。
+- reaction acts include `work_hold` and `motion_stop_rebound`。
+- `state_stolen_during_working` 不得出现。
+- `maxWariness` remains `0`。
+- final state returns to `waiting`。
+
+不得出现：
+
+- `work_started` 期间普通 `motion_cue` 抢占 `working`。
+- `work_ended` 后继续卡在 `working`。
+- 显式工作会话写入 bundle 或长期记忆。
+
+### 7. `privacy-trace`
 
 目的：证明所有 replay trace 都是 sanitized evidence。
 
@@ -359,7 +393,7 @@ export type PetInteractionReplayFailureCode =
 - `single-poke` 不进入 repeat-poke states。
 - `repeat-poke-retreat-watch` 达到 `waryDodgeThreshold`。
 - `quiet-recovery` 证明 wariness 下降并最终 settled。
-- `working-drag` 和 `working-scale` 证明普通 motion cue 不抢占 `working`。
+- `working-drag`、`working-scale` 和 `working-session` 证明普通 motion cue 不抢占 `working`，且显式 `work_ended` 能释放工作态。
 - Passive cursor contact 不移动 overlay window；pure runner 里该字段固定为 `false`，Electron smoke 继续提供真实证明。
 
 ### 隐私证据
@@ -378,14 +412,15 @@ export type PetInteractionReplayFailureCode =
 3. 按 `events[*].atMs` 顺序执行：
    - `poke` 调用 `recordRuntimePokeEmotion()`、state machine `tap()`，并根据 phase 推导 `repeat_poke_retreat` / `repeat_poke_watch`。
    - `quiet_tick` 调用 `decayRuntimeEmotionMemory()` 和 `classifyRuntimeEmotionMotionPhase()`。
-   - `drag_started`、`scale_started`、`scale_changed` 调用 state machine `working()`。
+   - `drag_started`、`scale_started`、`scale_changed`、`work_started` 调用 state machine `working()`。
+   - `work_ended` 调用 state machine `endWorking()`，释放后续普通 motion cue。
    - `motion_cue` 调用 state machine `motion()`，但验证 `working` 和 `poked` 的抢占保护。
    - `advance_time` 调用 state machine `advance()`。
 4. 每步生成 `PetInteractionTraceEntry`。
 5. 从 trace 汇总 `PetInteractionReplayResult`。
 6. 对 `expect` 和 privacy gate 断言。
 
-当前 Electron smoke 已复用同一批 fixture 做轻量 replay preflight。需要更细的 Electron 层事件回放时，可运行 `npm run smoke:runtime -- --synthetic-replay`，该模式会把 fixtures 转成脱敏 `doudou.runtime-smoke.synthetic-replay.v0.1` plan，经 main 注入 renderer，并在 renderer 内把 fixture events 映射到现有 DOM/IPC 路径：`poke` 走 `recordPoke` IPC，drag 走 `startWindowDrag` / `dragWindowTo` / `endWindowDrag` IPC，scale/cursor 走 synthetic DOM event，`motion_cue` 走 runtime state machine。它是默认 smoke 的附加证据，不替代现有窗口、canvas、drag/scale 和渲染 evidence。
+当前 Electron smoke 已复用同一批 fixture 做轻量 replay preflight。需要更细的 Electron 层事件回放时，可运行 `npm run smoke:runtime -- --synthetic-replay`，该模式会把 fixtures 转成脱敏 `doudou.runtime-smoke.synthetic-replay.v0.1` plan，经 main 注入 renderer，并在 renderer 内把 fixture events 映射到现有 DOM/IPC 路径：`poke` 走 `recordPoke` IPC，drag 走 `startWindowDrag` / `dragWindowTo` / `endWindowDrag` IPC，scale/cursor 走 synthetic DOM event，`work_started` / `work_ended` 走 runtime state machine，`motion_cue` 走 runtime state machine。它是默认 smoke 的附加证据，不替代现有窗口、canvas、drag/scale 和渲染 evidence。
 
 ## 与现有检查的关系
 
@@ -395,7 +430,7 @@ export type PetInteractionReplayFailureCode =
 | `tests/runtime/reaction.test.ts` | 保护 wariness、alpha reaction 和 phase |
 | `tests/runtime/default-doudou-emotions.test.ts` | 保护 scenario 到 emotion id |
 | `tests/runtime/interaction-replay.test.ts` | 串起 event -> trace -> acceptance |
-| `npm run replay:runtime` | 读取六个 JSON fixtures 并输出脱敏 replay summary |
+| `npm run replay:runtime` | 读取七个 JSON fixtures 并输出脱敏 replay summary |
 | `npm run smoke:runtime` | 先执行 replay preflight，再证明真实 Electron runtime、canvas、drag/scale、窗口和渲染 evidence |
 | `npm run smoke:runtime -- --synthetic-replay` | 在默认 smoke 证据上额外执行 fixtures -> renderer DOM/IPC adapter |
 
@@ -411,6 +446,7 @@ fixtures/runtime/interaction_replay/repeat-poke-retreat-watch.json
 fixtures/runtime/interaction_replay/quiet-recovery.json
 fixtures/runtime/interaction_replay/working-drag.json
 fixtures/runtime/interaction_replay/working-scale.json
+fixtures/runtime/interaction_replay/working-session.json
 fixtures/runtime/interaction_replay/privacy-trace.json
 src/runtime/interaction-replay.ts
 src/scripts/runtime-interaction-replay.ts
@@ -436,7 +472,7 @@ npm run smoke:runtime -- --synthetic-replay
 
 实现 replay runner 或 fixture 时，review 至少检查：
 
-- 是否覆盖全部六个最小 fixtures。
+- 是否覆盖全部七个最小 fixtures。
 - 是否保持 `pet bundle v0.1` 不变。
 - 是否只使用 runtime-only state 和 synthetic replay input。
 - 是否把 `poke`、`repeat_poke_retreat`、`repeat_poke_watch`、`quiet_recovery`、`working` 都变成可断言 evidence。

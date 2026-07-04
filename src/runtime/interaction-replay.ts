@@ -29,6 +29,7 @@ export const RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS = [
   "quiet-recovery",
   "working-drag",
   "working-scale",
+  "working-session",
   "privacy-trace"
 ] as const;
 
@@ -303,6 +304,12 @@ export function runPetInteractionReplay(fixture: PetInteractionReplayFixture): P
       ) {
         machine.working(event.atMs);
         recordTrace(event, "work_hold", classifyRuntimeEmotionMotionPhase(memory, event.atMs));
+        continue;
+      }
+
+      if (event.type === "work_ended") {
+        machine.endWorking(event.atMs);
+        recordTrace(event, reactionActForState(machine.current()), classifyRuntimeEmotionMotionPhase(memory, event.atMs));
         continue;
       }
 
