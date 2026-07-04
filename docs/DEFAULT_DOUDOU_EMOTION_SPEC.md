@@ -65,6 +65,8 @@ Stage A 不接真实模型，但后续研究可沿三个边界推进：
 
 Stage B 已将本文件的 12 个 emotion ids 映射为 Live2D Cubism expression 参数表，并定义 LLM/VLM 只输出安全意图和情绪建议的仲裁规格。详见 `docs/DEFAULT_DOUDOU_LIVE2D_AND_MODEL_ARBITRATION.md`。
 
+默认兜兜的发型、服装、表情资产 QA、动作资产 QA、授权与隐私边界由 `docs/DEFAULT_DOUDOU_CHARACTER_ASSET_SPEC.md` 维护。该规格不进入 `pet bundle v0.1` schema，但用于评审 sprite、Live2D 和未来生成 adapter 输出是否仍然读作“兜兜二次元数字人”。
+
 ## Verification
 
 Stage A 的自动证据来自：

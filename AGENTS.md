@@ -16,6 +16,7 @@ This file is the short Codex entrypoint. Keep durable project details in `docs/`
 - API, schema, CLI, event, or integration changes: read `docs/INTERFACES.md`.
 - Safety-sensitive changes: read `docs/SAFETY_POLICY.md`.
 - Testing or verification changes: read `docs/TESTING.md`.
+- 默认兜兜二次元角色资产、发型、服装、表情或动作 QA 变化：读 `docs/DEFAULT_DOUDOU_CHARACTER_ASSET_SPEC.md`.
 - 阶段模块实现/实现-review-修复循环：读 `.codex/skills/stage-module-loop/SKILL.md`.
 - Terminology questions: read `docs/GLOSSARY.md`.
 - Agent runtime/model/eval changes: read `docs/AGENT_RUNTIME.md`, `docs/MODEL_IO_SPEC.md`, and `docs/EVAL_PLAN.md`.
