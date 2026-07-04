@@ -44,10 +44,11 @@ describe("default doudou character asset spec", () => {
   test("covers hair, outfit, expression, motion, and safety QA requirements", async () => {
     const markdown = await readSpec();
 
-    expect(markdown).toContain("深紫");
+    expect(markdown).toContain("棕色");
     expect(markdown).toContain("侧分刘海");
-    expect(markdown).toContain("蓝色");
-    expect(markdown).toContain("上衣");
+    expect(markdown).toContain("红色发饰");
+    expect(markdown).toContain("黄色开衫");
+    expect(markdown).toContain("深色水手领");
     expect(markdown).toContain("禁止猫耳");
     expect(markdown).toContain("禁止尾巴");
     expect(markdown).toContain("不性感化");

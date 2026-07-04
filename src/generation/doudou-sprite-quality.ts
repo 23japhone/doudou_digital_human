@@ -1,4 +1,5 @@
 import { PNG } from "pngjs";
+import { DEFAULT_DOUDOU_CHARACTER_PROFILE } from "./doudou-sprite.js";
 
 type Rgb = readonly [number, number, number];
 
@@ -10,6 +11,7 @@ export interface DoudouSpriteQualityIssue {
     | "skin_readability"
     | "outfit_readability"
     | "collar_readability"
+    | "ribbon_readability"
     | "no_animal_ears"
     | "blink_expression"
     | "surprised_expression"
@@ -37,16 +39,7 @@ export class DoudouSpriteQualityError extends Error {
   }
 }
 
-const palette = {
-  accentYellow: [255, 226, 95],
-  collar: [255, 242, 176],
-  hairMain: [54, 48, 88],
-  hairShade: [82, 63, 125],
-  eye: [30, 34, 62],
-  outfit: [92, 121, 214],
-  skin: [255, 214, 190],
-  tear: [132, 202, 255]
-} as const;
+const palette = DEFAULT_DOUDOU_CHARACTER_PROFILE.palette;
 
 export function analyzeDoudouSpriteAtlasQuality(atlas: PNG): DoudouSpriteQualityReport {
   const issues: DoudouSpriteQualityIssue[] = [];
@@ -78,8 +71,8 @@ export function analyzeDoudouSpriteAtlasQuality(atlas: PNG): DoudouSpriteQuality
       frameIndex,
       "hair_readability",
       countApproxColor(frame, palette.hairMain) + countApproxColor(frame, palette.hairShade),
-      5800,
-      "Deep purple hair and side locks must remain readable at 256px."
+      6600,
+      "Brown hair and long side locks must remain readable at 256px."
     );
     requireMetric(
       issues,
@@ -93,25 +86,33 @@ export function analyzeDoudouSpriteAtlasQuality(atlas: PNG): DoudouSpriteQuality
       issues,
       frameIndex,
       "outfit_readability",
-      countApproxColor(frame, palette.outfit),
-      2500,
-      "Blue outfit must remain readable at 256px."
+      countApproxColor(frame, palette.cardigan),
+      1600,
+      "Yellow cardigan must remain readable at 256px."
     );
     requireMetric(
       issues,
       frameIndex,
       "collar_readability",
-      countApproxColor(frame, palette.collar),
+      countApproxColor(frame, palette.sailor),
+      600,
+      "Dark sailor collar and skirt must remain readable at 256px."
+    );
+    requireMetric(
+      issues,
+      frameIndex,
+      "ribbon_readability",
+      countApproxColor(frame, palette.ribbon),
       180,
-      "Light collar must remain readable at 256px."
+      "Red hair ribbons must remain readable at 256px."
     );
     requireMetric(
       issues,
       frameIndex,
       "hair_readability",
       countApproxColor(smallFrame, palette.hairMain) + countApproxColor(smallFrame, palette.hairShade),
-      1300,
-      "Deep purple hair and side locks must remain readable at 128px."
+      1450,
+      "Brown hair and long side locks must remain readable at 128px."
     );
     requireMetric(
       issues,
@@ -125,17 +126,25 @@ export function analyzeDoudouSpriteAtlasQuality(atlas: PNG): DoudouSpriteQuality
       issues,
       frameIndex,
       "outfit_readability",
-      countApproxColor(smallFrame, palette.outfit),
-      560,
-      "Blue outfit must remain readable at 128px."
+      countApproxColor(smallFrame, palette.cardigan),
+      390,
+      "Yellow cardigan must remain readable at 128px."
     );
     requireMetric(
       issues,
       frameIndex,
       "collar_readability",
-      countApproxColor(smallFrame, palette.collar),
+      countApproxColor(smallFrame, palette.sailor),
+      145,
+      "Dark sailor collar and skirt must remain readable at 128px."
+    );
+    requireMetric(
+      issues,
+      frameIndex,
+      "ribbon_readability",
+      countApproxColor(smallFrame, palette.ribbon),
       35,
-      "Light collar must remain readable at 128px."
+      "Red hair ribbons must remain readable at 128px."
     );
     if (pixelAt(frame, 68, 96)[3] !== 0 || pixelAt(frame, 188, 96)[3] !== 0) {
       issues.push({
@@ -213,9 +222,9 @@ function analyzeCoreExpressions(atlas: PNG, issues: DoudouSpriteQualityIssue[]):
     issues,
     7,
     "working_expression",
-    countApproxColor(workingFrame, palette.accentYellow, 12, { x: 91, y: 171, width: 74, height: 36 }),
+    countApproxColor(workingFrame, palette.cardigan, 12, { x: 91, y: 171, width: 74, height: 36 }),
     120,
-    "Working frame must show a readable yellow work prop."
+    "Working frame must keep the yellow cardigan readable while showing a small work prop."
   );
 }
 

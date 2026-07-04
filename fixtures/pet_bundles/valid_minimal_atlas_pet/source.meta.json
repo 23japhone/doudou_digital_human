@@ -1,8 +1,8 @@
 {
   "fixture": true,
   "generatedBy": "src/scripts/generate-fixture.ts",
-  "sourceType": "synthetic-geometric-shapes",
-  "license": "project-owned-test-fixture",
+  "sourceType": "authorized-aig-character-sprite",
+  "license": "user-authorized-derived-default-character-sprite",
   "containsPersonalImage": false,
   "containsExternalAsset": false
 }

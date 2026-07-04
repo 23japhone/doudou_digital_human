@@ -49,7 +49,7 @@ const sourceMetaSchema = z.object({
   generatedBy: z.string().min(1).max(160).optional(),
   generationAdapter: z.string().min(1).max(160).optional(),
   generationAdapterVersion: z.string().min(1).max(80).optional(),
-  sourceType: z.enum(["synthetic-geometric-shapes", "local-image-intake"]).optional(),
+  sourceType: z.enum(["synthetic-geometric-shapes", "local-image-intake", "authorized-aig-character-sprite"]).optional(),
   license: z.string().min(1).max(160).optional(),
   containsPersonalImage: z.boolean().optional(),
   containsExternalAsset: z.boolean().optional(),

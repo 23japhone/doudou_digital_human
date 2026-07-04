@@ -1,5 +1,6 @@
 import { PNG } from "pngjs";
 import {
+  DEFAULT_DOUDOU_CHARACTER_PROFILE,
   createDoudouSourceAccentsFromPng,
   createDoudouSpriteFrames
 } from "../doudou-sprite.js";
@@ -26,7 +27,7 @@ export function createDoudouDigitalHumanAdapter(): PetGenerationAdapter {
         adapterId,
         adapterVersion,
         petId: "generated_local_pet",
-        petName: "兜兜二次元数字人",
+        petName: DEFAULT_DOUDOU_CHARACTER_PROFILE.bundleName,
         previewFrameIndex: previewFrame?.index ?? 0,
         previewPng: previewFrame?.png ?? frames[0]!.png,
         frames

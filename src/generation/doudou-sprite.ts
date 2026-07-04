@@ -1,7 +1,30 @@
 import { PNG } from "pngjs";
 import type { GeneratedPetFrame } from "./adapters/types.js";
 
-type Rgb = [number, number, number];
+type Rgb = readonly [number, number, number];
+
+export const DEFAULT_DOUDOU_CHARACTER_PROFILE = {
+  id: "aig_authorized_default_doudou",
+  displayName: "兜兜",
+  bundleName: "兜兜 AIG 默认二次元数字人",
+  sourceType: "authorized-aig-character-sprite",
+  palette: {
+    cardigan: [238, 190, 78],
+    cardiganShade: [210, 145, 55],
+    sailor: [42, 48, 78],
+    sailorShade: [28, 32, 58],
+    ribbon: [190, 48, 58],
+    hairMain: [108, 70, 42],
+    hairShade: [72, 46, 32],
+    hairHighlight: [176, 118, 72],
+    skin: [255, 214, 190],
+    eye: [30, 34, 62],
+    blush: [255, 139, 156],
+    tear: [132, 202, 255],
+    cream: [246, 231, 177],
+    shoe: [96, 62, 42]
+  }
+} as const;
 
 export interface DoudouSpriteSourceAccents {
   left: Rgb;
@@ -27,6 +50,14 @@ export function createDoudouSpriteFrames(options: DoudouSpriteOptions = {}): Gen
     role: frameIndex >= 4 ? "tap_react" as const : "idle" as const,
     png: createDoudouSpriteFramePng(frameIndex, options)
   }));
+}
+
+export function createDoudouSpriteAtlasPng(options: DoudouSpriteOptions = {}): Buffer {
+  const png = new PNG({ width: 1024, height: 512 });
+  for (let frameIndex = 0; frameIndex < 8; frameIndex += 1) {
+    drawDoudouSpriteFrame(png, (frameIndex % 4) * 256, Math.floor(frameIndex / 4) * 256, frameIndex, options);
+  }
+  return PNG.sync.write(png);
 }
 
 export function createDoudouSpriteFramePng(frameIndex: number, options: DoudouSpriteOptions = {}): Buffer {
@@ -56,21 +87,29 @@ function drawDoudouSpriteFrame(
   const pose = doudouFramePose(frameIndex);
   const yShift = pose.yShift;
   const headX = pose.headX;
-  const hairColor: Rgb = [54, 48, 88];
-  const hairShade: Rgb = [82, 63, 125];
-  const hairHighlight: Rgb = [184, 156, 216];
-  const skinColor: Rgb = [255, 214, 190];
-  const eyeColor: Rgb = [30, 34, 62];
-  const outfitColor: Rgb = [92, 121, 214];
-  const outfitShade: Rgb = [62, 77, 154];
-  const blushColor: Rgb = [255, 139, 156];
-  const accentColor: Rgb = [255, 226, 95];
-  const tearColor: Rgb = [132, 202, 255];
+  const palette = DEFAULT_DOUDOU_CHARACTER_PROFILE.palette;
+  const hairColor: Rgb = palette.hairMain;
+  const hairShade: Rgb = palette.hairShade;
+  const hairHighlight: Rgb = palette.hairHighlight;
+  const skinColor: Rgb = palette.skin;
+  const eyeColor: Rgb = palette.eye;
+  const cardiganColor: Rgb = palette.cardigan;
+  const cardiganShade: Rgb = palette.cardiganShade;
+  const sailorColor: Rgb = palette.sailor;
+  const sailorShade: Rgb = palette.sailorShade;
+  const ribbonColor: Rgb = palette.ribbon;
+  const blushColor: Rgb = palette.blush;
+  const tearColor: Rgb = palette.tear;
 
-  fillEllipse(png, offsetX + 128, offsetY + 226 + yShift, 58, 8, [34, 42, 80], 90);
-  fillEllipse(png, offsetX + 128, offsetY + 198 + yShift, 58, 40, outfitColor, 255);
-  fillEllipse(png, offsetX + 96 + pose.armOffset, offsetY + 202 + yShift, 15, 27, outfitShade, 255);
-  fillEllipse(png, offsetX + 160 + pose.armOffset, offsetY + 202 + yShift, 15, 27, outfitShade, 255);
+  fillEllipse(png, offsetX + 128, offsetY + 226 + yShift, 58, 8, sailorShade, 90);
+  fillRect(png, offsetX + 105, offsetY + 214 + yShift, 9, 22, sailorShade, 255);
+  fillRect(png, offsetX + 142, offsetY + 214 + yShift, 9, 22, sailorShade, 255);
+  fillEllipse(png, offsetX + 110, offsetY + 239 + yShift, 14, 5, palette.shoe, 255);
+  fillEllipse(png, offsetX + 148, offsetY + 239 + yShift, 14, 5, palette.shoe, 255);
+
+  fillEllipse(png, offsetX + 128, offsetY + 198 + yShift, 57, 38, cardiganColor, 255);
+  fillEllipse(png, offsetX + 96 + pose.armOffset, offsetY + 201 + yShift, 15, 27, cardiganShade, 255);
+  fillEllipse(png, offsetX + 160 + pose.armOffset, offsetY + 201 + yShift, 15, 27, cardiganShade, 255);
   fillCircle(png, offsetX + 84 + pose.armOffset, offsetY + 202 + yShift, 9, skinColor, 255);
   fillCircle(png, offsetX + 172 + pose.armOffset, offsetY + 202 + yShift, 9, skinColor, 255);
 
@@ -79,11 +118,93 @@ function drawDoudouSpriteFrame(
     fillRect(png, offsetX + 161 + pose.armOffset, offsetY + 188 + yShift, 22, 29, options.sourceAccents.right, 255);
   }
 
+  fillTriangle(
+    png,
+    offsetX + 94,
+    offsetY + 172 + yShift,
+    offsetX + 126,
+    offsetY + 190 + yShift,
+    offsetX + 116,
+    offsetY + 171 + yShift,
+    sailorColor,
+    255
+  );
+  fillTriangle(
+    png,
+    offsetX + 162,
+    offsetY + 172 + yShift,
+    offsetX + 130,
+    offsetY + 190 + yShift,
+    offsetX + 140,
+    offsetY + 171 + yShift,
+    sailorColor,
+    255
+  );
+  fillRect(png, offsetX + 124, offsetY + 174 + yShift, 8, 17, sailorShade, 255);
+  fillTriangle(
+    png,
+    offsetX + 104,
+    offsetY + 207 + yShift,
+    offsetX + 152,
+    offsetY + 207 + yShift,
+    offsetX + 128,
+    offsetY + 226 + yShift,
+    sailorColor,
+    255
+  );
+  fillRect(png, offsetX + 112, offsetY + 209 + yShift, 5, 13, sailorShade, 255);
+  fillRect(png, offsetX + 132, offsetY + 208 + yShift, 5, 16, sailorShade, 255);
+  fillRect(png, offsetX + 146, offsetY + 209 + yShift, 5, 13, sailorShade, 255);
+  fillTriangle(
+    png,
+    offsetX + 120,
+    offsetY + 187 + yShift,
+    offsetX + 128,
+    offsetY + 194 + yShift,
+    offsetX + 120,
+    offsetY + 199 + yShift,
+    ribbonColor,
+    255
+  );
+  fillTriangle(
+    png,
+    offsetX + 136,
+    offsetY + 187 + yShift,
+    offsetX + 128,
+    offsetY + 194 + yShift,
+    offsetX + 136,
+    offsetY + 199 + yShift,
+    ribbonColor,
+    255
+  );
+  fillCircle(png, offsetX + 128, offsetY + 193 + yShift, 4, sailorShade, 255);
   fillRect(png, offsetX + 116, offsetY + 163 + yShift, 24, 25, skinColor, 255);
 
   fillEllipse(png, offsetX + 128 + headX, offsetY + 106 + yShift, 57, 61, hairColor, 255);
-  fillEllipse(png, offsetX + 87 + headX, offsetY + 128 + yShift, 14, 50, hairColor, 255);
-  fillEllipse(png, offsetX + 169 + headX, offsetY + 128 + yShift, 14, 50, hairColor, 255);
+  fillEllipse(png, offsetX + 87 + headX, offsetY + 132 + yShift, 14, 56, hairShade, 255);
+  fillEllipse(png, offsetX + 169 + headX, offsetY + 132 + yShift, 14, 56, hairShade, 255);
+  fillTriangle(
+    png,
+    offsetX + 79 + headX,
+    offsetY + 154 + yShift,
+    offsetX + 97 + headX,
+    offsetY + 154 + yShift,
+    offsetX + 85 + headX,
+    offsetY + 188 + yShift,
+    hairShade,
+    255
+  );
+  fillTriangle(
+    png,
+    offsetX + 159 + headX,
+    offsetY + 154 + yShift,
+    offsetX + 177 + headX,
+    offsetY + 154 + yShift,
+    offsetX + 171 + headX,
+    offsetY + 188 + yShift,
+    hairShade,
+    255
+  );
   fillEllipse(png, offsetX + 128 + headX, offsetY + 124 + yShift, 43, 47, skinColor, 255);
 
   fillTriangle(
@@ -100,7 +221,7 @@ function drawDoudouSpriteFrame(
   fillTriangle(
     png,
     offsetX + 118 + headX,
-    offsetY + 76 + yShift,
+    offsetY + 75 + yShift,
     offsetX + 159 + headX,
     offsetY + 87 + yShift,
     offsetX + 140 + headX,
@@ -122,38 +243,50 @@ function drawDoudouSpriteFrame(
   fillCircle(png, offsetX + 100 + headX, offsetY + 86 + yShift, 12, hairShade, 255);
   fillCircle(png, offsetX + 158 + headX, offsetY + 88 + yShift, 11, hairColor, 255);
   fillRect(png, offsetX + 127 + headX, offsetY + 78 + yShift, 21, 3, hairHighlight, 255);
-
+  fillCircle(png, offsetX + 95 + headX, offsetY + 94 + yShift, 8, ribbonColor, 255);
   fillTriangle(
     png,
-    offsetX + 112,
-    offsetY + 179 + yShift,
-    offsetX + 128,
-    offsetY + 190 + yShift,
-    offsetX + 144,
-    offsetY + 179 + yShift,
-    [255, 242, 176],
+    offsetX + 84 + headX,
+    offsetY + 88 + yShift,
+    offsetX + 95 + headX,
+    offsetY + 94 + yShift,
+    offsetX + 86 + headX,
+    offsetY + 101 + yShift,
+    ribbonColor,
     255
   );
   fillTriangle(
     png,
-    offsetX + 97,
-    offsetY + 176 + yShift,
-    offsetX + 120,
-    offsetY + 190 + yShift,
-    offsetX + 114,
-    offsetY + 172 + yShift,
-    [255, 242, 176],
+    offsetX + 106 + headX,
+    offsetY + 88 + yShift,
+    offsetX + 95 + headX,
+    offsetY + 94 + yShift,
+    offsetX + 106 + headX,
+    offsetY + 102 + yShift,
+    ribbonColor,
+    255
+  );
+  fillCircle(png, offsetX + 161 + headX, offsetY + 95 + yShift, 7, ribbonColor, 255);
+  fillTriangle(
+    png,
+    offsetX + 152 + headX,
+    offsetY + 90 + yShift,
+    offsetX + 161 + headX,
+    offsetY + 95 + yShift,
+    offsetX + 152 + headX,
+    offsetY + 103 + yShift,
+    ribbonColor,
     255
   );
   fillTriangle(
     png,
-    offsetX + 159,
-    offsetY + 176 + yShift,
-    offsetX + 136,
-    offsetY + 190 + yShift,
-    offsetX + 142,
-    offsetY + 172 + yShift,
-    [255, 242, 176],
+    offsetX + 170 + headX,
+    offsetY + 90 + yShift,
+    offsetX + 161 + headX,
+    offsetY + 95 + yShift,
+    offsetX + 171 + headX,
+    offsetY + 103 + yShift,
+    ribbonColor,
     255
   );
 
@@ -164,14 +297,14 @@ function drawDoudouSpriteFrame(
   drawBlush(png, offsetX + 152 + headX, offsetY + 141 + yShift, blushColor, pose.expression);
 
   if (pose.expression === "surprised") {
-    fillCircle(png, offsetX + 75, offsetY + 58, 6, accentColor, 255);
-    fillCircle(png, offsetX + 184, offsetY + 62, 5, accentColor, 255);
+    fillCircle(png, offsetX + 75, offsetY + 58, 6, palette.cream, 255);
+    fillCircle(png, offsetX + 184, offsetY + 62, 5, palette.cream, 255);
     fillCircle(png, offsetX + 75, offsetY + 58, 2, [255, 255, 255], 255);
   }
   if (pose.expression === "curious") {
-    fillCircle(png, offsetX + 184, offsetY + 72, 4, accentColor, 255);
-    fillRect(png, offsetX + 183, offsetY + 60, 3, 8, accentColor, 255);
-    fillCircle(png, offsetX + 185, offsetY + 58, 5, accentColor, 255);
+    fillCircle(png, offsetX + 184, offsetY + 72, 4, palette.cream, 255);
+    fillRect(png, offsetX + 183, offsetY + 60, 3, 8, palette.cream, 255);
+    fillCircle(png, offsetX + 185, offsetY + 58, 5, palette.cream, 255);
   }
   if (pose.expression === "teary") {
     fillEllipse(png, offsetX + 107 + headX, offsetY + 137 + yShift, 3, 8, tearColor, 255);
@@ -179,9 +312,9 @@ function drawDoudouSpriteFrame(
     fillCircle(png, offsetX + 108 + headX, offsetY + 134 + yShift, 2, [235, 249, 255], 255);
   }
   if (pose.expression === "working") {
-    fillRect(png, offsetX + 106, offsetY + 195 + yShift, 44, 14, accentColor, 255);
-    fillRect(png, offsetX + 110, offsetY + 198 + yShift, 36, 3, [255, 248, 186], 255);
-    fillRect(png, offsetX + 114, offsetY + 204 + yShift, 28, 2, outfitShade, 255);
+    fillRect(png, offsetX + 106, offsetY + 195 + yShift, 44, 14, sailorColor, 255);
+    fillRect(png, offsetX + 110, offsetY + 198 + yShift, 36, 3, palette.cream, 255);
+    fillRect(png, offsetX + 114, offsetY + 204 + yShift, 28, 2, cardiganShade, 255);
   }
 }
 

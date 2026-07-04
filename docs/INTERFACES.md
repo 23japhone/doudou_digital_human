@@ -59,7 +59,7 @@ Potential developer interfaces:
 - `pet bundle v0.1` uses a strict file allowlist. Files not referenced by `pet.json` are rejected.
 - `preview.png` and atlas assets must decode as PNGs and match declared dimensions.
 - `pet bundle v0.1` requires `privacy.sourceImageStored` to be false; source images, source image paths, raw prompts, raw model responses, secrets, and other private payloads must not be present in the bundle.
-- `source.meta.json` uses a strict v0.1 allowlist for non-sensitive provenance fields such as `fixture`, `generatedBy`, `generationAdapter`, `generationAdapterVersion`, `sourceType`, `inputMime`, `inputBytes`, `createdAt`, and `sourceImageStored:false`.
+- `source.meta.json` uses a strict v0.1 allowlist for non-sensitive provenance fields such as `fixture`, `generatedBy`, `generationAdapter`, `generationAdapterVersion`, `sourceType`, `inputMime`, `inputBytes`, `createdAt`, and `sourceImageStored:false`. Allowed `sourceType` values are `synthetic-geometric-shapes`, `local-image-intake`, and `authorized-aig-character-sprite`.
 - Add migrations only after at least one real bundle format exists.
 - Keep generated assets deterministic enough for regression tests where possible.
 
@@ -73,7 +73,7 @@ Generation adapters receive validated local source-image metadata and return gen
 - one transparent 256x256 `previewPng`
 - no source image paths, prompts, raw model responses, tokens, secrets, or provider payloads
 
-The default local adapter is `doudou-digital-human-adapter@0.1.0`. It is non-model and local-only: it derives small source-color accents from the normalized source image, renders the project-owned 8-frame 兜兜二次元数字人 atlas, and keeps the source image/path outside the bundle. The deterministic stylized PNG adapter remains available for local style comparison and stylizer QA. The bundle generator validates adapter output, packs frames into `atlases/main.png`, runs the shared 8-frame 兜兜 sprite QA gate by default, writes `preview.png`, and then validates the final bundle. Internal stylizer comparison runs may explicitly skip the 兜兜 sprite QA gate because they are not default 兜兜 generated asset packages. Runtime consumes only the final bundle.
+The default local adapter is `doudou-digital-human-adapter@0.1.0`. It is non-model and local-only: it derives small source-color accents from the normalized source image, renders the authorized AIG-direction 8-frame 兜兜二次元数字人 atlas with brown hair, red hair ribbons, a yellow cardigan, and a dark sailor outfit, and keeps the source image/path outside the bundle. The deterministic stylized PNG adapter remains available for local style comparison and stylizer QA. The bundle generator validates adapter output, packs frames into `atlases/main.png`, runs the shared 8-frame 兜兜 sprite QA gate by default, writes `preview.png`, and then validates the final bundle. Internal stylizer comparison runs may explicitly skip the 兜兜 sprite QA gate because they are not default 兜兜 generated asset packages. Runtime consumes only the final bundle.
 
 ## Stylizer QA Corpus
 
@@ -103,7 +103,7 @@ The guided app is a local Electron manager UI. It lets the user select a PNG/JPE
 {
   "schemaVersion": "0.1.0",
   "id": "valid_minimal_atlas_pet",
-  "name": "兜兜二次元数字人占位",
+  "name": "兜兜 AIG 默认二次元数字人",
   "assetFormat": "png_sprite_atlas_grid",
   "canvas": {
     "width": 256,

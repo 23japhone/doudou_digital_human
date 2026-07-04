@@ -8,6 +8,8 @@ Source reviewed: `/Users/zhipenghou/Public/code/agent/AiG`
 
 Source snapshot: `c755725 archive: preserve koharu before airi baseline`
 
+Implementation note: 本轮已将 AIG 角色方向落到兜兜默认桌宠资产链路：`src/generation/doudou-sprite.ts` 定义授权 AIG 默认角色 profile，默认 sprite 呈现棕色长发、红色发饰、黄色开衫和深色水手服；`fixtures/pet_bundles/valid_minimal_atlas_pet` 已更新为可运行 8 帧 bundle。实现没有拷贝 AiG 的 optional Live2D assets，也没有提交用户上传原图、source path、raw prompt 或 provider payload。
+
 ## 研究目标
 
 本研究阅读本地 AiG 项目的文档和代表性代码，提炼对兜兜数字人桌宠有价值的架构、模块边界、评测方法和后续研究方向。

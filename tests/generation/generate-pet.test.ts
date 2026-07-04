@@ -76,6 +76,10 @@ describe("generatePetBundleFromSource", () => {
     const preview = PNG.sync.read(await readFile(path.join(outputDir, "preview.png")));
     expect(countRedPixels(preview)).toBeGreaterThan(500);
     expect(countGreenPixels(preview)).toBeGreaterThan(500);
+    expect(countApproxColor(preview, [108, 70, 42]) + countApproxColor(preview, [72, 46, 32])).toBeGreaterThan(6000);
+    expect(countApproxColor(preview, [190, 48, 58])).toBeGreaterThan(180);
+    expect(countApproxColor(preview, [238, 190, 78])).toBeGreaterThan(1600);
+    expect(countApproxColor(preview, [42, 48, 78])).toBeGreaterThan(600);
 
     const atlas = PNG.sync.read(await readFile(path.join(outputDir, "atlases/main.png")));
     const quality = analyzeDoudouSpriteAtlasQuality(atlas);
@@ -485,6 +489,32 @@ function countGreenPixels(png: PNG): number {
   for (let index = 0; index < png.data.length; index += 4) {
     if (png.data[index + 3] > 0 && png.data[index + 1] > 150 && png.data[index] < 130) {
       count += 1;
+    }
+  }
+  return count;
+}
+
+function countApproxColor(
+  png: PNG,
+  rgb: readonly number[],
+  tolerance = 8,
+  region: { x: number; y: number; width: number; height: number } = { x: 0, y: 0, width: png.width, height: png.height }
+): number {
+  let count = 0;
+  for (let y = region.y; y < region.y + region.height; y += 1) {
+    for (let x = region.x; x < region.x + region.width; x += 1) {
+      const index = (png.width * y + x) << 2;
+      const alpha = png.data[index + 3] ?? 0;
+      if (alpha === 0) {
+        continue;
+      }
+      if (
+        Math.abs((png.data[index] ?? 0) - (rgb[0] ?? 0)) <= tolerance &&
+        Math.abs((png.data[index + 1] ?? 0) - (rgb[1] ?? 0)) <= tolerance &&
+        Math.abs((png.data[index + 2] ?? 0) - (rgb[2] ?? 0)) <= tolerance
+      ) {
+        count += 1;
+      }
     }
   }
   return count;

@@ -10,12 +10,12 @@ const tempDirs: string[] = [];
 const fixtureRelativeDir = path.join("fixtures", "pet_bundles", "valid_minimal_atlas_pet");
 const fixtureFiles = ["pet.json", "source.meta.json", "preview.png", path.join("atlases", "main.png")];
 const palette = {
-  accentYellow: [255, 226, 95],
-  collar: [255, 242, 176],
-  hairMain: [54, 48, 88],
-  hairShade: [82, 63, 125],
+  cardigan: [238, 190, 78],
+  sailor: [42, 48, 78],
+  ribbon: [190, 48, 58],
+  hairMain: [108, 70, 42],
+  hairShade: [72, 46, 32],
   eye: [30, 34, 62],
-  outfit: [92, 121, 214],
   skin: [255, 214, 190],
   tear: [132, 202, 255]
 } as const;
@@ -25,7 +25,7 @@ afterEach(async () => {
 });
 
 describe("generateFixturePetBundle", () => {
-  test("generates a rights-safe default doudou anime digital-human placeholder", async () => {
+  test("generates a rights-safe AIG-inspired default doudou anime digital-human", async () => {
     const rootDir = await createTempDir();
 
     await generateFixturePetBundle(rootDir);
@@ -45,7 +45,7 @@ describe("generateFixturePetBundle", () => {
 
     expect(manifest).toMatchObject({
       id: "valid_minimal_atlas_pet",
-      name: "兜兜二次元数字人占位",
+      name: "兜兜 AIG 默认二次元数字人",
       privacy: {
         sourceImageStored: false,
         cloudGenerated: false
@@ -54,12 +54,14 @@ describe("generateFixturePetBundle", () => {
     expect(sourceMeta).toMatchObject({
       containsExternalAsset: false,
       containsPersonalImage: false,
-      sourceType: "synthetic-geometric-shapes"
+      sourceType: "authorized-aig-character-sprite"
     });
 
-    expect(pixelAt(preview, 128, 72)).toEqual([54, 48, 88, 255]);
+    expect(pixelAt(preview, 128, 72)).toEqual([108, 70, 42, 255]);
+    expect(pixelAt(preview, 95, 91)).toEqual([190, 48, 58, 255]);
     expect(pixelAt(preview, 128, 124)).toEqual([255, 214, 190, 255]);
-    expect(pixelAt(preview, 128, 198)).toEqual([92, 121, 214, 255]);
+    expect(pixelAt(preview, 128, 198)).toEqual([238, 190, 78, 255]);
+    expect(pixelAt(preview, 128, 214)).toEqual([42, 48, 78, 255]);
     expect(pixelAt(preview, 68, 96)[3]).toBe(0);
     expect(pixelAt(preview, 188, 96)[3]).toBe(0);
   });
@@ -86,7 +88,7 @@ describe("generateFixturePetBundle", () => {
     expect(analyzeDoudouSpriteAtlasQuality(atlas)).toMatchObject({ ok: true, issues: [] });
   });
 
-  test("preserves hair, face, outfit, and collar readability at 256px and 128px", async () => {
+  test("preserves brown hair, face, yellow cardigan, sailor outfit, and red ribbon readability at 256px and 128px", async () => {
     const rootDir = await createTempDir();
     await generateFixturePetBundle(rootDir);
     const atlas = PNG.sync.read(await readFile(path.join(rootDir, fixtureRelativeDir, "atlases", "main.png")));
@@ -95,16 +97,18 @@ describe("generateFixturePetBundle", () => {
       const frame = framePng(atlas, frameIndex);
       const smallFrame = downscaleNearest(frame, 128, 128);
 
-      expect(countApproxColor(frame, palette.hairMain) + countApproxColor(frame, palette.hairShade)).toBeGreaterThan(5800);
+      expect(countApproxColor(frame, palette.hairMain) + countApproxColor(frame, palette.hairShade)).toBeGreaterThan(6600);
       expect(countApproxColor(frame, palette.skin)).toBeGreaterThan(2800);
-      expect(countApproxColor(frame, palette.outfit)).toBeGreaterThan(2500);
-      expect(countApproxColor(frame, palette.collar)).toBeGreaterThan(180);
+      expect(countApproxColor(frame, palette.cardigan)).toBeGreaterThan(1600);
+      expect(countApproxColor(frame, palette.sailor)).toBeGreaterThan(600);
+      expect(countApproxColor(frame, palette.ribbon)).toBeGreaterThan(180);
       expect(countApproxColor(smallFrame, palette.hairMain) + countApproxColor(smallFrame, palette.hairShade)).toBeGreaterThan(
-        1300
+        1450
       );
       expect(countApproxColor(smallFrame, palette.skin)).toBeGreaterThan(650);
-      expect(countApproxColor(smallFrame, palette.outfit)).toBeGreaterThan(560);
-      expect(countApproxColor(smallFrame, palette.collar)).toBeGreaterThan(35);
+      expect(countApproxColor(smallFrame, palette.cardigan)).toBeGreaterThan(390);
+      expect(countApproxColor(smallFrame, palette.sailor)).toBeGreaterThan(145);
+      expect(countApproxColor(smallFrame, palette.ribbon)).toBeGreaterThan(35);
       expect(pixelAt(frame, 68, 96)[3]).toBe(0);
       expect(pixelAt(frame, 188, 96)[3]).toBe(0);
     }
@@ -128,7 +132,7 @@ describe("generateFixturePetBundle", () => {
     expect(countApproxColor(poutFrame, palette.eye, 12, { x: 108, y: 143, width: 40, height: 14 })).toBeGreaterThan(95);
     expect(countApproxColor(poutFrame, palette.eye, 12, { x: 120, y: 150, width: 18, height: 18 })).toBeLessThan(55);
     expect(countApproxColor(tearyFrame, palette.tear, 12)).toBeGreaterThan(35);
-    expect(countApproxColor(workingFrame, palette.accentYellow, 12, { x: 91, y: 171, width: 74, height: 36 })).toBeGreaterThan(
+    expect(countApproxColor(workingFrame, palette.cardigan, 12, { x: 91, y: 171, width: 74, height: 36 })).toBeGreaterThan(
       120
     );
   });
