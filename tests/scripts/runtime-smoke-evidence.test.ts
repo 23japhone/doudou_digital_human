@@ -14,7 +14,7 @@ describe("runtime smoke evidence", () => {
       petPerformanceExpressionPrioritiesObserved: ["normal", "force"],
       petPerformanceGovernorSchemaVersionsObserved: ["doudou.pet-performance-governor.v0.1"],
       petPerformanceMotionBudgetsObserved: ["none", "low", "medium"],
-      petPerformanceReadabilityCatalogVersionsObserved: ["doudou.pet-performance-readability-catalog.v0.1"],
+      petPerformanceReadabilityCatalogVersionsObserved: ["doudou.pet-performance-readability-catalog.v0.2"],
       petPerformanceReadabilityEmotionIdsObserved: [
         "calm_idle",
         "surprised",
@@ -29,7 +29,7 @@ describe("runtime smoke evidence", () => {
       petPerformanceExpressionPrioritiesObserved: ["normal"],
       petPerformanceGovernorSchemaVersionsObserved: ["doudou.pet-performance-governor.v0.1"],
       petPerformanceMotionBudgetsObserved: ["none", "low"],
-      petPerformanceReadabilityCatalogVersionsObserved: ["doudou.pet-performance-readability-catalog.v0.1"],
+      petPerformanceReadabilityCatalogVersionsObserved: ["doudou.pet-performance-readability-catalog.v0.2"],
       petPerformanceReadabilityEmotionIdsObserved: ["calm_idle", "focused_working"],
       petPerformanceTransitionTonesObserved: ["idle", "focused"]
     })).toBe(false);

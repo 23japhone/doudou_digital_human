@@ -56,6 +56,9 @@ describe("default doudou character asset spec", () => {
     expect(markdown).toContain("source image");
     expect(markdown).toContain("raw prompt");
     expect(markdown).toContain("provider payload");
+    expect(markdown).toContain("doudou.pet-performance-readability-catalog.v0.2");
+    expect(markdown).toContain("ParamEyeLOpen");
+    expect(markdown).toContain("Cubism 参数");
   });
 
   test("keeps every default emotion and runtime scenario tied to asset QA", async () => {

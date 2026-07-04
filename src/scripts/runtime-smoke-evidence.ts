@@ -56,7 +56,7 @@ export function hasRuntimePetPerformanceSmokeEvidence(
   return Boolean(
     result.petPerformanceGovernorSchemaVersionsObserved?.includes("doudou.pet-performance-governor.v0.1") &&
     result.petPerformanceReadabilityCatalogVersionsObserved?.includes(
-      "doudou.pet-performance-readability-catalog.v0.1"
+      "doudou.pet-performance-readability-catalog.v0.2"
     ) &&
     hasEvery(result.petPerformanceMotionBudgetsObserved, ["none", "low", "medium"]) &&
     hasEvery(result.petPerformanceReadabilityEmotionIdsObserved, [

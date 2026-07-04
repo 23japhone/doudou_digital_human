@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { DEFAULT_DOUDOU_EMOTION_IDS } from "../../src/runtime/default-doudou-emotions.js";
 import {
+  DEFAULT_DOUDOU_LIVE2D_PARAMETER_RANGES,
+  doudouLive2DExpressionForEmotion
+} from "../../src/runtime/default-doudou-live2d.js";
+import {
   DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG,
   PET_PERFORMANCE_READABILITY_CATALOG_SCHEMA_VERSION,
   createPetPerformancePlan,
@@ -44,6 +48,47 @@ describe("pet performance governor", () => {
     );
   });
 
+  test("binds every readability catalog entry to Live2D parameter vocabulary and manual QA standards", () => {
+    const knownLive2DParameterIds = new Set(Object.keys(DEFAULT_DOUDOU_LIVE2D_PARAMETER_RANGES));
+
+    for (const emotionId of DEFAULT_DOUDOU_EMOTION_IDS) {
+      const entry = DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG[emotionId];
+      const expressionSpec = doudouLive2DExpressionForEmotion(emotionId);
+      const expressionParameterIds = new Set(expressionSpec.parameters.map((parameter) => parameter.id));
+      const allowedParameterIds = new Set([
+        ...entry.live2d.parameterVocabulary.faceParameterIds,
+        ...entry.live2d.parameterVocabulary.bodyParameterIds,
+        ...entry.live2d.parameterVocabulary.effectParameterIds
+      ]);
+
+      expect(entry.live2d.expressionFile).toBe(expressionSpec.expressionFile);
+      expect(entry.live2d.motionCue).toBe(expressionSpec.motionCue);
+      expect(entry.live2d.parameterVocabulary.requiredParameterIds.length).toBeGreaterThanOrEqual(4);
+      expect(entry.live2d.parameterVocabulary.faceParameterIds).toEqual(
+        expect.arrayContaining(["ParamEyeLOpen", "ParamEyeROpen", "ParamMouthForm"])
+      );
+      expect(entry.live2d.parameterVocabulary.bodyParameterIds.length).toBeGreaterThan(0);
+      expect(entry.live2d.parameterVocabulary.requiredParameterIds.every((parameterId) =>
+        expressionParameterIds.has(parameterId)
+      )).toBe(true);
+      expect(expressionSpec.parameters.every((parameter) => allowedParameterIds.has(parameter.id))).toBe(true);
+      expect([...allowedParameterIds].every((parameterId) => knownLive2DParameterIds.has(parameterId))).toBe(true);
+      expect(entry.live2d.parameterVocabulary.blockedParameterIds.every((parameterId) =>
+        knownLive2DParameterIds.has(parameterId) && !allowedParameterIds.has(parameterId)
+      )).toBe(true);
+
+      expect(entry.manualQa.sizeReadability.px128.length).toBeGreaterThan(0);
+      expect(entry.manualQa.sizeReadability.px256.length).toBeGreaterThan(0);
+      expect(entry.manualQa.emotionContrastIds.length).toBeGreaterThan(0);
+      expect(entry.manualQa.emotionContrastIds).not.toContain(emotionId);
+      expect(entry.manualQa.emotionContrastIds.every((contrastId) =>
+        DEFAULT_DOUDOU_EMOTION_IDS.includes(contrastId)
+      )).toBe(true);
+      expect(entry.manualQa.live2dParameterChecklist.length).toBeGreaterThanOrEqual(2);
+      expect(entry.manualQa.safetyChecklist.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   test("turns no-motion presentation into a still renderer adapter plan", () => {
     const plan = createPetPerformancePlan(envelopeFor({
       event: { source: "renderer", target: "runtime", type: "runtime_started" },
@@ -51,7 +96,7 @@ describe("pet performance governor", () => {
     }));
 
     expect(plan).toMatchObject({
-      readabilityCatalogVersion: "doudou.pet-performance-readability-catalog.v0.1",
+      readabilityCatalogVersion: "doudou.pet-performance-readability-catalog.v0.2",
       readabilityEmotionId: "calm_idle",
       schemaVersion: "doudou.pet-performance-governor.v0.1",
       motionBudget: "none",

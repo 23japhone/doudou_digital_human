@@ -115,6 +115,20 @@ Date: 2026-07-04
 - 表情切换需要过渡帧、fade 或 motion easing；禁止突然跳脸。
 - 表情特效必须是原创简单几何或项目自有图层，不能使用外部贴纸包、emoji 图像或 provider payload。
 
+### Live2D Parameter Readability Catalog
+
+`src/runtime/performance-governor.ts` 中的 `DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG` 是当前默认兜兜的可评审目录，schema version 为 `doudou.pet-performance-readability-catalog.v0.2`。每个 emotion id 除了 runtime CSS 动作走廊，还必须声明：
+
+- `live2d.expressionFile`：对应 `expressions/doudou_<emotion_id>.exp3.json`。
+- `live2d.motionCue`：对应现有 Live2D preview motion cue。
+- `live2d.parameterVocabulary.faceParameterIds`：可用于眼、眉、嘴、脸颊的 Cubism 参数，例如 `ParamEyeLOpen`、`ParamEyeROpen`、`ParamMouthForm`。
+- `live2d.parameterVocabulary.bodyParameterIds`：可用于头部、身体和呼吸的 Cubism 参数，例如 `ParamAngleZ`、`ParamBodyAngleY`、`ParamBreath`。
+- `live2d.parameterVocabulary.effectParameterIds` 与 `blockedParameterIds`：只允许当前情绪需要的原创特效层，例如 `ParamDoudouSparkle`、`ParamDoudouTear`、`ParamDoudouSleepBubble`。
+- `live2d.parameterVocabulary.requiredParameterIds`：该情绪必须在表达式规格中真实出现的关键参数。
+- `manualQa`：128px、256px、小尺寸区分、Live2D 参数检查和安全检查。
+
+人工评审正式 Live2D 或高质量 sprite 资产时，先看本文件的语义表，再对照 `manualQa` 逐项检查。任何新增参数必须先进入项目自有参数范围和 catalog vocabulary，不能让模型、prompt 或 runtime 直接写自由 Cubism 参数。
+
 ## Motion Asset QA
 
 默认动作先服务桌宠存在感，不追求复杂舞台动作。所有动作都应保持透明背景、稳定锚点和不干扰工作区。
@@ -156,6 +170,7 @@ Date: 2026-07-04
 - 发型满足棕色长发、侧分刘海、侧发、红色发饰、无猫耳、无尾巴。
 - 服装满足黄色开衫、深色水手领、深色短裙、小尺寸清楚、不性感化、不幼态化。
 - 12 个 emotion ids 都有对应视觉方案，且 `calm_idle`、`surprised`、`annoyed_pout`、`teary`、`comfort_soft`、`focused_working` 已覆盖核心 runtime 场景。
+- 12 个 emotion ids 都在 `doudou.pet-performance-readability-catalog.v0.2` 中声明 Live2D face/body/effect 参数 vocabulary、必需参数和人工 QA 标准。
 - 9 个 runtime scenarios 都有动作方案，并证明 passive cursor contact 不移动窗口。
 - 128px 与 256px 预览都能辨认发型、脸、服装和核心表情。
 - 资产和 metadata 不包含 source image、raw prompt、provider payload、secret、绝对路径或外部素材痕迹。
@@ -166,6 +181,7 @@ Date: 2026-07-04
 自动检查：
 
 - `tests/docs/default-doudou-character-asset-spec.test.ts` 校验本文覆盖发型、服装、表情 QA、动作 QA、安全隐私边界、12 个 emotion ids 和 9 个 runtime scenarios。
+- `tests/runtime/performance-governor.test.ts` 校验 `DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG` 覆盖 12 个 emotion ids，并让每个条目绑定 Live2D expression file、motion cue、Cubism 参数 vocabulary、128px/256px 人工 QA、情绪区分和安全检查。
 - `tests/runtime/default-doudou-emotions.test.ts` 校验 emotion ids、中文命名、persona 和 runtime-only 映射。
 - `npm run validate:fixture` 校验当前 AIG 默认二次元人形 bundle 仍符合 `pet bundle v0.1`。
 

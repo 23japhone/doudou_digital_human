@@ -33,7 +33,7 @@ describe("runtime interaction replay", () => {
       expect(result.trace.map((entry) => entry.presentation.scenario)).toEqual(result.trace.map((entry) => entry.scenario));
       expect(result.trace.map((entry) => entry.presentation.emotionId)).toEqual(result.trace.map((entry) => entry.emotionId));
       expect(result.trace.every((entry) => entry.performancePlan.schemaVersion === "doudou.pet-performance-governor.v0.1")).toBe(true);
-      expect(result.trace.every((entry) => entry.performancePlan.readabilityCatalogVersion === "doudou.pet-performance-readability-catalog.v0.1")).toBe(true);
+      expect(result.trace.every((entry) => entry.performancePlan.readabilityCatalogVersion === "doudou.pet-performance-readability-catalog.v0.2")).toBe(true);
       expect(result.trace.map((entry) => entry.performancePlan.readabilityEmotionId)).toEqual(
         result.trace.map((entry) => entry.presentation.emotionId)
       );
