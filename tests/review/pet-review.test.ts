@@ -34,7 +34,7 @@ describe("createPetReview", () => {
     expect(result.report.status).toBe("needs_review");
     expect(result.report.bundle).toMatchObject({
       id: "valid_minimal_atlas_pet",
-      name: "Valid Minimal Atlas Pet",
+      name: "兜兜二次元数字人占位",
       schemaVersion: "0.1.0",
       privacy: {
         sourceImageStored: false,
@@ -120,7 +120,7 @@ describe("acceptPetBundle", () => {
       status: "accepted",
       bundle: {
         id: "valid_minimal_atlas_pet",
-        name: "Valid Minimal Atlas Pet"
+        name: "兜兜二次元数字人占位"
       },
       createdAt: fixedNow.toISOString()
     });

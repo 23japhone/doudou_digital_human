@@ -102,7 +102,7 @@ The guided app is a local Electron manager UI. It lets the user select a PNG/JPE
 {
   "schemaVersion": "0.1.0",
   "id": "valid_minimal_atlas_pet",
-  "name": "Valid Minimal Atlas Pet",
+  "name": "兜兜二次元数字人占位",
   "assetFormat": "png_sprite_atlas_grid",
   "canvas": {
     "width": 256,
