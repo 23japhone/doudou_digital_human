@@ -2,7 +2,7 @@
 
 Date: 2026-07-04
 
-Status: pure runner and minimal fixtures landed
+Status: replay script and runtime smoke preflight landed
 
 Source contract: `docs/DOUDOU_INTERACTION_STATE_BUS.md`
 
@@ -21,7 +21,7 @@ Owning domain: `src/runtime/`, `tests/runtime/`, `fixtures/runtime/`
 - `working-scale`: 缩放期间进入低干扰工作态。
 - `privacy-trace`: 任何 replay trace 都不得泄漏路径、prompt、provider payload 或秘密。
 
-首个 pure runner 已落在 `src/runtime/interaction-replay.ts`，六个最小 JSON fixtures 已落在 `fixtures/runtime/interaction_replay/`，测试入口是 `tests/runtime/interaction-replay.test.ts`。后续扩展 Electron smoke 接入时，仍应从本文合同派生。
+首个 pure runner 已落在 `src/runtime/interaction-replay.ts`，六个最小 JSON fixtures 已落在 `fixtures/runtime/interaction_replay/`，测试入口是 `tests/runtime/interaction-replay.test.ts`。团队快速入口是 `npm run replay:runtime`；`npm run smoke:runtime` 已在启动 Electron 证据前复用同一批 fixtures 做 replay preflight。
 
 ## 非目标
 
@@ -385,7 +385,7 @@ export type PetInteractionReplayFailureCode =
 5. 从 trace 汇总 `PetInteractionReplayResult`。
 6. 对 `expect` 和 privacy gate 断言。
 
-未来 Electron 层可以复用同一批 fixture，把 synthetic events 映射成 renderer/main IPC smoke interactions，但这应作为第二阶段。
+当前 Electron smoke 已复用同一批 fixture 做轻量 replay preflight。未来如果需要更细的 Electron 层事件回放，可以再把 synthetic events 映射成 renderer/main IPC smoke interactions，但不应替代现有窗口、canvas、drag/scale 和渲染 evidence。
 
 ## 与现有检查的关系
 
@@ -394,8 +394,9 @@ export type PetInteractionReplayFailureCode =
 | `tests/runtime/state.test.ts` | 保护状态机基本 transition |
 | `tests/runtime/reaction.test.ts` | 保护 wariness、alpha reaction 和 phase |
 | `tests/runtime/default-doudou-emotions.test.ts` | 保护 scenario 到 emotion id |
-| future `tests/runtime/interaction-replay.test.ts` | 串起 event -> trace -> acceptance |
-| `npm run smoke:runtime` | 证明真实 Electron runtime、canvas、drag/scale、窗口和渲染 evidence |
+| `tests/runtime/interaction-replay.test.ts` | 串起 event -> trace -> acceptance |
+| `npm run replay:runtime` | 读取六个 JSON fixtures 并输出脱敏 replay summary |
+| `npm run smoke:runtime` | 先执行 replay preflight，再证明真实 Electron runtime、canvas、drag/scale、窗口和渲染 evidence |
 
 Replay tests 不应该替代 smoke；它们负责让行为合同更快、更细、更容易定位。
 
@@ -411,7 +412,9 @@ fixtures/runtime/interaction_replay/working-drag.json
 fixtures/runtime/interaction_replay/working-scale.json
 fixtures/runtime/interaction_replay/privacy-trace.json
 src/runtime/interaction-replay.ts
+src/scripts/runtime-interaction-replay.ts
 tests/runtime/interaction-replay.test.ts
+tests/scripts/runtime-interaction-replay.test.ts
 ```
 
 建议命令：
@@ -419,16 +422,11 @@ tests/runtime/interaction-replay.test.ts
 ```text
 npm test -- tests/runtime/interaction-replay.test.ts
 npm test -- tests/runtime/state.test.ts tests/runtime/reaction.test.ts tests/runtime/default-doudou-emotions.test.ts
+npm run replay:runtime
 npm run smoke:runtime
 ```
 
-如果团队希望单独暴露脚本，可以后续增加：
-
-```text
-npm run replay:runtime
-```
-
-新增脚本前应先确认它不会和现有 `smoke:runtime` 责任重叠。
+`npm run replay:runtime` 只负责快速 pure replay summary；`npm run smoke:runtime` 仍负责 Electron runtime 真实窗口和 renderer evidence，并把 replay summary 作为前置失败点输出。
 
 ## Review 清单
 
@@ -445,6 +443,6 @@ npm run replay:runtime
 
 ## 推荐下一步
 
-1. 给 `npm run smoke:runtime` 评估是否复用这批 fixtures，作为 Electron 层 replay smoke 的第二阶段。
-2. 如需团队常用入口，再新增 `npm run replay:runtime`。
-3. 后续新增交互场景时，先加 JSON fixture，再扩展 `src/runtime/interaction-replay.ts` 的 allowlist 和断言。
+1. 后续新增交互场景时，先加 JSON fixture，再扩展 `src/runtime/interaction-replay.ts` 的 allowlist 和断言。
+2. 如需更接近真实 DOM/IPC 的 replay，再为 `smoke:runtime` 增加可选 synthetic event adapter。
+3. 保持 `npm run replay:runtime` 输出为脱敏 summary，不输出逐步 trace 或本机路径。

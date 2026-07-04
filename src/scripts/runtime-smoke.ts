@@ -13,11 +13,16 @@ import {
   hasRuntimeEmotionModelTraySmokeEvidence,
   hasRuntimeLiveEmotionTraySmokeEvidence
 } from "./runtime-smoke-evidence.js";
+import {
+  runRuntimeInteractionReplaySuite,
+  type RuntimeInteractionReplaySummary
+} from "./runtime-interaction-replay.js";
 
 const repoRoot = process.cwd();
 const electronBin = path.join(repoRoot, "node_modules/.bin/electron");
 const runtimeMain = path.join(repoRoot, "dist/src/runtime/main.js");
 const validBundle = path.join(repoRoot, "fixtures/pet_bundles/valid_minimal_atlas_pet");
+export const RUNTIME_SMOKE_REPLAY_OUTPUT_PREFIX = "runtime smoke replay: ";
 
 interface SpawnResult {
   code: number | null;
@@ -25,6 +30,12 @@ interface SpawnResult {
 }
 
 async function main(): Promise<void> {
+  const replaySummary = await runRuntimeSmokeReplayPreflight();
+  console.log(`${RUNTIME_SMOKE_REPLAY_OUTPUT_PREFIX}${JSON.stringify(replaySummary)}`);
+  if (!replaySummary.ok) {
+    throw new Error(`runtime replay fixtures failed\n${JSON.stringify(replaySummary)}`);
+  }
+
   const tempRoot = await mkdtemp(path.join(tmpdir(), "runtime-smoke-"));
   try {
     await assertInvalidBundleFails("missing manifest", tempRoot, async (bundleDir) => {
@@ -61,6 +72,10 @@ async function main(): Promise<void> {
   } finally {
     await rm(tempRoot, { force: true, recursive: true });
   }
+}
+
+export function runRuntimeSmokeReplayPreflight(): Promise<RuntimeInteractionReplaySummary> {
+  return runRuntimeInteractionReplaySuite({ cwd: repoRoot });
 }
 
 async function assertValidRuntimeLoads(label: string, bundleDir: string): Promise<void> {

@@ -27,6 +27,7 @@
     "qa:stylizer:default-gate": "npm run build:main && node dist/src/scripts/stylizer-default-gate.js",
     "review:pet": "npm run build:main && node dist/src/cli/review-pet.js",
     "validate:fixture": "npm run build:main && node dist/src/cli/validate-pet.js fixtures/pet_bundles/valid_minimal_atlas_pet",
+    "replay:runtime": "npm run build:main && node dist/src/scripts/runtime-interaction-replay.js",
     "dev": "npm run build && NODE_OPTIONS= electron dist/src/runtime/main.js --bundle fixtures/pet_bundles/valid_minimal_atlas_pet",
     "dev:app": "npm run build && NODE_OPTIONS= electron dist/src/app/main.js",
     "smoke:runtime": "npm run build && NODE_OPTIONS= node dist/src/scripts/runtime-smoke.js",
