@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "doudou.interaction-replay.v0.1",
+  "id": "privacy-trace",
+  "titleZh": "隐私追踪门",
+  "initial": {
+    "state": "waiting",
+    "wariness": 0,
+    "atMs": 0
+  },
+  "events": [
+    { "atMs": 0, "type": "assert_trace", "target": "runtime" }
+  ],
+  "expect": {
+    "statesInclude": ["waiting"],
+    "scenariosInclude": ["idle"],
+    "emotionIdsInclude": ["calm_idle"],
+    "reactionActsInclude": ["none"],
+    "motionPhasesInclude": ["settled"],
+    "finalState": "waiting",
+    "finalEmotionId": "calm_idle",
+    "maxWarinessAtMost": 0,
+    "passiveCursorMovedWindow": false,
+    "privacySanitized": true
+  }
+}

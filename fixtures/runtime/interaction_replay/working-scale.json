@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "doudou.interaction-replay.v0.1",
+  "id": "working-scale",
+  "titleZh": "缩放工作态",
+  "initial": {
+    "state": "waiting",
+    "wariness": 0,
+    "atMs": 0
+  },
+  "events": [
+    { "atMs": 0, "type": "runtime_started", "target": "runtime" },
+    { "atMs": 1000, "type": "scale_started", "target": "interaction_frame" },
+    { "atMs": 1080, "type": "scale_changed", "target": "interaction_frame" },
+    { "atMs": 1160, "type": "cursor_alpha_entered", "target": "visible_alpha" },
+    { "atMs": 1240, "type": "scale_ended", "target": "interaction_frame" },
+    { "atMs": 1760, "type": "advance_time", "target": "runtime" }
+  ],
+  "expect": {
+    "statesInclude": ["working"],
+    "scenariosInclude": ["working"],
+    "scenariosExclude": ["tap", "repeat_poke_retreat", "repeat_poke_watch"],
+    "emotionIdsInclude": ["focused_working"],
+    "reactionActsInclude": ["work_hold"],
+    "reactionActsExclude": ["poke_pop", "repeat_poke_retreat", "repeat_poke_watch"],
+    "finalState": "waiting",
+    "maxWarinessAtMost": 0,
+    "stateStolenDuringWorking": false,
+    "passiveCursorMovedWindow": false,
+    "privacySanitized": true
+  }
+}

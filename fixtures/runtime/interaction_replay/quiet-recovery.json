@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "doudou.interaction-replay.v0.1",
+  "id": "quiet-recovery",
+  "titleZh": "安静恢复",
+  "initial": {
+    "state": "waiting",
+    "wariness": 0,
+    "atMs": 0
+  },
+  "events": [
+    { "atMs": 0, "type": "runtime_started", "target": "runtime" },
+    {
+      "atMs": 1000,
+      "type": "poke",
+      "target": "visible_alpha",
+      "point": { "canvasX": 128, "canvasY": 116 }
+    },
+    {
+      "atMs": 1300,
+      "type": "poke",
+      "target": "visible_alpha",
+      "point": { "canvasX": 128, "canvasY": 116 }
+    },
+    { "atMs": 2450, "type": "quiet_tick", "target": "runtime" },
+    { "atMs": 4400, "type": "quiet_tick", "target": "runtime" },
+    { "atMs": 8200, "type": "quiet_tick", "target": "runtime" }
+  ],
+  "expect": {
+    "statesInclude": ["waiting"],
+    "scenariosInclude": ["quiet_recovery"],
+    "emotionIdsInclude": ["comfort_soft"],
+    "reactionActsInclude": ["quiet_recovery"],
+    "motionPhasesInclude": ["recovering", "settled"],
+    "finalState": "waiting",
+    "finalEmotionId": "calm_idle",
+    "maxWarinessAtLeast": 0.58,
+    "finalWarinessLessThan": 0.2,
+    "passiveCursorMovedWindow": false,
+    "privacySanitized": true
+  }
+}

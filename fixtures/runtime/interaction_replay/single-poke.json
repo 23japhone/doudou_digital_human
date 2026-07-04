@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "doudou.interaction-replay.v0.1",
+  "id": "single-poke",
+  "titleZh": "单次戳戳",
+  "initial": {
+    "state": "waiting",
+    "wariness": 0,
+    "atMs": 0
+  },
+  "events": [
+    { "atMs": 0, "type": "runtime_started", "target": "runtime" },
+    {
+      "atMs": 1000,
+      "type": "poke",
+      "target": "visible_alpha",
+      "point": { "canvasX": 128, "canvasY": 116 }
+    },
+    { "atMs": 1420, "type": "advance_time", "target": "runtime" }
+  ],
+  "expect": {
+    "statesInclude": ["poked"],
+    "statesExclude": ["retreating", "watching"],
+    "scenariosInclude": ["tap"],
+    "scenariosExclude": ["repeat_poke_retreat", "repeat_poke_watch"],
+    "emotionIdsInclude": ["surprised"],
+    "reactionActsInclude": ["poke_pop"],
+    "reactionActsExclude": ["repeat_poke_retreat", "repeat_poke_watch"],
+    "finalState": "waiting",
+    "maxWarinessGreaterThan": 0,
+    "maxWarinessLessThan": 0.58,
+    "tapReactFrameObserved": true,
+    "passiveCursorMovedWindow": false,
+    "privacySanitized": true
+  }
+}

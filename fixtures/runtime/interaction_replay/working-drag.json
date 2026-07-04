@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "doudou.interaction-replay.v0.1",
+  "id": "working-drag",
+  "titleZh": "拖拽工作态",
+  "initial": {
+    "state": "waiting",
+    "wariness": 0,
+    "atMs": 0
+  },
+  "events": [
+    { "atMs": 0, "type": "runtime_started", "target": "runtime" },
+    { "atMs": 1000, "type": "drag_started", "target": "interaction_frame" },
+    {
+      "atMs": 1060,
+      "type": "motion_cue",
+      "target": "runtime",
+      "state": "approaching",
+      "direction": "right",
+      "motionIntensity": 0.8
+    },
+    { "atMs": 1120, "type": "drag_ended", "target": "interaction_frame" },
+    { "atMs": 1520, "type": "advance_time", "target": "runtime" }
+  ],
+  "expect": {
+    "statesInclude": ["working"],
+    "scenariosInclude": ["working"],
+    "emotionIdsInclude": ["focused_working"],
+    "reactionActsInclude": ["work_hold"],
+    "finalState": "waiting",
+    "maxWarinessAtMost": 0,
+    "stateStolenDuringWorking": false,
+    "passiveCursorMovedWindow": false,
+    "privacySanitized": true
+  }
+}

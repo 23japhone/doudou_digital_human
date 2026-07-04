@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "doudou.interaction-replay.v0.1",
+  "id": "repeat-poke-retreat-watch",
+  "titleZh": "连续戳戳后退观察",
+  "initial": {
+    "state": "waiting",
+    "wariness": 0,
+    "atMs": 0
+  },
+  "events": [
+    { "atMs": 0, "type": "runtime_started", "target": "runtime" },
+    {
+      "atMs": 1000,
+      "type": "poke",
+      "target": "visible_alpha",
+      "point": { "canvasX": 128, "canvasY": 116 }
+    },
+    {
+      "atMs": 1300,
+      "type": "poke",
+      "target": "visible_alpha",
+      "point": { "canvasX": 128, "canvasY": 116 }
+    },
+    { "atMs": 1450, "type": "assert_trace", "target": "runtime" },
+    { "atMs": 1850, "type": "assert_trace", "target": "runtime" }
+  ],
+  "expect": {
+    "statesInclude": ["retreating", "watching"],
+    "scenariosInclude": ["repeat_poke_retreat", "repeat_poke_watch"],
+    "emotionIdsInclude": ["annoyed_pout", "teary"],
+    "reactionActsInclude": ["repeat_poke_retreat", "repeat_poke_watch"],
+    "motionPhasesInclude": ["retreating", "watching"],
+    "finalState": "watching",
+    "maxWarinessAtLeast": 0.58,
+    "maxWarinessAtMost": 1,
+    "passiveCursorMovedWindow": false,
+    "privacySanitized": true
+  }
+}
