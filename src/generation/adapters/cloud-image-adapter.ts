@@ -5,6 +5,10 @@ import type {
   PetGenerationAdapter,
   PetGenerationRequest
 } from "./types.js";
+import {
+  createDoudouSourceAccentsFromPng,
+  createDoudouSpriteFrames
+} from "../doudou-sprite.js";
 import type { NormalizedSourceImage } from "../normalization/source-normalizer.js";
 
 export type CloudImageAdapterErrorCode =
@@ -101,7 +105,7 @@ export function createCloudImageAdapter(options: CreateCloudImageAdapterOptions)
         adapterId: `cloud-image-adapter.${options.provider.id}`,
         adapterVersion: "0.1.0",
         petId: "generated_cloud_pet",
-        petName: "Generated Cloud Pet",
+        petName: "兜兜云端二次元数字人",
         previewFrameIndex: previewFrame?.index ?? 0,
         previewPng: previewFrame?.png ?? frames[0]!.png,
         frames
@@ -211,51 +215,12 @@ function createFramesFromProviderImage(providerPng: Buffer): GeneratedPetFrame[]
     throw new CloudImageAdapterError("MODEL_OUTPUT_INVALID", "Cloud provider image output could not be decoded.");
   }
 
-  const frames: GeneratedPetFrame[] = [];
-  for (let frameIndex = 0; frameIndex < 8; frameIndex += 1) {
-    frames.push({
-      index: frameIndex,
-      role: frameIndex >= 4 ? "tap_react" : "idle",
-      png: renderFrame(reference, frameIndex)
-    });
-  }
-  return frames;
-}
-
-function renderFrame(reference: PNG, frameIndex: number): Buffer {
   try {
-    const frame = new PNG({ width: 256, height: 256 });
-    const bounce = frameIndex % 3;
-    const react = frameIndex >= 4;
-    blitScaled(reference, frame, 0, react ? -bounce * 2 : -bounce);
-    if (react) {
-      fillCircle(frame, 68, 54, 6, [255, 226, 95], 255);
-      fillCircle(frame, 188, 58, 5, [255, 226, 95], 255);
-    }
-    return PNG.sync.write(frame);
+    return createDoudouSpriteFrames({
+      sourceAccents: createDoudouSourceAccentsFromPng(reference)
+    });
   } catch {
     throw new CloudImageAdapterError("POSTPROCESSING_FAILED", "Cloud provider image could not be post-processed.");
-  }
-}
-
-function blitScaled(source: PNG, target: PNG, offsetX: number, offsetY: number): void {
-  const scale = Math.min(target.width / source.width, target.height / source.height);
-  const width = Math.max(1, Math.round(source.width * scale));
-  const height = Math.max(1, Math.round(source.height * scale));
-  const startX = Math.floor((target.width - width) / 2) + offsetX;
-  const startY = Math.floor((target.height - height) / 2) + offsetY;
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const sourceX = Math.min(source.width - 1, Math.floor(x / scale));
-      const sourceY = Math.min(source.height - 1, Math.floor(y / scale));
-      const sourceIndex = (source.width * sourceY + sourceX) << 2;
-      setPixel(target, startX + x, startY + y, [
-        source.data[sourceIndex] ?? 0,
-        source.data[sourceIndex + 1] ?? 0,
-        source.data[sourceIndex + 2] ?? 0
-      ], source.data[sourceIndex + 3] ?? 0);
-    }
   }
 }
 

@@ -4,8 +4,9 @@ import { PNG } from "pngjs";
 import type { PetManifest } from "../pet_bundle/manifest.js";
 import { validatePetBundle } from "../pet_bundle/validate.js";
 import { SourceImageIntakeError, validateSourceImage, type SourceImageInfo } from "../intake/source-image.js";
-import { createDeterministicStylizedPngAdapter } from "./adapters/deterministic-stylized-png-adapter.js";
+import { createDoudouDigitalHumanAdapter } from "./adapters/doudou-digital-human-adapter.js";
 import type { GeneratedPetAdapterOutput, GeneratedPetFrame, PetGenerationAdapter } from "./adapters/types.js";
+import { analyzeDoudouSpriteAtlasQuality } from "./doudou-sprite-quality.js";
 import {
   normalizeSourceImage,
   SourceImageNormalizationError,
@@ -20,6 +21,7 @@ export interface GeneratePetBundleOptions {
   now?: Date;
   adapter?: PetGenerationAdapter;
   normalizationTempRoot?: string;
+  enforceDoudouSpriteQuality?: boolean;
 }
 
 export interface GeneratePetBundleResult {
@@ -51,7 +53,7 @@ export async function generatePetBundleFromSource(options: GeneratePetBundleOpti
     throw new PetGenerationError("MISSING_OUTPUT_DIR", "An output bundle directory is required.");
   }
 
-  const adapter = options.adapter ?? createDeterministicStylizedPngAdapter();
+  const adapter = options.adapter ?? createDoudouDigitalHumanAdapter();
   adapter.preflight?.();
 
   const sourceImage = await validateSourceImage(options.sourceImagePath);
@@ -77,9 +79,14 @@ export async function generatePetBundleFromSource(options: GeneratePetBundleOpti
     await normalizedSourceImage?.cleanup();
   }
 
+  const atlasPng = createAtlasPng(generatedPet.frames);
+  if (options.enforceDoudouSpriteQuality ?? true) {
+    assertDoudouQuality(atlasPng);
+  }
+
   const manifest = createManifest(generatedPet, adapter);
   await mkdir(path.join(bundleDir, "atlases"), { recursive: true });
-  await writeFile(path.join(bundleDir, "atlases/main.png"), createAtlasPng(generatedPet.frames));
+  await writeFile(path.join(bundleDir, "atlases/main.png"), atlasPng);
   await writeFile(path.join(bundleDir, "preview.png"), generatedPet.previewPng);
   await writeFile(
     path.join(bundleDir, "source.meta.json"),
@@ -280,6 +287,16 @@ function createAtlasPng(frames: GeneratedPetFrame[]): Buffer {
     blitFrame(png, framePng, (frame.index % 4) * 256, Math.floor(frame.index / 4) * 256);
   }
   return PNG.sync.write(png);
+}
+
+function assertDoudouQuality(atlasPng: Buffer): void {
+  const quality = analyzeDoudouSpriteAtlasQuality(PNG.sync.read(atlasPng));
+  if (!quality.ok) {
+    throw new PetGenerationError(
+      "ADAPTER_OUTPUT_INVALID",
+      `Generated pet atlas failed Doudou sprite QA: ${quality.issues.map((issue) => issue.code).join(", ")}`
+    );
+  }
 }
 
 function blitFrame(atlas: PNG, frame: PNG, offsetX: number, offsetY: number): void {

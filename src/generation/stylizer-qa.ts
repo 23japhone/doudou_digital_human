@@ -323,6 +323,7 @@ export async function runStylizerQaCorpus(options: RunStylizerQaCorpusOptions): 
         sourceImagePath: sourcePath,
         outputBundleDir: bundleDir,
         normalizationTempRoot: path.join(outputDir, ".normalization", preset.id, corpusCase.id),
+        enforceDoudouSpriteQuality: false,
         adapter: createDeterministicStylizedPngAdapter({ params: preset.params }),
         now: options.now
       });

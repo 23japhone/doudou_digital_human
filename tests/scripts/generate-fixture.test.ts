@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, test } from "vitest";
+import { analyzeDoudouSpriteAtlasQuality } from "../../src/generation/doudou-sprite-quality.js";
 import { generateFixturePetBundle } from "../../src/scripts/generate-fixture.js";
 
 const tempDirs: string[] = [];
@@ -82,6 +83,7 @@ describe("generateFixturePetBundle", () => {
     const signatures = Array.from({ length: 8 }, (_unused, frameIndex) => frameSignature(atlas, frameIndex));
 
     expect(new Set(signatures).size).toBe(8);
+    expect(analyzeDoudouSpriteAtlasQuality(atlas)).toMatchObject({ ok: true, issues: [] });
   });
 
   test("preserves hair, face, outfit, and collar readability at 256px and 128px", async () => {

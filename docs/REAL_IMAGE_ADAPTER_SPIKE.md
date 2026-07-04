@@ -2,11 +2,11 @@
 
 Date: 2026-06-30
 
-Status: Scaffold implemented with `mock-provider`; `openai-image` is connected only through the guided manager behind `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and per-generation UI upload confirmation.
+Status: Scaffold implemented with `mock-provider`; `openai-image` is connected only through the guided manager behind `DOUDOU_ENABLE_OPENAI_LIVE=1`, `OPENAI_API_KEY`, and per-generation UI upload confirmation. The local no-network default has since moved from the scripted shim to `doudou-digital-human-adapter`.
 
 ## Decision
 
-The first real image-to-character adapter should be a cloud adapter behind explicit user opt-in. The existing scripted adapter remains the default local/no-network path. A local model adapter should use the same adapter contract later, but it is not the first real adapter because local packaging, model weights, GPU/CPU variance, and cache deletion are larger product risks than the adapter boundary itself.
+The first real image-to-character adapter should be a cloud adapter behind explicit user opt-in. The current default local/no-network path is the 兜兜二次元数字人 adapter; the scripted adapter remains a contract-test shim. A local model adapter should use the same adapter contract later, but it is not the first real adapter because local packaging, model weights, GPU/CPU variance, and cache deletion are larger product risks than the adapter boundary itself.
 
 The real adapter must still produce the existing sanitized adapter output:
 
@@ -121,7 +121,7 @@ Actions:
 
 - `Generate with cloud provider`
 - `Cancel`
-- `Use local/scripted mode`
+- `Use local 兜兜 mode`
 
 Local generation/cache notice:
 
@@ -161,7 +161,7 @@ Unit tests:
 
 Integration/smoke:
 
-- default `generate:pet` remains no-network and scripted
+- default `generate:pet` remains no-network and produces a 兜兜二次元数字人 bundle
 - cloud adapter tests use mocked provider responses by default
 - live provider smoke is opt-in and skipped unless explicit environment variables are set
 - generated cloud bundle passes validator and runtime smoke

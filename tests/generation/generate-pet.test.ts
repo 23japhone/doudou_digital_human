@@ -5,6 +5,7 @@ import { encode as encodeJpeg } from "jpeg-js";
 import { PNG } from "pngjs";
 import { afterEach, describe, expect, test } from "vitest";
 import { runGeneratePetCli } from "../../src/cli/generate-pet.js";
+import { analyzeDoudouSpriteAtlasQuality } from "../../src/generation/doudou-sprite-quality.js";
 import { generatePetBundleFromSource } from "../../src/generation/generate-pet.js";
 import type { PetGenerationAdapter } from "../../src/generation/adapters/types.js";
 import { validatePetBundle } from "../../src/pet_bundle/validate.js";
@@ -59,7 +60,7 @@ describe("generatePetBundleFromSource", () => {
     expect(sourceMeta).toMatchObject({
       fixture: false,
       generatedBy: "src/generation/generate-pet.ts",
-      generationAdapter: "deterministic-stylized-png-adapter",
+      generationAdapter: "doudou-digital-human-adapter",
       generationAdapterVersion: "0.1.0",
       sourceType: "local-image-intake",
       inputMime: "image/png",
@@ -75,6 +76,10 @@ describe("generatePetBundleFromSource", () => {
     const preview = PNG.sync.read(await readFile(path.join(outputDir, "preview.png")));
     expect(countRedPixels(preview)).toBeGreaterThan(500);
     expect(countGreenPixels(preview)).toBeGreaterThan(500);
+
+    const atlas = PNG.sync.read(await readFile(path.join(outputDir, "atlases/main.png")));
+    const quality = analyzeDoudouSpriteAtlasQuality(atlas);
+    expect(quality).toMatchObject({ ok: true, issues: [] });
   });
 
   test("generates a validated v0.1 bundle from a local JPEG", async () => {
@@ -126,7 +131,7 @@ describe("generatePetBundleFromSource", () => {
       manifest: expect.objectContaining({ id: "generated_local_pet" })
     });
     const sourceMeta = JSON.parse(await readFile(path.join(outputDir, "source.meta.json"), "utf8")) as Record<string, unknown>;
-    expect(sourceMeta.generationAdapter).toBe("deterministic-stylized-png-adapter");
+    expect(sourceMeta.generationAdapter).toBe("doudou-digital-human-adapter");
   });
 
   test("rejects adapter output that does not provide all required frame PNGs", async () => {
@@ -283,6 +288,44 @@ describe("generatePetBundleFromSource", () => {
         adapter: badAdapter
       })
     ).rejects.toMatchObject({ code: "ADAPTER_OUTPUT_INVALID" });
+  });
+
+  test("requires the shared Doudou sprite QA gate by default", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "input.png");
+    await writeFile(sourcePath, createPngSource());
+
+    await expect(
+      generatePetBundleFromSource({
+        sourceImagePath: sourcePath,
+        outputBundleDir: path.join(workspace, "out"),
+        now: fixedNow,
+        adapter: createPlainFrameAdapter()
+      })
+    ).rejects.toMatchObject({
+      code: "ADAPTER_OUTPUT_INVALID",
+      message: expect.stringContaining("Generated pet atlas failed Doudou sprite QA")
+    });
+  });
+
+  test("allows internal comparison adapters to opt out of Doudou sprite QA", async () => {
+    const workspace = await createTempDir();
+    const sourcePath = path.join(workspace, "input.png");
+    const outputDir = path.join(workspace, "out");
+    await writeFile(sourcePath, createPngSource());
+
+    const result = await generatePetBundleFromSource({
+      sourceImagePath: sourcePath,
+      outputBundleDir: outputDir,
+      enforceDoudouSpriteQuality: false,
+      now: fixedNow,
+      adapter: createPlainFrameAdapter()
+    });
+
+    expect(result.generation.adapterId).toBe("plain-frame-test-adapter");
+    await expect(validatePetBundle(outputDir)).resolves.toMatchObject({
+      manifest: expect.objectContaining({ id: "plain_frame_pet" })
+    });
   });
 
   test.each([
@@ -467,6 +510,24 @@ function createFramePngOutputs() {
     role: index >= 4 ? "tap_react" as const : "idle" as const,
     png: createPngSource(256, 256)
   }));
+}
+
+function createPlainFrameAdapter(): PetGenerationAdapter {
+  return {
+    id: "plain-frame-test-adapter",
+    version: "0.1.0",
+    async generate() {
+      return {
+        adapterId: "plain-frame-test-adapter",
+        adapterVersion: "0.1.0",
+        petId: "plain_frame_pet",
+        petName: "Plain Frame Pet",
+        previewFrameIndex: 0,
+        previewPng: createPngSource(256, 256),
+        frames: createFramePngOutputs()
+      };
+    }
+  };
 }
 
 function createJpegHeaderOnlySource(width: number, height: number): Buffer {

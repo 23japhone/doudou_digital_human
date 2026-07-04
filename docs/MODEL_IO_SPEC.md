@@ -14,7 +14,7 @@ Optional controls:
 - Target animation set, such as idle only or idle plus tap reaction.
 - Output constraints, such as transparent background, max texture size, sprite atlas dimensions, and target platform.
 
-The model layer should receive normalized images and structured controls, not raw UI state. Real model integrations should implement the generation adapter contract currently exercised by the scripted adapter. The first real adapter should be cloud-backed and opt-in; local model mode remains a later adapter using the same contract.
+The model layer should receive normalized images and structured controls, not raw UI state. Real model integrations should implement the same generation adapter contract as the default local 兜兜 adapter and the scripted contract-test adapter. The first real adapter should be cloud-backed and opt-in; local model mode remains a later adapter using the same contract.
 
 Normalization before model invocation should decode the image, apply orientation, strip metadata, reject unsafe dimensions, resize to provider-safe limits, and use temporary working files outside the final bundle.
 
