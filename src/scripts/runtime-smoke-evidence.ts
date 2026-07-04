@@ -32,6 +32,13 @@ export interface RuntimePetPresentationSmokeEvidence {
   petPresentationStableStatesObserved?: string[];
 }
 
+export interface RuntimePetPerformanceSmokeEvidence {
+  petPerformanceExpressionPrioritiesObserved?: string[];
+  petPerformanceGovernorSchemaVersionsObserved?: string[];
+  petPerformanceMotionBudgetsObserved?: string[];
+  petPerformanceTransitionTonesObserved?: string[];
+}
+
 export interface RuntimeLiveEmotionPanelSmokeEvidence {
   atlasLoaded: boolean;
   bundleLoaded: boolean;
@@ -39,6 +46,17 @@ export interface RuntimeLiveEmotionPanelSmokeEvidence {
   live2DRendererSpike: RuntimeLive2DRendererSpikeMinimalEvidence | null;
   nonTransparentPixel: boolean;
   renderLoopAdvanced: boolean;
+}
+
+export function hasRuntimePetPerformanceSmokeEvidence(
+  result: RuntimePetPerformanceSmokeEvidence
+): boolean {
+  return Boolean(
+    result.petPerformanceGovernorSchemaVersionsObserved?.includes("doudou.pet-performance-governor.v0.1") &&
+    hasEvery(result.petPerformanceMotionBudgetsObserved, ["none", "low", "medium"]) &&
+    hasEvery(result.petPerformanceExpressionPrioritiesObserved, ["normal", "force"]) &&
+    hasEvery(result.petPerformanceTransitionTonesObserved, ["idle", "reaction", "soft_recovery", "focused"])
+  );
 }
 
 export function hasRuntimePetPresentationSmokeEvidence(

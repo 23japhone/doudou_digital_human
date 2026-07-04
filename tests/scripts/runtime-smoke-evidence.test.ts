@@ -4,10 +4,26 @@ import {
   hasRuntimeEmotionModelTraySmokeEvidence,
   hasRuntimeLiveEmotionPanelSmokeEvidence,
   hasRuntimeLiveEmotionTraySmokeEvidence,
+  hasRuntimePetPerformanceSmokeEvidence,
   hasRuntimePetPresentationSmokeEvidence
 } from "../../src/scripts/runtime-smoke-evidence.js";
 
 describe("runtime smoke evidence", () => {
+  test("requires pet performance governor smoke coverage", () => {
+    expect(hasRuntimePetPerformanceSmokeEvidence({
+      petPerformanceExpressionPrioritiesObserved: ["normal", "force"],
+      petPerformanceGovernorSchemaVersionsObserved: ["doudou.pet-performance-governor.v0.1"],
+      petPerformanceMotionBudgetsObserved: ["none", "low", "medium"],
+      petPerformanceTransitionTonesObserved: ["idle", "reaction", "soft_recovery", "focused"]
+    })).toBe(true);
+    expect(hasRuntimePetPerformanceSmokeEvidence({
+      petPerformanceExpressionPrioritiesObserved: ["normal"],
+      petPerformanceGovernorSchemaVersionsObserved: ["doudou.pet-performance-governor.v0.1"],
+      petPerformanceMotionBudgetsObserved: ["none", "low"],
+      petPerformanceTransitionTonesObserved: ["idle", "focused"]
+    })).toBe(false);
+  });
+
   test("requires pet presentation envelope smoke coverage", () => {
     expect(hasRuntimePetPresentationSmokeEvidence({
       petPresentationEnvelopeSchemaVersionsObserved: ["doudou.pet-presentation-envelope.v0.1"],

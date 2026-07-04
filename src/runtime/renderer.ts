@@ -23,6 +23,12 @@ import {
   type RuntimeEmotionMemory
 } from "./reaction.js";
 import {
+  createPetPerformancePlan,
+  shouldSwitchExpressionForPerformancePlan,
+  type PetPerformancePlan,
+  type PetPerformanceTransitionTone
+} from "./performance-governor.js";
+import {
   createPetPresentationEnvelope,
   type PetAffectStableState,
   type PetInteractionEvent,
@@ -51,7 +57,8 @@ import {
   createRuntimePetStateMachine,
   runtimePetStateClass,
   type RuntimePetMotionCue,
-  type RuntimePetState
+  type RuntimePetState,
+  type RuntimePetVisualPose
 } from "./state.js";
 import {
   RUNTIME_MOTION_TUNING_DEFAULTS,
@@ -184,6 +191,10 @@ const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
 const defaultDoudouEmotionIdsObserved = new Set<DefaultDoudouEmotionId>();
 const defaultDoudouEmotionScenariosObserved = new Set<DefaultDoudouEmotionScenario>();
+const petPerformanceExpressionPrioritiesObserved = new Set<PetPerformancePlan["expression"]["priority"]>();
+const petPerformanceGovernorSchemaVersionsObserved = new Set<string>();
+const petPerformanceMotionBudgetsObserved = new Set<PetPerformancePlan["motionBudget"]>();
+const petPerformanceTransitionTonesObserved = new Set<PetPerformanceTransitionTone>();
 const petPresentationEnvelopeSchemaVersionsObserved = new Set<string>();
 const petPresentationReactionActsObserved = new Set<PetReactionAct>();
 const petPresentationStableStatesObserved = new Set<PetAffectStableState>();
@@ -664,6 +675,10 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     defaultDoudouEmotionIdsObserved: [...defaultDoudouEmotionIdsObserved],
     defaultDoudouEmotionScenariosObserved: [...defaultDoudouEmotionScenariosObserved],
     emotionMotionPhasesObserved: [],
+    petPerformanceExpressionPrioritiesObserved: [...petPerformanceExpressionPrioritiesObserved],
+    petPerformanceGovernorSchemaVersionsObserved: [...petPerformanceGovernorSchemaVersionsObserved],
+    petPerformanceMotionBudgetsObserved: [...petPerformanceMotionBudgetsObserved],
+    petPerformanceTransitionTonesObserved: [...petPerformanceTransitionTonesObserved],
     petPresentationEnvelopeSchemaVersionsObserved: [...petPresentationEnvelopeSchemaVersionsObserved],
     petPresentationReactionActsObserved: [...petPresentationReactionActsObserved],
     petPresentationStableStatesObserved: [...petPresentationStableStatesObserved],
@@ -1389,11 +1404,11 @@ function applyRuntimePetState(
   const previousState = visualState;
   visualState = state;
   petFrame.dataset.runtimeState = state;
-  recordPetPresentationState(state, previousState, event, nowMs);
+  const performancePlan = recordPetPresentationState(state, previousState, event, nowMs);
   for (const candidate of RUNTIME_PET_STATES) {
     petFrame.classList.toggle(runtimePetStateClass(candidate), candidate === state);
   }
-  applyRuntimeVisualPose();
+  applyRuntimeVisualPose(performancePlan);
 }
 
 function recordPetPresentationState(
@@ -1401,7 +1416,7 @@ function recordPetPresentationState(
   previousState: RuntimePetState,
   event: PetInteractionEvent,
   nowMs: number
-): void {
+): PetPerformancePlan {
   petPresentationMemory = decayRuntimeEmotionMemory(petPresentationMemory, nowMs);
   const motionPhase = classifyRuntimeEmotionMotionPhase(petPresentationMemory, nowMs);
   const presentation = createPetPresentationEnvelope({
@@ -1414,18 +1429,27 @@ function recordPetPresentationState(
     state,
     timing: runtimeStateTiming
   });
+  const performancePlan = createPetPerformancePlan(presentation);
   const scenarioEmotion = doudouEmotionForRuntimeScenario(presentation.scenario);
   petFrame.dataset.doudouEmotion = presentation.emotionId;
   petFrame.dataset.doudouEmotionLabel = scenarioEmotion.labelZh;
+  petFrame.dataset.petPerformanceGovernorSchemaVersion = performancePlan.schemaVersion;
+  petFrame.dataset.petPerformanceMotionBudget = performancePlan.motionBudget;
+  petFrame.dataset.petPerformanceTransitionTone = performancePlan.expression.transitionTone;
   petFrame.dataset.petPresentationReactionAct = presentation.reactionAct;
   petFrame.dataset.petPresentationSchemaVersion = presentation.schemaVersion;
   petFrame.dataset.petPresentationStableState = presentation.affect.stableState;
   defaultDoudouEmotionIdsObserved.add(presentation.emotionId);
   defaultDoudouEmotionScenariosObserved.add(presentation.scenario);
+  petPerformanceExpressionPrioritiesObserved.add(performancePlan.expression.priority);
+  petPerformanceGovernorSchemaVersionsObserved.add(performancePlan.schemaVersion);
+  petPerformanceMotionBudgetsObserved.add(performancePlan.motionBudget);
+  petPerformanceTransitionTonesObserved.add(performancePlan.expression.transitionTone);
   petPresentationEnvelopeSchemaVersionsObserved.add(presentation.schemaVersion);
   petPresentationReactionActsObserved.add(presentation.reactionAct);
   petPresentationStableStatesObserved.add(presentation.affect.stableState);
-  switchLive2DRendererSpikeExpression(presentation.emotionId);
+  switchLive2DRendererSpikeExpression(presentation.emotionId, performancePlan);
+  return performancePlan;
 }
 
 function createRendererPresentationEvent(
@@ -1449,27 +1473,82 @@ function isRuntimeVisualStateApplied(): boolean {
   );
 }
 
-function applyRuntimeVisualPose(): void {
+function applyRuntimeVisualPose(performancePlan: PetPerformancePlan): void {
   const pose = stateMachine.pose();
+  const motionPlan = performancePlan.motion;
   const directionX = horizontalDirectionMultiplier(pose.direction);
   const motionIntensity = clamp01(pose.motionIntensity);
   const stopRebound = clamp01(pose.stopRebound);
   motionDirectionsObserved.add(pose.direction);
   maxStopRebound = Math.max(maxStopRebound, stopRebound);
   petFrame.dataset.motionDirection = pose.direction;
-  petFrame.style.setProperty("--runtime-approach-lift", `${-(3 + motionIntensity * 5).toFixed(2)}px`);
-  petFrame.style.setProperty("--runtime-approach-rotate", `${(directionX * (2 + motionIntensity * 5)).toFixed(2)}deg`);
-  petFrame.style.setProperty("--runtime-approach-scale", (1 + motionIntensity * 0.028).toFixed(3));
-  petFrame.style.setProperty("--runtime-retreat-x", `${(-directionX * (14 + motionIntensity * 18)).toFixed(2)}px`);
-  petFrame.style.setProperty("--runtime-retreat-rotate", `${(-directionX * (8 + motionIntensity * 6)).toFixed(2)}deg`);
-  petFrame.style.setProperty("--runtime-watch-rotate", `${(directionX * (3 + motionIntensity * 4)).toFixed(2)}deg`);
-  petFrame.style.setProperty("--runtime-watch-scale", (1 + motionIntensity * 0.018).toFixed(3));
-  petFrame.style.setProperty("--runtime-stop-drop", `${(2 + stopRebound * 5).toFixed(2)}px`);
-  petFrame.style.setProperty("--runtime-stop-scale-x", (1 + stopRebound * 0.03).toFixed(3));
-  petFrame.style.setProperty("--runtime-stop-scale-y", (1 - stopRebound * 0.045).toFixed(3));
-  petFrame.style.setProperty("--runtime-dodge-x", `${(-directionX * (8 + motionIntensity * 10)).toFixed(2)}px`);
-  petFrame.style.setProperty("--runtime-dodge-rotate", `${(-directionX * (6 + motionIntensity * 5)).toFixed(2)}deg`);
-  petFrame.style.setProperty("--runtime-click-pop", pose.clickExpression === "tap_react" ? "1.075" : "1.04");
+  petFrame.style.setProperty("--runtime-transform-transition-ms", `${transitionMsForPerformancePlan(performancePlan)}ms`);
+  petFrame.style.setProperty("--runtime-waiting-breathe-ms", `${motionPlan.cadenceMs}ms`);
+  petFrame.style.setProperty("--runtime-working-pulse-ms", `${motionPlan.cadenceMs}ms`);
+  petFrame.style.setProperty(
+    "--runtime-approach-lift",
+    `${-capMotion(3 + motionIntensity * 5, motionPlan.maxTranslateYPx, motionPlan.amplitudeScale).toFixed(2)}px`
+  );
+  petFrame.style.setProperty(
+    "--runtime-approach-rotate",
+    `${(directionX * capMotion(2 + motionIntensity * 5, motionPlan.maxRotateDeg, motionPlan.amplitudeScale)).toFixed(2)}deg`
+  );
+  petFrame.style.setProperty(
+    "--runtime-approach-scale",
+    (1 + capMotion(motionIntensity * 0.028, motionPlan.scaleDelta, motionPlan.amplitudeScale)).toFixed(3)
+  );
+  petFrame.style.setProperty(
+    "--runtime-retreat-x",
+    `${(-directionX * capMotion(14 + motionIntensity * 18, motionPlan.maxTranslateXPx, motionPlan.amplitudeScale)).toFixed(2)}px`
+  );
+  petFrame.style.setProperty(
+    "--runtime-retreat-rotate",
+    `${(-directionX * capMotion(8 + motionIntensity * 6, motionPlan.maxRotateDeg, motionPlan.amplitudeScale)).toFixed(2)}deg`
+  );
+  petFrame.style.setProperty(
+    "--runtime-watch-rotate",
+    `${(directionX * capMotion(3 + motionIntensity * 4, motionPlan.maxRotateDeg, motionPlan.amplitudeScale)).toFixed(2)}deg`
+  );
+  petFrame.style.setProperty(
+    "--runtime-watch-scale",
+    (1 + capMotion(motionIntensity * 0.018, motionPlan.scaleDelta, motionPlan.amplitudeScale)).toFixed(3)
+  );
+  petFrame.style.setProperty(
+    "--runtime-stop-drop",
+    `${capMotion(2 + stopRebound * 5, motionPlan.maxTranslateYPx, motionPlan.amplitudeScale).toFixed(2)}px`
+  );
+  petFrame.style.setProperty(
+    "--runtime-stop-scale-x",
+    (1 + capMotion(stopRebound * 0.03, motionPlan.scaleDelta, motionPlan.amplitudeScale)).toFixed(3)
+  );
+  petFrame.style.setProperty(
+    "--runtime-stop-scale-y",
+    (1 - capMotion(stopRebound * 0.045, motionPlan.stopSquash, motionPlan.amplitudeScale)).toFixed(3)
+  );
+  petFrame.style.setProperty(
+    "--runtime-dodge-x",
+    `${(-directionX * capMotion(8 + motionIntensity * 10, motionPlan.maxTranslateXPx, motionPlan.amplitudeScale)).toFixed(2)}px`
+  );
+  petFrame.style.setProperty(
+    "--runtime-dodge-rotate",
+    `${(-directionX * capMotion(6 + motionIntensity * 5, motionPlan.maxRotateDeg, motionPlan.amplitudeScale)).toFixed(2)}deg`
+  );
+  petFrame.style.setProperty("--runtime-click-pop", clickPopScale(pose, performancePlan));
+}
+
+function transitionMsForPerformancePlan(performancePlan: PetPerformancePlan): number {
+  return Math.round(Math.min(320, Math.max(80, performancePlan.motion.cadenceMs * 0.25)));
+}
+
+function capMotion(value: number, maxValue: number, amplitudeScale: number): number {
+  return Math.min(Math.max(0, maxValue), Math.max(0, value) * Math.max(0, amplitudeScale));
+}
+
+function clickPopScale(pose: RuntimePetVisualPose, performancePlan: PetPerformancePlan): string {
+  if (pose.clickExpression !== "tap_react" || !performancePlan.expression.canUseTapReactFrames) {
+    return "1.04";
+  }
+  return (1 + Math.min(0.075, performancePlan.motion.scaleDelta + 0.02)).toFixed(3);
 }
 
 function horizontalDirectionMultiplier(direction: string): number {
@@ -1714,12 +1793,24 @@ function drawLive2DRendererSpikeFrame(timestamp: number): void {
   }
 }
 
-function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmotionId): boolean {
+function switchLive2DRendererSpikeExpression(
+  targetEmotionId: DefaultDoudouEmotionId,
+  performancePlan?: PetPerformancePlan
+): boolean {
   const config = bundle.live2DRendererSpike;
   if (!config || !live2DRendererSpike) {
     return false;
   }
-  if (targetEmotionId === live2DRendererSpikeActiveEmotionId) {
+  if (performancePlan && !performancePlan.expression.canSwitchExpression) {
+    return false;
+  }
+  if (
+    performancePlan &&
+    !shouldSwitchExpressionForPerformancePlan(live2DRendererSpikeActiveEmotionId, targetEmotionId, performancePlan)
+  ) {
+    return true;
+  }
+  if (!performancePlan && targetEmotionId === live2DRendererSpikeActiveEmotionId) {
     return true;
   }
   const playback = live2DRendererSpike.switchExpression(
@@ -1727,7 +1818,7 @@ function switchLive2DRendererSpikeExpression(targetEmotionId: DefaultDoudouEmoti
     live2DRendererSpikeActiveEmotionId,
     targetEmotionId,
     performance.now(),
-    "normal"
+    performancePlan?.expression.priority ?? "normal"
   );
   if (playback.ok) {
     live2DRendererSpikeActiveEmotionId = targetEmotionId;

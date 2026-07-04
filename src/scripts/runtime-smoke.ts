@@ -12,6 +12,7 @@ import {
 import {
   hasRuntimeEmotionModelTraySmokeEvidence,
   hasRuntimeLiveEmotionTraySmokeEvidence,
+  hasRuntimePetPerformanceSmokeEvidence,
   hasRuntimePetPresentationSmokeEvidence
 } from "./runtime-smoke-evidence.js";
 import {
@@ -154,6 +155,7 @@ async function assertValidRuntimeLoads(
     !hasAllEmotionMotionPhases(smokeResult.emotionMotionPhasesObserved) ||
     !hasAllDefaultDoudouEmotionScenarios(smokeResult.defaultDoudouEmotionScenariosObserved) ||
     !hasAllDefaultDoudouEmotionIds(smokeResult.defaultDoudouEmotionIdsObserved) ||
+    !hasRuntimePetPerformanceSmokeEvidence(smokeResult) ||
     !hasRuntimePetPresentationSmokeEvidence(smokeResult) ||
     !smokeResult.motionTuningApplied ||
     !smokeResult.motionTuningPanelVisible ||
@@ -486,6 +488,10 @@ function parseSmokeResult(output: string) {
     emotionMotionPhasesObserved: string[];
     defaultDoudouEmotionIdsObserved: string[];
     defaultDoudouEmotionScenariosObserved: string[];
+    petPerformanceExpressionPrioritiesObserved?: string[];
+    petPerformanceGovernorSchemaVersionsObserved?: string[];
+    petPerformanceMotionBudgetsObserved?: string[];
+    petPerformanceTransitionTonesObserved?: string[];
     petPresentationEnvelopeSchemaVersionsObserved?: string[];
     petPresentationReactionActsObserved?: string[];
     petPresentationStableStatesObserved?: string[];

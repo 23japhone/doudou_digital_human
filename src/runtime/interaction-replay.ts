@@ -6,6 +6,10 @@ import {
 } from "./default-doudou-emotions.js";
 import type { RuntimeMotionDirection } from "./motion.js";
 import {
+  createPetPerformancePlan,
+  type PetPerformancePlan
+} from "./performance-governor.js";
+import {
   createPetPresentationEnvelope,
   type PetEmbodimentPolicy,
   type PetInteractionTarget,
@@ -119,6 +123,7 @@ export interface PetInteractionTraceEntry {
   emotionId: DefaultDoudouEmotionId;
   eventType: PetInteractionReplayEventType;
   motionPhase: RuntimeEmotionMotionPhase;
+  performancePlan: PetPerformancePlan;
   policy: PetEmbodimentPolicy;
   presentation: PetPresentationEnvelope;
   reactionAct: PetReactionAct;
@@ -241,11 +246,13 @@ export function runPetInteractionReplay(fixture: PetInteractionReplayFixture): P
       previousState: lastRecordedState,
       state
     });
+    const performancePlan = createPetPerformancePlan(presentation);
     const entry: PetInteractionTraceEntry = {
       atMs: event.atMs,
       emotionId: presentation.emotionId,
       eventType: event.type,
       motionPhase,
+      performancePlan,
       policy: presentation.policy,
       presentation,
       reactionAct: presentation.reactionAct,

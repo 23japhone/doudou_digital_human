@@ -20,9 +20,14 @@ import type {
   PetInteractionReplayEventType
 } from "./interaction-replay.js";
 import type {
+  PetPerformancePlan,
+  PetPerformanceTransitionTone
+} from "./performance-governor.js";
+import type {
   PetAffectStableState,
   PetReactionAct
 } from "./presentation.js";
+import type { DoudouCubismMotionPriority } from "./default-doudou-live2d-cubism-adapter.js";
 
 export interface RuntimeAtlas {
   id: string;
@@ -167,6 +172,10 @@ export interface RuntimeSmokeResult {
   defaultDoudouEmotionIdsObserved: DefaultDoudouEmotionId[];
   defaultDoudouEmotionScenariosObserved: DefaultDoudouEmotionScenario[];
   emotionMotionPhasesObserved: string[];
+  petPerformanceExpressionPrioritiesObserved: DoudouCubismMotionPriority[];
+  petPerformanceGovernorSchemaVersionsObserved: string[];
+  petPerformanceMotionBudgetsObserved: PetPerformancePlan["motionBudget"][];
+  petPerformanceTransitionTonesObserved: PetPerformanceTransitionTone[];
   petPresentationEnvelopeSchemaVersionsObserved: string[];
   petPresentationReactionActsObserved: PetReactionAct[];
   petPresentationStableStatesObserved: PetAffectStableState[];

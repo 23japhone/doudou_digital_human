@@ -33,7 +33,8 @@ Owning domain: `src/runtime/presentation.ts`, `src/runtime/interaction-replay.ts
 - `src/runtime/reaction.ts` 定义短期 `wariness`、alpha hit reaction、`retreating` / `watching` / `recovering` motion phase。
 - `src/runtime/default-doudou-emotions.ts` 把 runtime scenario 映射到默认兜兜 emotion id。
 - `src/runtime/presentation.ts` 已落地 `PetAffectCore`、`PetReactionAct`、`PetEmbodimentPolicy` 和 `PetPresentationEnvelope`，schema version 为 `doudou.pet-presentation-envelope.v0.1`。
-- `src/runtime/interaction-replay.ts` 的每条 `PetInteractionTraceEntry` 都携带同一份 `presentation` envelope；renderer smoke 也上报 envelope schema、reaction acts 和 stable states。
+- `src/runtime/performance-governor.ts` 已落地轻量 `PetPerformancePlan`，schema version 为 `doudou.pet-performance-governor.v0.1`，把 `motionBudget` 转成 renderer adapter 可消费的动作幅度、节奏和表情限制。
+- `src/runtime/interaction-replay.ts` 的每条 `PetInteractionTraceEntry` 都携带同一份 `presentation` envelope 和 `performancePlan`；renderer smoke 也上报 envelope schema、reaction acts、stable states 和 governor plan evidence。
 - `tests/runtime/state.test.ts`、`tests/runtime/reaction.test.ts`、`tests/runtime/default-doudou-emotions.test.ts` 已覆盖状态机、wariness 和默认兜兜场景映射。
 - `tests/runtime/presentation.test.ts` 覆盖表现层合同；`tests/runtime/interaction-replay.test.ts` 校验 replay trace 与 presentation envelope 一致。
 - `npm run smoke:runtime` 要求观察到 `idle`、`tap`、`repeat_poke_retreat`、`repeat_poke_watch`、`quiet_recovery`、`working` 场景，以及全部 runtime states。
@@ -51,6 +52,7 @@ Desktop/App events
 -> PetReactionAct
 -> PetEmbodimentPolicy
 -> PetPresentationEnvelope
+-> PetPerformancePlan
 -> Renderer adapter
 -> PetInteractionTrace
 ```
@@ -60,7 +62,7 @@ Desktop/App events
 - Manager app 可以启动或停止 runtime，但 runtime launch 只接收 accepted bundle path。
 - Runtime 可以读取 pet bundle manifest、atlas、hit area 和本地 runtime tuning。
 - Runtime 不知道 source image、generation adapter internals、provider endpoint、prompt 或 raw response。
-- Renderer 只消费 `PetPresentationEnvelope` 或现有等价 motion/state cue，不直接消费模型 payload。
+- Renderer 只消费 `PetPresentationEnvelope`、`PetPerformancePlan` 或现有等价 motion/state cue，不直接消费模型 payload。
 - Smoke、debug panel 和 future replay 只记录 sanitized trace，不记录本地私密路径或用户内容。
 
 ## 合同对象
@@ -206,6 +208,49 @@ export interface PetPresentationEnvelope {
 
 `quiet_recovery` 是由 transition context 产生的 scenario，不是新的长期 state。当前 `doudouEmotionScenarioForRuntimeState("waiting", previousState)` 已体现这个规则。
 
+### PetPerformancePlan
+
+`PetPerformancePlan` 是 envelope 后面的轻量 performance governor 输出。它不重新判断情绪，只把 `PetEmbodimentPolicy.motionBudget`、`reactionAct` 和 policy flags 转成 renderer adapter 可以直接使用的幅度、节奏和表情限制。
+
+```ts
+export interface PetPerformancePlan {
+  schemaVersion: "doudou.pet-performance-governor.v0.1";
+  reactionAct: PetReactionAct;
+  motionBudget: "none" | "low" | "medium";
+  motion: {
+    amplitudeScale: number;
+    cadenceMs: number;
+    maxTranslateXPx: number;
+    maxTranslateYPx: number;
+    maxRotateDeg: number;
+    scaleDelta: number;
+    stopSquash: number;
+  };
+  expression: {
+    targetEmotionId: DefaultDoudouEmotionId;
+    canSwitchExpression: boolean;
+    canUseTapReactFrames: boolean;
+    priority: "normal" | "force";
+    minSwitchIntervalMs: number;
+    holdMs: number;
+    transitionTone: "idle" | "reaction" | "soft_recovery" | "focused";
+  };
+  interaction: {
+    canMoveWindow: boolean;
+    canShowResizeFrame: boolean;
+    interruptibleByPassiveCursor: boolean;
+  };
+}
+```
+
+规则：
+
+- `motionBudget:"none"` 产出 0 幅度和 1800ms idle cadence，只保留表情回到 idle 的能力。
+- `motionBudget:"low"` 用于 `quiet_recovery` 和 `working`，幅度低于中等反应；`quiet_recovery` 使用更慢、更柔和的 cadence，`working` 不允许 passive cursor 抢占。
+- `motionBudget:"medium"` 用于 poke、repeat poke、cursor dodge 和 stop rebound，允许完整 CSS transform 幅度。
+- `poke_pop` 使用 `priority:"force"` 和 `tap_react` frames；其他状态保持 `priority:"normal"`。
+- Renderer adapter 当前用该 plan 驱动 CSS transform caps、transition/breathe/pulse cadence、tap pop scale 和 Live2D expression priority。
+
 ## 四个核心流程
 
 ### 1. 单次 poke
@@ -306,6 +351,7 @@ export interface PetInteractionTraceEntry {
   emotionId: DefaultDoudouEmotionId;
   reactionAct: PetReactionAct;
   presentation: PetPresentationEnvelope;
+  performancePlan: PetPerformancePlan;
   wariness: number;
   motionPhase: "settled" | "retreating" | "watching" | "recovering";
   policy: PetEmbodimentPolicy;
@@ -350,6 +396,7 @@ Trace 推荐保留：
 - Smoke:
   - `npm run smoke:runtime` 继续观察全部 runtime states、核心 scenarios 和 emotion ids。
   - `npm run smoke:runtime` 继续观察 `doudou.pet-presentation-envelope.v0.1`、`none` / `poke_pop` / `repeat_poke_retreat` / `repeat_poke_watch` / `quiet_recovery` / `work_hold` reaction acts，以及 `calm` / `curious` / `focused` / `wary` stable states。
+  - `npm run smoke:runtime` 继续观察 `doudou.pet-performance-governor.v0.1`、`none` / `low` / `medium` motion budgets、`normal` / `force` expression priorities，以及 `idle` / `reaction` / `soft_recovery` / `focused` transition tones。
   - passive cursor contact 不移动窗口。
   - repeated poke 观察到最大 `wariness` 超过阈值。
 - Future replay:
@@ -381,6 +428,6 @@ Trace 推荐保留：
 
 ## 推荐下一步
 
-1. 在 `PetPresentationEnvelope` 后面增加轻量 performance governor，把 `motionBudget` 转成 renderer adapter 可消费的位移、表情和节奏限制。
-2. 将未来模型驱动的 allowlisted runtime intent 先映射为 `PetInteractionEvent` 或 `PetReactionAct`，不要让模型直接写 renderer 参数。
-3. 需要更接近桌面窗口的回归时，优先运行 `npm run smoke:runtime -- --synthetic-replay`，让 replay fixture 经 DOM/IPC adapter 再验证 envelope evidence。
+1. 为 `PetPerformancePlan` 增加 readability catalog，把不同默认兜兜 emotion id 的位移上限、停留时长和表情切换间隔从固定映射升级为可评审目录。
+2. 将未来模型驱动的 allowlisted runtime intent 先映射为 `PetInteractionEvent` 或 `PetReactionAct`，再经过 envelope 和 governor，不要让模型直接写 renderer 参数。
+3. 需要更接近桌面窗口的回归时，优先运行 `npm run smoke:runtime -- --synthetic-replay`，让 replay fixture 经 DOM/IPC adapter 再验证 envelope 和 governor evidence。

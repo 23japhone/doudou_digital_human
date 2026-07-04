@@ -32,6 +32,10 @@ describe("runtime interaction replay", () => {
       expect(result.trace.map((entry) => entry.presentation.reactionAct)).toEqual(result.trace.map((entry) => entry.reactionAct));
       expect(result.trace.map((entry) => entry.presentation.scenario)).toEqual(result.trace.map((entry) => entry.scenario));
       expect(result.trace.map((entry) => entry.presentation.emotionId)).toEqual(result.trace.map((entry) => entry.emotionId));
+      expect(result.trace.every((entry) => entry.performancePlan.schemaVersion === "doudou.pet-performance-governor.v0.1")).toBe(true);
+      expect(result.trace.map((entry) => entry.performancePlan.motionBudget)).toEqual(
+        result.trace.map((entry) => entry.presentation.policy.motionBudget)
+      );
     }
   });
 
