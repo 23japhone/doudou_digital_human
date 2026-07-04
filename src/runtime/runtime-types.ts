@@ -15,6 +15,10 @@ import type { ScreenPoint } from "./drag.js";
 import type { RuntimeScaleLimits } from "./scale.js";
 import type { RuntimePetMotionCue, RuntimePetState } from "./state.js";
 import type { RuntimeMotionTuning, RuntimeMotionTuningPreset } from "./tuning.js";
+import type {
+  PetInteractionReplayFixtureId,
+  PetInteractionReplayEventType
+} from "./interaction-replay.js";
 
 export interface RuntimeAtlas {
   id: string;
@@ -49,6 +53,43 @@ export interface RuntimeBundle {
   motionTuning: RuntimeMotionTuning;
   motionTuningEnabled: boolean;
   motionTuningPresets: RuntimeMotionTuningPreset[];
+  smokeSyntheticReplay: RuntimeSmokeSyntheticReplayPlan | null;
+}
+
+export const RUNTIME_SMOKE_SYNTHETIC_REPLAY_SCHEMA_VERSION = "doudou.runtime-smoke.synthetic-replay.v0.1" as const;
+export const RUNTIME_SMOKE_SYNTHETIC_REPLAY_PLAN_ENV = "DOUDOU_RUNTIME_SMOKE_SYNTHETIC_REPLAY_PLAN" as const;
+
+export type RuntimeSmokeSyntheticReplayEventType = PetInteractionReplayEventType;
+
+export interface RuntimeSmokeSyntheticReplayEvent {
+  atMs: number;
+  direction?: RuntimePetMotionCue["direction"];
+  fixtureId: PetInteractionReplayFixtureId;
+  motionIntensity?: number;
+  point?: {
+    canvasX: number;
+    canvasY: number;
+  };
+  state?: RuntimePetMotionCue["state"];
+  type: RuntimeSmokeSyntheticReplayEventType;
+}
+
+export interface RuntimeSmokeSyntheticReplayPlan {
+  enabled: true;
+  events: RuntimeSmokeSyntheticReplayEvent[];
+  fixtureIds: PetInteractionReplayFixtureId[];
+  schemaVersion: typeof RUNTIME_SMOKE_SYNTHETIC_REPLAY_SCHEMA_VERSION;
+}
+
+export interface RuntimeSmokeSyntheticReplayEvidence {
+  appliedEventTypes: RuntimeSmokeSyntheticReplayEventType[];
+  completed: boolean;
+  domEventsDispatched: number;
+  enabled: boolean;
+  eventCount: number;
+  fixtureIds: string[];
+  ipcEventsDispatched: number;
+  privacySanitized: boolean;
 }
 
 export interface RuntimeDefaultDoudouLive2DRendererSpikeConfig {
@@ -146,6 +187,7 @@ export interface RuntimeSmokeResult {
   emotionModelTrigger?: RuntimeEmotionModelTriggerSmokeResult;
   emotionModelPanel?: RuntimeEmotionModelPanelSmokeResult;
   emotionModelTray?: RuntimeEmotionModelTraySmokeResult;
+  syntheticReplay?: RuntimeSmokeSyntheticReplayEvidence;
 }
 
 export interface RuntimeEmotionModelTriggerSmokeResult {

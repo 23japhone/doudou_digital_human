@@ -6,6 +6,8 @@ import type {
   RuntimeLive2DOfficialRendererAssetProbe,
   RuntimeLive2DRendererSpikeSmokeResult,
   RuntimeScaleSource,
+  RuntimeSmokeSyntheticReplayEvidence,
+  RuntimeSmokeSyntheticReplayEvent,
   RuntimeSmokeResult
 } from "./runtime-types.js";
 import {
@@ -162,6 +164,7 @@ let smokeEmotionModelTrayProviderCalled: boolean | null = null;
 let smokeEmotionModelTrayRequestDispatched = false;
 let smokeEmotionModelTrayStatusSanitized = true;
 let smokeEmotionModelTrayStatusText = "";
+let smokeSyntheticReplayEvidence: RuntimeSmokeSyntheticReplayEvidence | undefined;
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = bundle.motionTuningPresets;
 const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
@@ -620,6 +623,7 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
   if (pointerScale !== null) {
     runtimeScale = await applyRuntimeScale(pointerScale, "pointer");
   }
+  await exerciseRuntimeSyntheticReplayForSmoke();
 }
 
 function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
@@ -687,8 +691,148 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
       requestDispatched: smokeEmotionModelTrayRequestDispatched,
       statusSanitized: smokeEmotionModelTrayStatusSanitized,
       statusText: smokeEmotionModelTrayStatusText
-    }
+    },
+    ...(smokeSyntheticReplayEvidence ? { syntheticReplay: smokeSyntheticReplayEvidence } : {})
   };
+}
+
+async function exerciseRuntimeSyntheticReplayForSmoke(): Promise<void> {
+  const plan = bundle.smokeSyntheticReplay;
+  if (!plan?.enabled) {
+    return;
+  }
+  const appliedEventTypes = new Set<RuntimeSmokeSyntheticReplayEvent["type"]>();
+  const evidence: RuntimeSmokeSyntheticReplayEvidence = {
+    appliedEventTypes: [],
+    completed: false,
+    domEventsDispatched: 0,
+    enabled: true,
+    eventCount: plan.events.length,
+    fixtureIds: [...plan.fixtureIds],
+    ipcEventsDispatched: 0,
+    privacySanitized: true
+  };
+
+  for (const event of plan.events) {
+    appliedEventTypes.add(event.type);
+    await applyRuntimeSyntheticReplayEvent(event, evidence);
+  }
+
+  evidence.appliedEventTypes = [...appliedEventTypes];
+  evidence.completed = true;
+  evidence.privacySanitized = isRuntimeSyntheticReplayEvidencePrivacySafe(evidence);
+  smokeSyntheticReplayEvidence = evidence;
+}
+
+async function applyRuntimeSyntheticReplayEvent(
+  event: RuntimeSmokeSyntheticReplayEvent,
+  evidence: RuntimeSmokeSyntheticReplayEvidence
+): Promise<void> {
+  if (event.type === "cursor_alpha_entered") {
+    dispatchSyntheticMouseMoveAtFrameCenter();
+    evidence.domEventsDispatched += 1;
+    return;
+  }
+  if (event.type === "cursor_alpha_left") {
+    window.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+    evidence.domEventsDispatched += 1;
+    return;
+  }
+  if (event.type === "poke") {
+    const screenPoint = screenPointForSyntheticReplayEvent(event);
+    window.petRuntime.recordPoke(screenPoint);
+    evidence.ipcEventsDispatched += 1;
+    markRuntimePoked();
+    player.tap();
+    drawTapExpressionFramesForSmoke();
+    return;
+  }
+  if (event.type === "drag_started") {
+    window.petRuntime.startWindowDrag(screenPointForSyntheticReplayEvent(event));
+    evidence.ipcEventsDispatched += 1;
+    markRuntimeWorking();
+    return;
+  }
+  if (event.type === "drag_ended") {
+    window.petRuntime.dragWindowTo(offsetSyntheticScreenPoint(screenPointForSyntheticReplayEvent(event), 12, 16));
+    window.petRuntime.endWindowDrag();
+    evidence.ipcEventsDispatched += 2;
+    return;
+  }
+  if (event.type === "scale_started" || event.type === "work_started") {
+    markRuntimeWorking();
+    return;
+  }
+  if (event.type === "scale_changed") {
+    dispatchSyntheticWheelAtFrameCenter();
+    evidence.domEventsDispatched += 1;
+    await waitForSmokeMotion(30);
+    return;
+  }
+  if (event.type === "scale_ended" || event.type === "work_ended") {
+    applyRuntimePetState(stateMachine.advance(260, performance.now() + 260));
+    return;
+  }
+  if (event.type === "motion_cue" && event.state) {
+    applyRuntimeMotionCue({
+      direction: event.direction ?? "none",
+      motionIntensity: clamp01(event.motionIntensity ?? 0),
+      state: event.state
+    });
+    return;
+  }
+  if (event.type === "advance_time" || event.type === "assert_trace" || event.type === "quiet_tick") {
+    applyRuntimePetState(stateMachine.advance(180, performance.now() + 180));
+  }
+}
+
+function dispatchSyntheticMouseMoveAtFrameCenter(): void {
+  window.dispatchEvent(new MouseEvent("mousemove", {
+    bubbles: true,
+    clientX: window.innerWidth / 2,
+    clientY: window.innerHeight / 2,
+    screenX: window.screenX + window.innerWidth / 2,
+    screenY: window.screenY + window.innerHeight / 2
+  }));
+}
+
+function dispatchSyntheticWheelAtFrameCenter(): void {
+  petFrame.dispatchEvent(new WheelEvent("wheel", {
+    bubbles: true,
+    cancelable: true,
+    clientX: window.innerWidth / 2,
+    clientY: window.innerHeight / 2,
+    deltaY: -24,
+    screenX: window.screenX + window.innerWidth / 2,
+    screenY: window.screenY + window.innerHeight / 2
+  }));
+}
+
+function screenPointForSyntheticReplayEvent(event: RuntimeSmokeSyntheticReplayEvent): { x: number; y: number } {
+  if (!event.point) {
+    return frameCenterScreenPoint();
+  }
+  const rect = petCanvas.getBoundingClientRect();
+  return {
+    x: window.screenX + rect.left + (event.point.canvasX / bundle.manifest.canvas.width) * rect.width,
+    y: window.screenY + rect.top + (event.point.canvasY / bundle.manifest.canvas.height) * rect.height
+  };
+}
+
+function offsetSyntheticScreenPoint(
+  point: { x: number; y: number },
+  offsetX: number,
+  offsetY: number
+): { x: number; y: number } {
+  return {
+    x: point.x + offsetX,
+    y: point.y + offsetY
+  };
+}
+
+function isRuntimeSyntheticReplayEvidencePrivacySafe(evidence: RuntimeSmokeSyntheticReplayEvidence): boolean {
+  const text = JSON.stringify(evidence);
+  return !/\/Users\/|[A-Za-z]:\\|file:\/\/|https?:\/\/|source\.png|secret|token|provider payload|raw prompt/i.test(text);
 }
 
 function applyRuntimeMotionCue(cue: RuntimePetMotionCue): void {

@@ -16,11 +16,17 @@ import {
   type WindowDragSession
 } from "./drag.js";
 import type {
+  RuntimeSmokeSyntheticReplayEvent,
+  RuntimeSmokeSyntheticReplayPlan,
   RuntimeDefaultDoudouLive2DRendererSpikeConfig,
   RuntimeBundle,
   RuntimeCursorHitTestResult,
   RuntimeScaleSource,
   RuntimeSmokeResult
+} from "./runtime-types.js";
+import {
+  RUNTIME_SMOKE_SYNTHETIC_REPLAY_PLAN_ENV,
+  RUNTIME_SMOKE_SYNTHETIC_REPLAY_SCHEMA_VERSION
 } from "./runtime-types.js";
 import {
   RUNTIME_SCALE_LIMITS,
@@ -48,6 +54,10 @@ import {
   type RuntimeAlphaReaction,
   type RuntimeEmotionMotionPhase
 } from "./reaction.js";
+import {
+  RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS,
+  type PetInteractionReplayFixtureId
+} from "./interaction-replay.js";
 import type { RuntimeMotionPetState, RuntimePetMotionCue } from "./state.js";
 import {
   RUNTIME_MOTION_TUNING_DEFAULTS,
@@ -99,6 +109,7 @@ interface RuntimeOptions {
 let mainWindow: BrowserWindow | null = null;
 let currentBundle: ValidatedPetBundle | null = null;
 let smokeMode = false;
+let runtimeSmokeSyntheticReplayPlan: RuntimeSmokeSyntheticReplayPlan | null = null;
 let readySignalMode = false;
 let ignoreMouseEvents = false;
 let dragSession: WindowDragSession | null = null;
@@ -155,6 +166,7 @@ async function main(): Promise<void> {
   }
 
   smokeMode = options.smoke ?? false;
+  runtimeSmokeSyntheticReplayPlan = smokeMode ? resolveRuntimeSmokeSyntheticReplayPlan(process.env) : null;
   readySignalMode = options.readySignal ?? false;
   live2DRendererSpikeEnabled = Boolean(options.live2dRendererSpike || process.env.DOUDOU_LIVE2D_RENDERER_SPIKE === "1");
   runtimeMotionTuningEnabled = Boolean(options.tuning || process.env.DOUDOU_RUNTIME_TUNING === "1");
@@ -230,6 +242,130 @@ function parseArgs(args: string[]): Partial<RuntimeOptions> {
     }
   }
   return options;
+}
+
+function resolveRuntimeSmokeSyntheticReplayPlan(env: NodeJS.ProcessEnv): RuntimeSmokeSyntheticReplayPlan | null {
+  const rawPlan = env[RUNTIME_SMOKE_SYNTHETIC_REPLAY_PLAN_ENV];
+  if (!rawPlan) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(rawPlan) as Partial<RuntimeSmokeSyntheticReplayPlan>;
+    if (
+      parsed.schemaVersion !== RUNTIME_SMOKE_SYNTHETIC_REPLAY_SCHEMA_VERSION ||
+      parsed.enabled !== true ||
+      !Array.isArray(parsed.fixtureIds) ||
+      !Array.isArray(parsed.events)
+    ) {
+      return null;
+    }
+    const fixtureIds = parsed.fixtureIds.map((fixtureId) => sanitizeReplayFixtureId(fixtureId)).filter(isReplayFixtureId);
+    if (
+      parsed.fixtureIds.length !== RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS.length ||
+      fixtureIds.length !== parsed.fixtureIds.length ||
+      fixtureIds.length !== RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS.length ||
+      !RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS.every((fixtureId, index) => fixtureIds[index] === fixtureId)
+    ) {
+      return null;
+    }
+    const events = parsed.events.map(sanitizeReplayEvent).filter(isRuntimeSmokeSyntheticReplayEvent);
+    if (events.length !== parsed.events.length) {
+      return null;
+    }
+    return {
+      enabled: true,
+      events,
+      fixtureIds,
+      schemaVersion: RUNTIME_SMOKE_SYNTHETIC_REPLAY_SCHEMA_VERSION
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeReplayFixtureId(value: unknown): PetInteractionReplayFixtureId | null {
+  return typeof value === "string" &&
+    RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS.includes(value as PetInteractionReplayFixtureId)
+    ? value as PetInteractionReplayFixtureId
+    : null;
+}
+
+function isReplayFixtureId(value: PetInteractionReplayFixtureId | null): value is PetInteractionReplayFixtureId {
+  return value !== null;
+}
+
+function sanitizeReplayEvent(event: unknown): RuntimeSmokeSyntheticReplayEvent | null {
+  if (!event || typeof event !== "object") {
+    return null;
+  }
+  const candidate = event as Partial<RuntimeSmokeSyntheticReplayEvent>;
+  const fixtureId = sanitizeReplayFixtureId(candidate.fixtureId);
+  if (!fixtureId || typeof candidate.type !== "string" || !isRuntimeSmokeSyntheticReplayEventType(candidate.type)) {
+    return null;
+  }
+  const atMs = finiteNumber(candidate.atMs);
+  if (atMs === undefined) {
+    return null;
+  }
+  return {
+    atMs,
+    direction: sanitizeMotionDirection(candidate.direction),
+    fixtureId,
+    motionIntensity: finiteNumber(candidate.motionIntensity),
+    point: sanitizeReplayPoint(candidate.point),
+    state: sanitizeMotionState(candidate.state),
+    type: candidate.type
+  };
+}
+
+function isRuntimeSmokeSyntheticReplayEvent(event: RuntimeSmokeSyntheticReplayEvent | null): event is RuntimeSmokeSyntheticReplayEvent {
+  return event !== null;
+}
+
+function isRuntimeSmokeSyntheticReplayEventType(value: string): value is RuntimeSmokeSyntheticReplayEvent["type"] {
+  return [
+    "runtime_started",
+    "cursor_alpha_entered",
+    "cursor_alpha_left",
+    "poke",
+    "drag_started",
+    "drag_ended",
+    "scale_started",
+    "scale_changed",
+    "scale_ended",
+    "quiet_tick",
+    "work_started",
+    "work_ended",
+    "advance_time",
+    "assert_trace",
+    "motion_cue"
+  ].includes(value);
+}
+
+function sanitizeReplayPoint(point: unknown): RuntimeSmokeSyntheticReplayEvent["point"] {
+  if (!point || typeof point !== "object") {
+    return undefined;
+  }
+  const candidate = point as { canvasX?: unknown; canvasY?: unknown };
+  const canvasX = finiteNumber(candidate.canvasX);
+  const canvasY = finiteNumber(candidate.canvasY);
+  return canvasX === undefined || canvasY === undefined ? undefined : { canvasX, canvasY };
+}
+
+function sanitizeMotionDirection(direction: unknown): RuntimeSmokeSyntheticReplayEvent["direction"] {
+  return direction === "down" || direction === "left" || direction === "none" || direction === "right" || direction === "up"
+    ? direction
+    : undefined;
+}
+
+function sanitizeMotionState(state: unknown): RuntimeSmokeSyntheticReplayEvent["state"] {
+  return state === "approaching" || state === "dodging" || state === "retreating" || state === "stopped" || state === "watching"
+    ? state
+    : undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function createWindow(bundle: ValidatedPetBundle): void {
@@ -354,7 +490,8 @@ ipcMain.handle("pet:get-bundle", () => {
     emotionTraySmokeConsentEnabled,
     motionTuning: runtimeMotionTuning,
     motionTuningEnabled: runtimeMotionTuningEnabled,
-    motionTuningPresets: runtimeMotionTuningPresets
+    motionTuningPresets: runtimeMotionTuningPresets,
+    smokeSyntheticReplay: runtimeSmokeSyntheticReplayPlan
   };
   return runtimeBundle;
 });

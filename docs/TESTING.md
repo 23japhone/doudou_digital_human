@@ -32,8 +32,11 @@
 - Fixture validation: `npm run validate:fixture`
 - Runtime interaction replay: `npm run replay:runtime`
 - Runtime smoke: `npm run smoke:runtime`
+- Runtime smoke with fixture-driven synthetic renderer replay: `npm run smoke:runtime -- --synthetic-replay`
 
 `replay:runtime` runs the six committed `fixtures/runtime/interaction_replay/*.json` files through the pure runtime replay runner and emits a sanitized `runtime replay:` summary. It is the quick behavior-contract gate for poke, repeat-poke retreat/watch, quiet recovery, drag/scale working state, and replay privacy.
+
+`smoke:runtime -- --synthetic-replay` keeps the default Electron smoke coverage, then injects a sanitized synthetic replay plan derived from the same six fixtures into the renderer. The renderer reports `syntheticReplay` evidence with fixture ids, applied event types, DOM event count, IPC bridge count, completion, and privacy status. This mode is also available with `DOUDOU_RUNTIME_SMOKE_SYNTHETIC_REPLAY=1`.
 
 `smoke:runtime` also requires tray-menu 兜兜回应 evidence: the formal menu item must exist without enabling the legacy flag-gated panel, and default smoke must not dispatch a consented provider call. User-facing status text must not include provider/model/command/apply fields.
 

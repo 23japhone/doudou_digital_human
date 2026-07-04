@@ -17,6 +17,16 @@ import {
   runRuntimeInteractionReplaySuite,
   type RuntimeInteractionReplaySummary
 } from "./runtime-interaction-replay.js";
+import {
+  RUNTIME_SMOKE_SYNTHETIC_REPLAY_PLAN_ENV,
+  createRuntimeSmokeSyntheticReplayPlanFromFixtureDir,
+  hasRuntimeSmokeSyntheticReplayEvidence,
+  serializeRuntimeSmokeSyntheticReplayPlan
+} from "./runtime-smoke-synthetic-replay.js";
+import type {
+  RuntimeSmokeSyntheticReplayEvidence,
+  RuntimeSmokeSyntheticReplayPlan
+} from "../runtime/runtime-types.js";
 
 const repoRoot = process.cwd();
 const electronBin = path.join(repoRoot, "node_modules/.bin/electron");
@@ -29,7 +39,21 @@ interface SpawnResult {
   output: string;
 }
 
+interface RuntimeSmokeOptions {
+  syntheticReplay: boolean;
+}
+
+interface RuntimeSmokeProcessEnvInput {
+  baseEnv: NodeJS.ProcessEnv;
+  runtimeUserDataDir: string;
+  syntheticReplayPlan: RuntimeSmokeSyntheticReplayPlan | null;
+}
+
 async function main(): Promise<void> {
+  const smokeOptions = resolveRuntimeSmokeOptions(process.argv.slice(2), process.env);
+  const syntheticReplayPlan = smokeOptions.syntheticReplay
+    ? await createRuntimeSmokeSyntheticReplayPlanFromFixtureDir(path.join(repoRoot, "fixtures/runtime/interaction_replay"))
+    : null;
   const replaySummary = await runRuntimeSmokeReplayPreflight();
   console.log(`${RUNTIME_SMOKE_REPLAY_OUTPUT_PREFIX}${JSON.stringify(replaySummary)}`);
   if (!replaySummary.ok) {
@@ -55,7 +79,7 @@ async function main(): Promise<void> {
       await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     }, "UNSUPPORTED_SCHEMA_VERSION");
 
-    await assertValidRuntimeLoads("fixture bundle", validBundle);
+    await assertValidRuntimeLoads("fixture bundle", validBundle, { syntheticReplayPlan });
     if (isLiveEmotionTraySmoke()) {
       return;
     }
@@ -68,7 +92,7 @@ async function main(): Promise<void> {
       outputBundleDir: generatedBundle,
       now: new Date("2026-06-30T12:00:00.000Z")
     });
-    await assertValidRuntimeLoads("generated bundle", generatedBundle);
+    await assertValidRuntimeLoads("generated bundle", generatedBundle, { syntheticReplayPlan });
   } finally {
     await rm(tempRoot, { force: true, recursive: true });
   }
@@ -78,8 +102,34 @@ export function runRuntimeSmokeReplayPreflight(): Promise<RuntimeInteractionRepl
   return runRuntimeInteractionReplaySuite({ cwd: repoRoot });
 }
 
-async function assertValidRuntimeLoads(label: string, bundleDir: string): Promise<void> {
-  const validResult = await runRuntime(bundleDir);
+export function resolveRuntimeSmokeOptions(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv
+): RuntimeSmokeOptions {
+  return {
+    syntheticReplay: args.includes("--synthetic-replay") || env.DOUDOU_RUNTIME_SMOKE_SYNTHETIC_REPLAY === "1"
+  };
+}
+
+export function createRuntimeSmokeProcessEnv(input: RuntimeSmokeProcessEnvInput): NodeJS.ProcessEnv {
+  return {
+    ...input.baseEnv,
+    ...(input.syntheticReplayPlan
+      ? {
+        [RUNTIME_SMOKE_SYNTHETIC_REPLAY_PLAN_ENV]: serializeRuntimeSmokeSyntheticReplayPlan(input.syntheticReplayPlan)
+      }
+      : {}),
+    DOUDOU_RUNTIME_USER_DATA_DIR: input.runtimeUserDataDir,
+    NODE_OPTIONS: ""
+  };
+}
+
+async function assertValidRuntimeLoads(
+  label: string,
+  bundleDir: string,
+  options: { syntheticReplayPlan: RuntimeSmokeSyntheticReplayPlan | null }
+): Promise<void> {
+  const validResult = await runRuntime(bundleDir, options);
   if (validResult.code !== 0) {
     throw new Error(`${label} runtime smoke exited ${validResult.code}\n${validResult.output}`);
   }
@@ -127,7 +177,9 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !hasLive2DRendererSpike(smokeResult.live2DRendererSpike) ||
     !smokeResult.renderLoopAdvanced ||
     smokeResult.scale <= 1 ||
-    smokeResult.drawCount < 2
+    smokeResult.drawCount < 2 ||
+    (options.syntheticReplayPlan !== null &&
+      !hasRuntimeSmokeSyntheticReplayEvidence(smokeResult.syntheticReplay, options.syntheticReplayPlan))
   ) {
     throw new Error(`${label} runtime smoke returned incomplete result\n${validResult.output}`);
   }
@@ -366,9 +418,17 @@ function createSmokeSourcePng(): Buffer {
   return PNG.sync.write(png);
 }
 
-function runRuntime(bundleDir: string): Promise<SpawnResult> {
+function runRuntime(
+  bundleDir: string,
+  options: { syntheticReplayPlan: RuntimeSmokeSyntheticReplayPlan | null } = { syntheticReplayPlan: null }
+): Promise<SpawnResult> {
   return new Promise((resolve, reject) => {
     const runtimeUserDataDir = path.join(tmpdir(), `runtime-smoke-user-data-${process.pid}-${Date.now()}`);
+    const runtimeEnv = createRuntimeSmokeProcessEnv({
+      baseEnv: process.env,
+      runtimeUserDataDir,
+      syntheticReplayPlan: options.syntheticReplayPlan
+    });
     const child = spawn(electronBin, [
       runtimeMain,
       "--bundle",
@@ -378,7 +438,7 @@ function runRuntime(bundleDir: string): Promise<SpawnResult> {
       "--live2d-renderer-spike"
     ], {
       cwd: repoRoot,
-      env: { ...process.env, DOUDOU_RUNTIME_USER_DATA_DIR: runtimeUserDataDir, NODE_OPTIONS: "" },
+      env: runtimeEnv,
       stdio: ["ignore", "pipe", "pipe"]
     });
     let output = "";
@@ -472,6 +532,7 @@ function parseSmokeResult(output: string) {
       statusSanitized: boolean;
       statusText: string;
     };
+    syntheticReplay?: RuntimeSmokeSyntheticReplayEvidence;
     live2DRendererSpike: {
       activeEmotionId: string;
       drawModelCalls: number;

@@ -2,7 +2,7 @@
 
 Date: 2026-07-04
 
-Status: replay script and runtime smoke preflight landed
+Status: replay script and optional runtime smoke synthetic adapter landed
 
 Source contract: `docs/DOUDOU_INTERACTION_STATE_BUS.md`
 
@@ -21,7 +21,7 @@ Owning domain: `src/runtime/`, `tests/runtime/`, `fixtures/runtime/`
 - `working-scale`: 缩放期间进入低干扰工作态。
 - `privacy-trace`: 任何 replay trace 都不得泄漏路径、prompt、provider payload 或秘密。
 
-首个 pure runner 已落在 `src/runtime/interaction-replay.ts`，六个最小 JSON fixtures 已落在 `fixtures/runtime/interaction_replay/`，测试入口是 `tests/runtime/interaction-replay.test.ts`。团队快速入口是 `npm run replay:runtime`；`npm run smoke:runtime` 已在启动 Electron 证据前复用同一批 fixtures 做 replay preflight。
+首个 pure runner 已落在 `src/runtime/interaction-replay.ts`，六个最小 JSON fixtures 已落在 `fixtures/runtime/interaction_replay/`，测试入口是 `tests/runtime/interaction-replay.test.ts`。团队快速入口是 `npm run replay:runtime`；`npm run smoke:runtime` 已在启动 Electron 证据前复用同一批 fixtures 做 replay preflight，并可通过 `--synthetic-replay` 启用更接近 renderer DOM/IPC 的可选回放 adapter。
 
 ## 非目标
 
@@ -385,7 +385,7 @@ export type PetInteractionReplayFailureCode =
 5. 从 trace 汇总 `PetInteractionReplayResult`。
 6. 对 `expect` 和 privacy gate 断言。
 
-当前 Electron smoke 已复用同一批 fixture 做轻量 replay preflight。未来如果需要更细的 Electron 层事件回放，可以再把 synthetic events 映射成 renderer/main IPC smoke interactions，但不应替代现有窗口、canvas、drag/scale 和渲染 evidence。
+当前 Electron smoke 已复用同一批 fixture 做轻量 replay preflight。需要更细的 Electron 层事件回放时，可运行 `npm run smoke:runtime -- --synthetic-replay`，该模式会把 fixtures 转成脱敏 `doudou.runtime-smoke.synthetic-replay.v0.1` plan，经 main 注入 renderer，并在 renderer 内把 fixture events 映射到现有 DOM/IPC 路径：`poke` 走 `recordPoke` IPC，drag 走 `startWindowDrag` / `dragWindowTo` / `endWindowDrag` IPC，scale/cursor 走 synthetic DOM event，`motion_cue` 走 runtime state machine。它是默认 smoke 的附加证据，不替代现有窗口、canvas、drag/scale 和渲染 evidence。
 
 ## 与现有检查的关系
 
@@ -397,6 +397,7 @@ export type PetInteractionReplayFailureCode =
 | `tests/runtime/interaction-replay.test.ts` | 串起 event -> trace -> acceptance |
 | `npm run replay:runtime` | 读取六个 JSON fixtures 并输出脱敏 replay summary |
 | `npm run smoke:runtime` | 先执行 replay preflight，再证明真实 Electron runtime、canvas、drag/scale、窗口和渲染 evidence |
+| `npm run smoke:runtime -- --synthetic-replay` | 在默认 smoke 证据上额外执行 fixtures -> renderer DOM/IPC adapter |
 
 Replay tests 不应该替代 smoke；它们负责让行为合同更快、更细、更容易定位。
 
@@ -413,8 +414,10 @@ fixtures/runtime/interaction_replay/working-scale.json
 fixtures/runtime/interaction_replay/privacy-trace.json
 src/runtime/interaction-replay.ts
 src/scripts/runtime-interaction-replay.ts
+src/scripts/runtime-smoke-synthetic-replay.ts
 tests/runtime/interaction-replay.test.ts
 tests/scripts/runtime-interaction-replay.test.ts
+tests/scripts/runtime-smoke-synthetic-replay.test.ts
 ```
 
 建议命令：
@@ -424,9 +427,10 @@ npm test -- tests/runtime/interaction-replay.test.ts
 npm test -- tests/runtime/state.test.ts tests/runtime/reaction.test.ts tests/runtime/default-doudou-emotions.test.ts
 npm run replay:runtime
 npm run smoke:runtime
+npm run smoke:runtime -- --synthetic-replay
 ```
 
-`npm run replay:runtime` 只负责快速 pure replay summary；`npm run smoke:runtime` 仍负责 Electron runtime 真实窗口和 renderer evidence，并把 replay summary 作为前置失败点输出。
+`npm run replay:runtime` 只负责快速 pure replay summary；`npm run smoke:runtime` 仍负责 Electron runtime 真实窗口和 renderer evidence，并把 replay summary 作为前置失败点输出。`--synthetic-replay` 仅作为可选加严模式使用，也可通过 `DOUDOU_RUNTIME_SMOKE_SYNTHETIC_REPLAY=1` 启用。
 
 ## Review 清单
 
@@ -440,9 +444,11 @@ npm run smoke:runtime
 - 是否证明 `wariness` 能上升、clamp、衰减和恢复。
 - 是否没有 source path、raw prompt、provider payload、token、secret、absolute path、remote URL、screen text 或 window title 泄漏。
 - 是否把失败输出限制为 fixed failure codes 和 public enum evidence。
+- 如果是新增交互行为，是否先提交 `fixtures/runtime/interaction_replay/*.json`，再扩展 pure runner allowlist、synthetic adapter plan 和 smoke evidence gate。
+- 如果启用 DOM/IPC synthetic adapter，是否保持 adapter 可选、脱敏、fixture-id allowlist，并且不替代默认 Electron smoke evidence。
 
 ## 推荐下一步
 
-1. 后续新增交互场景时，先加 JSON fixture，再扩展 `src/runtime/interaction-replay.ts` 的 allowlist 和断言。
-2. 如需更接近真实 DOM/IPC 的 replay，再为 `smoke:runtime` 增加可选 synthetic event adapter。
-3. 保持 `npm run replay:runtime` 输出为脱敏 summary，不输出逐步 trace 或本机路径。
+1. 后续新增交互场景时，先加 JSON fixture，再扩展 `src/runtime/interaction-replay.ts` 的 allowlist、`src/scripts/runtime-smoke-synthetic-replay.ts` 的 adapter plan 和对应 smoke evidence gate。
+2. 保持 `npm run replay:runtime` 输出为脱敏 summary，不输出逐步 trace 或本机路径。
+3. 仅在需要验证 renderer DOM/IPC 贴近度时运行 `npm run smoke:runtime -- --synthetic-replay`；默认 `npm run smoke:runtime` 保持现有速度和证据范围。
