@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, Menu, screen } from "electron";
+import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeImage, screen, Tray } from "electron";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { validatePetBundle, type ValidatedPetBundle } from "../pet_bundle/validate.js";
@@ -68,6 +68,12 @@ import {
   resolveDoudouEmotionDebugPanelEnabled,
   resolveDoudouEmotionDebugPanelSmokeConsent
 } from "./default-doudou-emotion-debug-panel.js";
+import {
+  createDoudouRuntimeTrayMenuTemplate,
+  createDoudouTrayEmotionBehaviorRequest,
+  hasDoudouRuntimeTrayEmotionMenuItem,
+  resolveDoudouTrayEmotionSmokeConsent
+} from "./default-doudou-emotion-tray.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const RUNTIME_CURSOR_FOLLOW_INTERVAL_MS = 33;
@@ -75,6 +81,8 @@ const RUNTIME_CURSOR_FOLLOW_MAX_DELTA_MS = 100;
 const RUNTIME_CURSOR_HIT_TEST_TIMEOUT_MS = 80;
 const RUNTIME_CURSOR_FOLLOW_RESUME_DELAY_MS = 220;
 const RUNTIME_CLIPBOARD_TEXT_MAX_LENGTH = 512;
+const RUNTIME_TRAY_ICON_DATA_URL =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAASklEQVR4AaXBwQ3AIBADwbWVYq7/Bi8fHiAShOQZVRUJEzKhh2/NPzExu+asmZhVc6cZTMiETMiETMiEzErcEYPZiTMxUVWRMKEXuWwGEUQZoRMAAAAASUVORK5CYII=";
 
 interface RuntimeOptions {
   bundleDir: string;
@@ -107,7 +115,12 @@ let runtimeMotionTuning = RUNTIME_MOTION_TUNING_DEFAULTS;
 let runtimeMotionTuningEnabled = false;
 let emotionDebugPanelEnabled = false;
 let emotionDebugPanelSmokeConsentEnabled = false;
+let emotionTraySmokeConsentEnabled = false;
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = [];
+let runtimeTray: Tray | null = null;
+let runtimeTrayEmotionMenuItemVisible = false;
+let runtimeTrayEmotionRequestDispatched = false;
+let runtimeTrayMenuCreated = false;
 let live2DRendererSpikeEnabled = false;
 let live2DOfficialRuntimeResolution: DoudouOfficialLive2DRendererRuntimeResolution = {
   available: false,
@@ -150,6 +163,7 @@ async function main(): Promise<void> {
     optionEnabled: options.emotionPanel ?? false
   });
   emotionDebugPanelSmokeConsentEnabled = resolveDoudouEmotionDebugPanelSmokeConsent(process.env);
+  emotionTraySmokeConsentEnabled = resolveDoudouTrayEmotionSmokeConsent(process.env);
   runtimeMotionTuning = runtimeMotionTuningFromEnv(process.env);
   if (live2DRendererSpikeEnabled) {
     live2DOfficialRuntimeResolution = await resolveDoudouOfficialLive2DRendererRuntime({
@@ -172,6 +186,7 @@ async function main(): Promise<void> {
     ? await loadRuntimeMotionTuningPresets(runtimeMotionTuningPresetsPath())
     : [];
   createWindow(currentBundle);
+  setupRuntimeTray();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0 && currentBundle) {
@@ -285,6 +300,39 @@ function createWindow(bundle: ValidatedPetBundle): void {
   });
 }
 
+function setupRuntimeTray(): void {
+  const icon = nativeImage.createFromDataURL(RUNTIME_TRAY_ICON_DATA_URL);
+  icon.setTemplateImage(true);
+  runtimeTray ??= new Tray(icon);
+  runtimeTray.setToolTip("兜兜");
+  updateRuntimeTrayMenu();
+}
+
+function updateRuntimeTrayMenu(): void {
+  if (!runtimeTray) {
+    return;
+  }
+  const template = createRuntimeTrayMenuTemplate();
+  runtimeTrayEmotionMenuItemVisible = hasDoudouRuntimeTrayEmotionMenuItem(template);
+  runtimeTray.setContextMenu(Menu.buildFromTemplate(template));
+  runtimeTrayMenuCreated = true;
+}
+
+function createRuntimeTrayMenuTemplate(): ReturnType<typeof createDoudouRuntimeTrayMenuTemplate> {
+  return createDoudouRuntimeTrayMenuTemplate({
+    onQuit: () => app.quit(),
+    onRequestEmotion: () => requestDoudouTrayEmotionBehavior()
+  });
+}
+
+function requestDoudouTrayEmotionBehavior(): void {
+  runtimeTrayEmotionRequestDispatched = true;
+  if (!mainWindow || mainWindow.webContents.isDestroyed()) {
+    return;
+  }
+  mainWindow.webContents.send("pet:tray-emotion-behavior-request", createDoudouTrayEmotionBehaviorRequest());
+}
+
 ipcMain.handle("pet:get-bundle", () => {
   if (!currentBundle) {
     throw new Error("No validated pet bundle is loaded.");
@@ -303,6 +351,7 @@ ipcMain.handle("pet:get-bundle", () => {
     smoke: smokeMode,
     emotionDebugPanelEnabled,
     emotionDebugPanelSmokeConsentEnabled,
+    emotionTraySmokeConsentEnabled,
     motionTuning: runtimeMotionTuning,
     motionTuningEnabled: runtimeMotionTuningEnabled,
     motionTuningPresets: runtimeMotionTuningPresets
@@ -441,12 +490,7 @@ ipcMain.on("pet:show-context-menu", () => {
   if (!mainWindow) {
     return;
   }
-  Menu.buildFromTemplate([
-    {
-      label: "退出",
-      click: () => app.quit()
-    }
-  ]).popup({ window: mainWindow });
+  Menu.buildFromTemplate(createRuntimeTrayMenuTemplate()).popup({ window: mainWindow });
 });
 
 ipcMain.on("pet:quit", () => {
@@ -470,6 +514,9 @@ ipcMain.on("pet:renderer-ready", () => {
   }
   if (smokeMode) {
     console.log("runtime smoke ready: renderer");
+    if (emotionTraySmokeConsentEnabled) {
+      setTimeout(requestDoudouTrayEmotionBehavior, 0);
+    }
   }
 });
 
@@ -493,7 +540,13 @@ ipcMain.on("pet:smoke-result", (_event, result: RuntimeSmokeResult) => {
         motionTuningApplied: result.motionTuningApplied,
         motionTuningPanelVisible: result.motionTuningPanelVisible,
         motionTuningSnapshot: runtimeMotionTuning,
-        maxEmotionWariness: smokeMaxEmotionWariness
+        maxEmotionWariness: smokeMaxEmotionWariness,
+        emotionModelTray: {
+          ...(result.emotionModelTray ?? {}),
+          menuCreated: runtimeTrayMenuCreated,
+          menuItemVisible: runtimeTrayEmotionMenuItemVisible,
+          requestDispatched: runtimeTrayEmotionRequestDispatched
+        }
       })}`
     );
     setTimeout(() => app.quit(), 250);

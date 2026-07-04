@@ -32,9 +32,9 @@
 - Fixture validation: `npm run validate:fixture`
 - Runtime smoke: `npm run smoke:runtime`
 
-`smoke:runtime` also opens the 兜兜回应 entry, clicks the button without consent, and requires formal user-facing panel status plus evidence that the provider was not called. The visible status must not include provider/model/command/apply fields.
+`smoke:runtime` also requires tray-menu 兜兜回应 evidence: the formal menu item must exist without enabling the legacy flag-gated panel, and default smoke must not dispatch a consented provider call. User-facing status text must not include provider/model/command/apply fields.
 
-Set `DOUDOU_EMOTION_PANEL_SMOKE_CONSENT=1` together with the local emotion-model env vars to run the same panel path with consent enabled against the real provider; this live acceptance path validates provider-called and command-applied evidence for the fixture bundle only, to avoid repeated live calls, while the visible status remains limited to 兜兜 expression feedback.
+Set `DOUDOU_EMOTION_TRAY_SMOKE_CONSENT=1` together with the local emotion-model env vars to run the tray-menu path with consent enabled against the real provider; this live acceptance path validates provider-called and command-applied evidence for the fixture bundle only, to avoid repeated live calls, while the visible status remains limited to 兜兜 expression feedback. `DOUDOU_EMOTION_PANEL_SMOKE_CONSENT=1` remains a legacy alias for the same live smoke path.
 
 ## Local Official Live2D SDK Setup
 

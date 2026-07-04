@@ -33,6 +33,13 @@ contextBridge.exposeInMainWorld("petRuntime", {
     ipcRenderer.on("pet:motion-state", listener);
     return () => ipcRenderer.off("pet:motion-state", listener);
   },
+  onTrayEmotionBehaviorRequest: (callback) => {
+    const listener = (_event, input) => {
+      callback(sanitizeEmotionBehaviorRequest(input));
+    };
+    ipcRenderer.on("pet:tray-emotion-behavior-request", listener);
+    return () => ipcRenderer.off("pet:tray-emotion-behavior-request", listener);
+  },
   quit: () => ipcRenderer.send("pet:quit"),
   recordPoke: (point) => ipcRenderer.send("pet:record-poke", sanitizeOptionalPoint(point)),
   reportSmokeResult: (result) => ipcRenderer.send("pet:smoke-result", result),

@@ -156,6 +156,12 @@ let smokeEmotionModelPanelProviderCalled: boolean | null = null;
 let smokeEmotionModelPanelStatusSanitized = false;
 let smokeEmotionModelPanelStatusText = "";
 let smokeEmotionModelPanelVisible = false;
+let smokeEmotionModelTrayCommandApplied: boolean | null = null;
+let smokeEmotionModelTrayConsented = false;
+let smokeEmotionModelTrayProviderCalled: boolean | null = null;
+let smokeEmotionModelTrayRequestDispatched = false;
+let smokeEmotionModelTrayStatusSanitized = true;
+let smokeEmotionModelTrayStatusText = "";
 let runtimeMotionTuningPresets: RuntimeMotionTuningPreset[] = bundle.motionTuningPresets;
 const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
@@ -194,6 +200,7 @@ let emotionDebugPanelLastInteraction: {
   applyResult: DoudouRuntimeEmotionBehaviorApplyResult | null;
   result: DoudouRuntimeEmotionBehaviorTriggerResult;
 } | null = null;
+let emotionTraySubmitPromise: Promise<void> | null = null;
 
 petCanvas.width = bundle.manifest.canvas.width;
 petCanvas.height = bundle.manifest.canvas.height;
@@ -220,6 +227,16 @@ window.addEventListener("doudou:emotion-behavior-request", (event) => {
     currentEmotionId: live2DRendererSpikeActiveEmotionId,
     text: typeof event.detail?.text === "string" ? event.detail.text : ""
   }).catch(logRuntimeError);
+});
+
+window.petRuntime.onTrayEmotionBehaviorRequest((input) => {
+  emotionTraySubmitPromise = submitEmotionTrayRequest(input).catch((error: unknown) => {
+    logRuntimeError(error);
+    smokeEmotionModelTrayStatusText = "兜兜这次没听清稍后再试一次";
+    smokeEmotionModelTrayStatusSanitized =
+      isDoudouEmotionDebugPanelSmokeStatusSanitized(smokeEmotionModelTrayStatusText);
+  });
+  void emotionTraySubmitPromise;
 });
 
 window.addEventListener("contextmenu", (event) => {
@@ -563,6 +580,7 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
   }
   smokeInteractionsExercised = true;
   await exerciseEmotionModelTriggerForSmoke();
+  await exerciseEmotionModelTrayForSmoke();
   await exerciseEmotionModelPanelForSmoke();
   await exerciseRuntimeMotionTuningForSmoke();
   applyRuntimeMotionCue({
@@ -647,14 +665,28 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
       explicitConsentGate: smokeEmotionModelTriggerExplicitConsentGate,
       providerCalledWithoutConsent: smokeEmotionModelTriggerProviderCalledWithoutConsent
     },
-    emotionModelPanel: {
-      buttonSubmitted: smokeEmotionModelPanelButtonSubmitted,
-      commandApplied: smokeEmotionModelPanelCommandApplied,
-      consented: smokeEmotionModelPanelConsented,
-      panelVisible: smokeEmotionModelPanelVisible,
-      providerCalled: smokeEmotionModelPanelProviderCalled,
-      statusSanitized: smokeEmotionModelPanelStatusSanitized,
-      statusText: smokeEmotionModelPanelStatusText
+    ...(bundle.emotionDebugPanelEnabled
+      ? {
+        emotionModelPanel: {
+          buttonSubmitted: smokeEmotionModelPanelButtonSubmitted,
+          commandApplied: smokeEmotionModelPanelCommandApplied,
+          consented: smokeEmotionModelPanelConsented,
+          panelVisible: smokeEmotionModelPanelVisible,
+          providerCalled: smokeEmotionModelPanelProviderCalled,
+          statusSanitized: smokeEmotionModelPanelStatusSanitized,
+          statusText: smokeEmotionModelPanelStatusText
+        }
+      }
+      : {}),
+    emotionModelTray: {
+      commandApplied: smokeEmotionModelTrayCommandApplied,
+      consented: smokeEmotionModelTrayConsented,
+      menuCreated: false,
+      menuItemVisible: false,
+      providerCalled: smokeEmotionModelTrayProviderCalled,
+      requestDispatched: smokeEmotionModelTrayRequestDispatched,
+      statusSanitized: smokeEmotionModelTrayStatusSanitized,
+      statusText: smokeEmotionModelTrayStatusText
     }
   };
 }
@@ -677,6 +709,17 @@ async function exerciseEmotionModelTriggerForSmoke(): Promise<void> {
     !interaction.result.provider.called;
 }
 
+async function exerciseEmotionModelTrayForSmoke(): Promise<void> {
+  if (!bundle.emotionTraySmokeConsentEnabled) {
+    return;
+  }
+  const deadline = performance.now() + 3000;
+  while (!emotionTraySubmitPromise && performance.now() < deadline) {
+    await waitForSmokeMotion(20);
+  }
+  await emotionTraySubmitPromise;
+}
+
 async function exerciseEmotionModelPanelForSmoke(): Promise<void> {
   smokeEmotionModelPanelVisible = Boolean(document.querySelector("#runtime-emotion-debug-panel"));
   if (!bundle.emotionDebugPanelEnabled || !emotionDebugInput || !emotionDebugConsent || !emotionDebugSubmit) {
@@ -693,6 +736,24 @@ async function exerciseEmotionModelPanelForSmoke(): Promise<void> {
   smokeEmotionModelPanelStatusText = emotionDebugStatus?.textContent ?? "";
   smokeEmotionModelPanelStatusSanitized =
     isDoudouEmotionDebugPanelSmokeStatusSanitized(smokeEmotionModelPanelStatusText);
+}
+
+async function submitEmotionTrayRequest(input: DoudouRuntimeEmotionBehaviorTriggerInput): Promise<void> {
+  smokeEmotionModelTrayRequestDispatched = true;
+  smokeEmotionModelTrayConsented = input.consent;
+  const interaction = await requestRuntimeEmotionBehaviorForExplicitUserInput({
+    ...input,
+    currentEmotionId: live2DRendererSpikeActiveEmotionId
+  });
+  const status = createDoudouEmotionDebugPanelStatus(interaction);
+  smokeEmotionModelTrayProviderCalled = interaction.result.provider.called;
+  smokeEmotionModelTrayCommandApplied = interaction.applyResult?.applied ?? null;
+  smokeEmotionModelTrayStatusText = `${status.heading}${status.details.join("")}`;
+  smokeEmotionModelTrayStatusSanitized =
+    isDoudouEmotionDebugPanelSmokeStatusSanitized(smokeEmotionModelTrayStatusText);
+  if (emotionDebugStatus) {
+    updateEmotionDebugPanelStatus(status);
+  }
 }
 
 async function requestRuntimeEmotionBehaviorForExplicitUserInput(

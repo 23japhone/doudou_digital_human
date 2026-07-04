@@ -45,6 +45,7 @@ export interface RuntimeBundle {
   smoke: boolean;
   emotionDebugPanelEnabled: boolean;
   emotionDebugPanelSmokeConsentEnabled: boolean;
+  emotionTraySmokeConsentEnabled: boolean;
   motionTuning: RuntimeMotionTuning;
   motionTuningEnabled: boolean;
   motionTuningPresets: RuntimeMotionTuningPreset[];
@@ -91,6 +92,7 @@ export interface PetRuntimeBridge {
   listMotionTuningPresets(): Promise<RuntimeMotionTuningPreset[]>;
   onCursorHitTest(callback: (screenPoint: ScreenPoint) => RuntimeCursorHitTestResult): () => void;
   onMotionState(callback: (cue: RuntimePetMotionCue) => void): () => void;
+  onTrayEmotionBehaviorRequest(callback: (input: DoudouRuntimeEmotionBehaviorTriggerInput) => void): () => void;
   quit(): void;
   recordPoke(point?: ScreenPoint): void;
   reportSmokeResult(result: RuntimeSmokeResult): void;
@@ -143,6 +145,7 @@ export interface RuntimeSmokeResult {
   live2DRendererSpike: RuntimeLive2DRendererSpikeSmokeResult | null;
   emotionModelTrigger?: RuntimeEmotionModelTriggerSmokeResult;
   emotionModelPanel?: RuntimeEmotionModelPanelSmokeResult;
+  emotionModelTray?: RuntimeEmotionModelTraySmokeResult;
 }
 
 export interface RuntimeEmotionModelTriggerSmokeResult {
@@ -157,6 +160,17 @@ export interface RuntimeEmotionModelPanelSmokeResult {
   consented: boolean;
   panelVisible: boolean;
   providerCalled: boolean | null;
+  statusSanitized: boolean;
+  statusText: string;
+}
+
+export interface RuntimeEmotionModelTraySmokeResult {
+  commandApplied: boolean | null;
+  consented: boolean;
+  menuCreated: boolean;
+  menuItemVisible: boolean;
+  providerCalled: boolean | null;
+  requestDispatched: boolean;
   statusSanitized: boolean;
   statusText: string;
 }

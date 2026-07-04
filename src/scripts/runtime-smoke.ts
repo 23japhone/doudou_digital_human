@@ -10,8 +10,8 @@ import {
   sanitizeDoudouOfficialLive2DRendererRuntimeSmokeEvidence
 } from "../runtime/default-doudou-live2d-official-smoke-evidence.js";
 import {
-  hasRuntimeEmotionModelPanelSmokeEvidence,
-  hasRuntimeLiveEmotionPanelSmokeEvidence
+  hasRuntimeEmotionModelTraySmokeEvidence,
+  hasRuntimeLiveEmotionTraySmokeEvidence
 } from "./runtime-smoke-evidence.js";
 
 const repoRoot = process.cwd();
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
     }, "UNSUPPORTED_SCHEMA_VERSION");
 
     await assertValidRuntimeLoads("fixture bundle", validBundle);
-    if (isLiveEmotionPanelSmoke()) {
+    if (isLiveEmotionTraySmoke()) {
       return;
     }
 
@@ -69,9 +69,9 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     throw new Error(`${label} runtime smoke exited ${validResult.code}\n${validResult.output}`);
   }
   const smokeResult = parseSmokeResult(validResult.output);
-  if (isLiveEmotionPanelSmoke()) {
-    if (!hasRuntimeLiveEmotionPanelSmokeEvidence(smokeResult)) {
-      throw new Error(`${label} live emotion panel smoke returned incomplete result\n${validResult.output}`);
+  if (isLiveEmotionTraySmoke()) {
+    if (!hasRuntimeLiveEmotionTraySmokeEvidence(smokeResult)) {
+      throw new Error(`${label} live emotion tray smoke returned incomplete result\n${validResult.output}`);
     }
     console.log(`runtime smoke ${label}: ${JSON.stringify(smokeResult)}`);
     return;
@@ -108,7 +108,7 @@ async function assertValidRuntimeLoads(label: string, bundleDir: string): Promis
     !smokeResult.frameHiddenByDefault ||
     !smokeResult.frameVisibleOnResizeEdge ||
     !hasEmotionModelTriggerGate(smokeResult.emotionModelTrigger) ||
-    !hasEmotionModelPanel(smokeResult.emotionModelPanel) ||
+    !hasEmotionModelTray(smokeResult.emotionModelTray) ||
     !hasLive2DRendererSpike(smokeResult.live2DRendererSpike) ||
     !smokeResult.renderLoopAdvanced ||
     smokeResult.scale <= 1 ||
@@ -138,20 +138,24 @@ function hasEmotionModelTriggerGate(trigger: {
   );
 }
 
-function hasEmotionModelPanel(panel: {
-  buttonSubmitted: boolean;
+function isLiveEmotionTraySmoke(): boolean {
+  return (
+    process.env.DOUDOU_EMOTION_TRAY_SMOKE_CONSENT === "1" ||
+    process.env.DOUDOU_EMOTION_PANEL_SMOKE_CONSENT === "1"
+  );
+}
+
+function hasEmotionModelTray(tray: {
   commandApplied: boolean | null;
   consented: boolean;
-  panelVisible: boolean;
+  menuCreated: boolean;
+  menuItemVisible: boolean;
   providerCalled: boolean | null;
+  requestDispatched: boolean;
   statusSanitized: boolean;
   statusText: string;
 } | undefined): boolean {
-  return hasRuntimeEmotionModelPanelSmokeEvidence(panel, { expectConsented: false });
-}
-
-function isLiveEmotionPanelSmoke(): boolean {
-  return process.env.DOUDOU_EMOTION_PANEL_SMOKE_CONSENT === "1";
+  return hasRuntimeEmotionModelTraySmokeEvidence(tray, { expectConsented: false });
 }
 
 function hasAllEmotionMotionPhases(phases: string[]): boolean {
@@ -355,7 +359,6 @@ function runRuntime(bundleDir: string): Promise<SpawnResult> {
       "--bundle",
       bundleDir,
       "--smoke",
-      "--emotion-panel",
       "--tuning",
       "--live2d-renderer-spike"
     ], {
@@ -441,6 +444,16 @@ function parseSmokeResult(output: string) {
       consented: boolean;
       panelVisible: boolean;
       providerCalled: boolean | null;
+      statusSanitized: boolean;
+      statusText: string;
+    };
+    emotionModelTray?: {
+      commandApplied: boolean | null;
+      consented: boolean;
+      menuCreated: boolean;
+      menuItemVisible: boolean;
+      providerCalled: boolean | null;
+      requestDispatched: boolean;
       statusSanitized: boolean;
       statusText: string;
     };
