@@ -26,6 +26,12 @@ export interface RuntimeLive2DRendererSpikeMinimalEvidence {
   modelLoaded: boolean;
 }
 
+export interface RuntimePetPresentationSmokeEvidence {
+  petPresentationEnvelopeSchemaVersionsObserved?: string[];
+  petPresentationReactionActsObserved?: string[];
+  petPresentationStableStatesObserved?: string[];
+}
+
 export interface RuntimeLiveEmotionPanelSmokeEvidence {
   atlasLoaded: boolean;
   bundleLoaded: boolean;
@@ -33,6 +39,23 @@ export interface RuntimeLiveEmotionPanelSmokeEvidence {
   live2DRendererSpike: RuntimeLive2DRendererSpikeMinimalEvidence | null;
   nonTransparentPixel: boolean;
   renderLoopAdvanced: boolean;
+}
+
+export function hasRuntimePetPresentationSmokeEvidence(
+  result: RuntimePetPresentationSmokeEvidence
+): boolean {
+  return Boolean(
+    result.petPresentationEnvelopeSchemaVersionsObserved?.includes("doudou.pet-presentation-envelope.v0.1") &&
+    hasEvery(result.petPresentationReactionActsObserved, [
+      "none",
+      "poke_pop",
+      "repeat_poke_retreat",
+      "repeat_poke_watch",
+      "quiet_recovery",
+      "work_hold"
+    ]) &&
+    hasEvery(result.petPresentationStableStatesObserved, ["calm", "curious", "focused", "wary"])
+  );
 }
 
 export interface RuntimeLiveEmotionTraySmokeEvidence {
@@ -122,4 +145,8 @@ export function hasRuntimeLiveEmotionTraySmokeEvidence(
     result.live2DRendererSpike.expressionCount === 12 &&
     hasRuntimeEmotionModelTraySmokeEvidence(result.emotionModelTray, { expectConsented: true })
   );
+}
+
+function hasEvery(values: string[] | undefined, requiredValues: readonly string[]): boolean {
+  return Boolean(values && requiredValues.every((value) => values.includes(value)));
 }

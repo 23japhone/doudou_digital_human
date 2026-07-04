@@ -3,10 +3,31 @@ import {
   hasRuntimeEmotionModelPanelSmokeEvidence,
   hasRuntimeEmotionModelTraySmokeEvidence,
   hasRuntimeLiveEmotionPanelSmokeEvidence,
-  hasRuntimeLiveEmotionTraySmokeEvidence
+  hasRuntimeLiveEmotionTraySmokeEvidence,
+  hasRuntimePetPresentationSmokeEvidence
 } from "../../src/scripts/runtime-smoke-evidence.js";
 
 describe("runtime smoke evidence", () => {
+  test("requires pet presentation envelope smoke coverage", () => {
+    expect(hasRuntimePetPresentationSmokeEvidence({
+      petPresentationEnvelopeSchemaVersionsObserved: ["doudou.pet-presentation-envelope.v0.1"],
+      petPresentationReactionActsObserved: [
+        "none",
+        "poke_pop",
+        "repeat_poke_retreat",
+        "repeat_poke_watch",
+        "quiet_recovery",
+        "work_hold"
+      ],
+      petPresentationStableStatesObserved: ["calm", "curious", "focused", "wary"]
+    })).toBe(true);
+    expect(hasRuntimePetPresentationSmokeEvidence({
+      petPresentationEnvelopeSchemaVersionsObserved: ["doudou.pet-presentation-envelope.v0.1"],
+      petPresentationReactionActsObserved: ["none", "poke_pop", "work_hold"],
+      petPresentationStableStatesObserved: ["calm", "curious", "focused", "wary"]
+    })).toBe(false);
+  });
+
   test("accepts only consented successful emotion panel smoke evidence in live mode", () => {
     expect(hasRuntimeEmotionModelPanelSmokeEvidence({
       buttonSubmitted: true,

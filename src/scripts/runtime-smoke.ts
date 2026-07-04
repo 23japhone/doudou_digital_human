@@ -11,7 +11,8 @@ import {
 } from "../runtime/default-doudou-live2d-official-smoke-evidence.js";
 import {
   hasRuntimeEmotionModelTraySmokeEvidence,
-  hasRuntimeLiveEmotionTraySmokeEvidence
+  hasRuntimeLiveEmotionTraySmokeEvidence,
+  hasRuntimePetPresentationSmokeEvidence
 } from "./runtime-smoke-evidence.js";
 import {
   runRuntimeInteractionReplaySuite,
@@ -153,6 +154,7 @@ async function assertValidRuntimeLoads(
     !hasAllEmotionMotionPhases(smokeResult.emotionMotionPhasesObserved) ||
     !hasAllDefaultDoudouEmotionScenarios(smokeResult.defaultDoudouEmotionScenariosObserved) ||
     !hasAllDefaultDoudouEmotionIds(smokeResult.defaultDoudouEmotionIdsObserved) ||
+    !hasRuntimePetPresentationSmokeEvidence(smokeResult) ||
     !smokeResult.motionTuningApplied ||
     !smokeResult.motionTuningPanelVisible ||
     !smokeResult.motionTuningPresetButtonVisible ||
@@ -484,6 +486,9 @@ function parseSmokeResult(output: string) {
     emotionMotionPhasesObserved: string[];
     defaultDoudouEmotionIdsObserved: string[];
     defaultDoudouEmotionScenariosObserved: string[];
+    petPresentationEnvelopeSchemaVersionsObserved?: string[];
+    petPresentationReactionActsObserved?: string[];
+    petPresentationStableStatesObserved?: string[];
     motionTuningApplied: boolean;
     motionTuningPanelVisible: boolean;
     motionTuningPresetButtonVisible: boolean;

@@ -2,9 +2,9 @@
 
 Date: 2026-07-04
 
-Status: draft contract for next runtime slice
+Status: implemented v0.1 runtime contract
 
-Owning domain: `src/runtime/`, `tests/runtime/`, `docs/DEFAULT_DOUDOU_CHARACTER_ASSET_SPEC.md`
+Owning domain: `src/runtime/presentation.ts`, `src/runtime/interaction-replay.ts`, `src/runtime/renderer.ts`, `tests/runtime/`, `docs/DEFAULT_DOUDOU_CHARACTER_ASSET_SPEC.md`
 
 ## 目标
 
@@ -32,10 +32,13 @@ Owning domain: `src/runtime/`, `tests/runtime/`, `docs/DEFAULT_DOUDOU_CHARACTER_
 - `src/runtime/state.ts` 定义 `RuntimePetState`：`approaching`、`dodging`、`poked`、`retreating`、`stopped`、`waiting`、`watching`、`working`。
 - `src/runtime/reaction.ts` 定义短期 `wariness`、alpha hit reaction、`retreating` / `watching` / `recovering` motion phase。
 - `src/runtime/default-doudou-emotions.ts` 把 runtime scenario 映射到默认兜兜 emotion id。
+- `src/runtime/presentation.ts` 已落地 `PetAffectCore`、`PetReactionAct`、`PetEmbodimentPolicy` 和 `PetPresentationEnvelope`，schema version 为 `doudou.pet-presentation-envelope.v0.1`。
+- `src/runtime/interaction-replay.ts` 的每条 `PetInteractionTraceEntry` 都携带同一份 `presentation` envelope；renderer smoke 也上报 envelope schema、reaction acts 和 stable states。
 - `tests/runtime/state.test.ts`、`tests/runtime/reaction.test.ts`、`tests/runtime/default-doudou-emotions.test.ts` 已覆盖状态机、wariness 和默认兜兜场景映射。
+- `tests/runtime/presentation.test.ts` 覆盖表现层合同；`tests/runtime/interaction-replay.test.ts` 校验 replay trace 与 presentation envelope 一致。
 - `npm run smoke:runtime` 要求观察到 `idle`、`tap`、`repeat_poke_retreat`、`repeat_poke_watch`、`quiet_recovery`、`working` 场景，以及全部 runtime states。
 
-本文把这些事实提升为下一步实现和评审应遵守的合同。
+本文把这些事实固化为后续实现和评审应遵守的合同。
 
 ## 总线边界
 
@@ -62,7 +65,7 @@ Desktop/App events
 
 ## 合同对象
 
-以下 TypeScript sketch 是目标形状，不要求在本次文档变更中新增代码文件。未来实现时应尽量保持字段小而稳定。
+以下 TypeScript sketch 对应当前 `src/runtime/presentation.ts` 的已实现合同。未来扩展应尽量保持字段小而稳定。
 
 ```ts
 export type PetInteractionEventType =
@@ -81,14 +84,9 @@ export type PetInteractionEventType =
 
 export interface PetInteractionEvent {
   type: PetInteractionEventType;
-  atMs: number;
   target: "visible_alpha" | "interaction_frame" | "runtime" | "unknown";
-  pointer?: {
-    canvasX?: number;
-    canvasY?: number;
-    direction?: RuntimeMotionDirection;
-  };
   source: "main" | "renderer" | "manager" | "smoke" | "replay";
+  direction?: RuntimeMotionDirection;
 }
 ```
 
@@ -175,7 +173,9 @@ export interface PetEmbodimentPolicy {
 
 ```ts
 export interface PetPresentationEnvelope {
+  schemaVersion: "doudou.pet-presentation-envelope.v0.1";
   state: RuntimePetState;
+  affect: PetAffectCore;
   scenario: DefaultDoudouEmotionScenario;
   emotionId: DefaultDoudouEmotionId;
   reactionAct: PetReactionAct;
@@ -305,9 +305,10 @@ export interface PetInteractionTraceEntry {
   scenario: DefaultDoudouEmotionScenario;
   emotionId: DefaultDoudouEmotionId;
   reactionAct: PetReactionAct;
+  presentation: PetPresentationEnvelope;
   wariness: number;
   motionPhase: "settled" | "retreating" | "watching" | "recovering";
-  policy: Pick<PetEmbodimentPolicy, "motionBudget" | "canMoveWindow" | "recoverySpeed">;
+  policy: PetEmbodimentPolicy;
 }
 ```
 
@@ -348,6 +349,7 @@ Trace 推荐保留：
   - default 兜兜 emotion tests 覆盖 runtime scenario 到 emotion id 的映射。
 - Smoke:
   - `npm run smoke:runtime` 继续观察全部 runtime states、核心 scenarios 和 emotion ids。
+  - `npm run smoke:runtime` 继续观察 `doudou.pet-presentation-envelope.v0.1`、`none` / `poke_pop` / `repeat_poke_retreat` / `repeat_poke_watch` / `quiet_recovery` / `work_hold` reaction acts，以及 `calm` / `curious` / `focused` / `wary` stable states。
   - passive cursor contact 不移动窗口。
   - repeated poke 观察到最大 `wariness` 超过阈值。
 - Future replay:
@@ -379,6 +381,6 @@ Trace 推荐保留：
 
 ## 推荐下一步
 
-1. 新增 `docs/DOUDOU_INTERACTION_REPLAY_PLAN.md`，把本文的 trace 合同转成最小 replay fixture 和验收指标。
-2. 将现有 `src/runtime/state.ts`、`src/runtime/reaction.ts`、`src/runtime/default-doudou-emotions.ts` 的隐式组合整理成显式 `PetPresentationEnvelope` 生成函数。
-3. 在 smoke 输出中保留当前 evidence，同时逐步补充 `reactionAct` 和 sanitized trace summary，方便未来做回放对比。
+1. 在 `PetPresentationEnvelope` 后面增加轻量 performance governor，把 `motionBudget` 转成 renderer adapter 可消费的位移、表情和节奏限制。
+2. 将未来模型驱动的 allowlisted runtime intent 先映射为 `PetInteractionEvent` 或 `PetReactionAct`，不要让模型直接写 renderer 参数。
+3. 需要更接近桌面窗口的回归时，优先运行 `npm run smoke:runtime -- --synthetic-replay`，让 replay fixture 经 DOM/IPC adapter 再验证 envelope evidence。

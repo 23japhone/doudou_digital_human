@@ -12,10 +12,24 @@ import type {
 } from "./runtime-types.js";
 import {
   doudouEmotionForRuntimeScenario,
-  doudouEmotionScenarioForRuntimeState,
   type DefaultDoudouEmotionId,
   type DefaultDoudouEmotionScenario
 } from "./default-doudou-emotions.js";
+import {
+  createRuntimeEmotionMemory,
+  decayRuntimeEmotionMemory,
+  classifyRuntimeEmotionMotionPhase,
+  recordRuntimePokeEmotion,
+  type RuntimeEmotionMemory
+} from "./reaction.js";
+import {
+  createPetPresentationEnvelope,
+  type PetAffectStableState,
+  type PetInteractionEvent,
+  type PetInteractionTarget,
+  type PetPresentationEventType,
+  type PetReactionAct
+} from "./presentation.js";
 import {
   createRuntimeScreenHitTestResult,
   isPointInsideRuntimeHitArea,
@@ -170,6 +184,10 @@ const motionDirectionsObserved = new Set<string>();
 const tapExpressionFramesObserved = new Set<number>();
 const defaultDoudouEmotionIdsObserved = new Set<DefaultDoudouEmotionId>();
 const defaultDoudouEmotionScenariosObserved = new Set<DefaultDoudouEmotionScenario>();
+const petPresentationEnvelopeSchemaVersionsObserved = new Set<string>();
+const petPresentationReactionActsObserved = new Set<PetReactionAct>();
+const petPresentationStableStatesObserved = new Set<PetAffectStableState>();
+let petPresentationMemory: RuntimeEmotionMemory = createRuntimeEmotionMemory();
 let live2DRendererSpike: DoudouWebCubismRendererSpike | null = null;
 let live2DRendererSpikeActiveEmotionId: DefaultDoudouEmotionId = "calm_idle";
 let live2DRendererSpikeSdkCalls: string[] = [];
@@ -211,7 +229,7 @@ live2DCanvas.width = bundle.manifest.canvas.width;
 live2DCanvas.height = bundle.manifest.canvas.height;
 petFrame.style.setProperty("--runtime-frame-padding", `${RUNTIME_FRAME_PADDING}px`);
 setupLive2DRendererSpike();
-applyRuntimePetState(visualState);
+applyRuntimePetState(visualState, createRendererPresentationEvent("runtime_started"));
 setupRuntimeTuningPanel();
 setupEmotionDebugPanel();
 
@@ -267,7 +285,10 @@ window.addEventListener("mouseleave", () => {
 });
 
 window.petRuntime.onMotionState((state) => {
-  applyRuntimePetState(stateMachine.motion(state, performance.now()));
+  applyRuntimePetState(
+    stateMachine.motion(state, performance.now()),
+    createRendererPresentationEvent("cursor_alpha_entered", "visible_alpha", "main")
+  );
 });
 
 window.petRuntime.onCursorHitTest((screenPoint) =>
@@ -287,7 +308,7 @@ petFrame.addEventListener("pointerdown", (event) => {
     return;
   }
   if (shouldStartScaleDrag(framePoint, event)) {
-    markRuntimeWorking();
+    markRuntimeWorking("scale_started");
     scalingPointerId = event.pointerId;
     scaleDragSession = createRuntimeScaleDragSession({
       origin: frameCenterScreenPoint(),
@@ -301,7 +322,7 @@ petFrame.addEventListener("pointerdown", (event) => {
     return;
   }
   draggingPointerId = event.pointerId;
-  markRuntimeWorking();
+  markRuntimeWorking("drag_started");
   petFrame.setPointerCapture(event.pointerId);
   window.petRuntime.setIgnoreMouseEvents(false);
   const screenPoint = screenPointFromPointerEvent(event);
@@ -323,7 +344,7 @@ petFrame.addEventListener("pointermove", (event) => {
       bundle.scaleLimits
     );
     if (requestedScale !== null) {
-      markRuntimeWorking();
+      markRuntimeWorking("scale_changed");
       scheduleRuntimeScale(requestedScale, "pointer");
     }
     return;
@@ -332,7 +353,7 @@ petFrame.addEventListener("pointermove", (event) => {
     return;
   }
   event.preventDefault();
-  markRuntimeWorking();
+  markRuntimeWorking("drag_started");
   window.petRuntime.dragWindowTo(screenPointFromPointerEvent(event));
 });
 
@@ -346,7 +367,7 @@ petFrame.addEventListener(
       return;
     }
     event.preventDefault();
-    markRuntimeWorking();
+    markRuntimeWorking("scale_started");
     scheduleRuntimeScale(nextRuntimeScale(runtimeScale, event.deltaY, bundle.scaleLimits, event.deltaMode), "wheel");
   },
   { passive: false }
@@ -466,7 +487,7 @@ function logRuntimeError(error: unknown): void {
 function render(timestamp: number): void {
   const deltaMs = timestamp - lastTimestamp;
   lastTimestamp = timestamp;
-  applyRuntimePetState(stateMachine.advance(deltaMs, timestamp));
+  applyRuntimePetState(stateMachine.advance(deltaMs, timestamp), createRendererPresentationEvent("quiet_tick"), timestamp);
   player.advance(deltaMs);
   drawCurrentFrame();
   drawLive2DRendererSpikeFrame(timestamp);
@@ -610,7 +631,7 @@ async function exerciseSmokeInteractionsIfNeeded(): Promise<void> {
   player.tap();
   drawTapExpressionFramesForSmoke();
   window.petRuntime.startWindowDrag({ x: 100, y: 100 });
-  markRuntimeWorking();
+  markRuntimeWorking("drag_started");
   window.petRuntime.dragWindowTo({ x: 112, y: 116 });
   window.petRuntime.endWindowDrag();
   runtimeScale = await applyRuntimeScale(nextRuntimeScale(runtimeScale, -24, bundle.scaleLimits), "wheel");
@@ -643,6 +664,9 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     defaultDoudouEmotionIdsObserved: [...defaultDoudouEmotionIdsObserved],
     defaultDoudouEmotionScenariosObserved: [...defaultDoudouEmotionScenariosObserved],
     emotionMotionPhasesObserved: [],
+    petPresentationEnvelopeSchemaVersionsObserved: [...petPresentationEnvelopeSchemaVersionsObserved],
+    petPresentationReactionActsObserved: [...petPresentationReactionActsObserved],
+    petPresentationStableStatesObserved: [...petPresentationStableStatesObserved],
     motionTuningApplied: smokeMotionTuningApplied,
     motionTuningPanelVisible: smokeMotionTuningPanelVisible,
     motionTuningPresetButtonVisible: smokeMotionTuningPresetButtonVisible,
@@ -750,7 +774,7 @@ async function applyRuntimeSyntheticReplayEvent(
   if (event.type === "drag_started") {
     window.petRuntime.startWindowDrag(screenPointForSyntheticReplayEvent(event));
     evidence.ipcEventsDispatched += 1;
-    markRuntimeWorking();
+    markRuntimeWorking("drag_started");
     return;
   }
   if (event.type === "drag_ended") {
@@ -760,7 +784,7 @@ async function applyRuntimeSyntheticReplayEvent(
     return;
   }
   if (event.type === "scale_started" || event.type === "work_started") {
-    markRuntimeWorking();
+    markRuntimeWorking(event.type);
     return;
   }
   if (event.type === "scale_changed") {
@@ -770,11 +794,14 @@ async function applyRuntimeSyntheticReplayEvent(
     return;
   }
   if (event.type === "scale_ended") {
-    applyRuntimePetState(stateMachine.advance(260, performance.now() + 260));
+    applyRuntimePetState(
+      stateMachine.advance(260, performance.now() + 260),
+      createRendererPresentationEvent("scale_ended")
+    );
     return;
   }
   if (event.type === "work_ended") {
-    applyRuntimePetState(stateMachine.endWorking(performance.now()));
+    applyRuntimePetState(stateMachine.endWorking(performance.now()), createRendererPresentationEvent("work_ended"));
     return;
   }
   if (event.type === "motion_cue" && event.state) {
@@ -786,7 +813,10 @@ async function applyRuntimeSyntheticReplayEvent(
     return;
   }
   if (event.type === "advance_time" || event.type === "assert_trace" || event.type === "quiet_tick") {
-    applyRuntimePetState(stateMachine.advance(180, performance.now() + 180));
+    applyRuntimePetState(
+      stateMachine.advance(180, performance.now() + 180),
+      createRendererPresentationEvent("quiet_tick")
+    );
   }
 }
 
@@ -840,7 +870,10 @@ function isRuntimeSyntheticReplayEvidencePrivacySafe(evidence: RuntimeSmokeSynth
 }
 
 function applyRuntimeMotionCue(cue: RuntimePetMotionCue): void {
-  applyRuntimePetState(stateMachine.motion(cue, performance.now()));
+  applyRuntimePetState(
+    stateMachine.motion(cue, performance.now()),
+    createRendererPresentationEvent("cursor_alpha_entered", "visible_alpha", "main")
+  );
 }
 
 async function exerciseEmotionModelTriggerForSmoke(): Promise<void> {
@@ -1077,11 +1110,19 @@ function exerciseQuietRecoveryForSmoke(): void {
     direction: "left",
     motionIntensity: 0.88,
     state: "retreating"
-  }, nowMs));
+  }, nowMs), createRendererPresentationEvent("cursor_alpha_entered", "visible_alpha", "smoke"), nowMs);
   const watchingAtMs = nowMs + runtimeStateTiming.retreatingToWatchingMs;
-  applyRuntimePetState(stateMachine.advance(runtimeStateTiming.retreatingToWatchingMs, watchingAtMs));
+  applyRuntimePetState(
+    stateMachine.advance(runtimeStateTiming.retreatingToWatchingMs, watchingAtMs),
+    createRendererPresentationEvent("quiet_tick", "runtime", "smoke"),
+    watchingAtMs
+  );
   const waitingAtMs = watchingAtMs + runtimeStateTiming.watchingToWaitingMs;
-  applyRuntimePetState(stateMachine.advance(runtimeStateTiming.watchingToWaitingMs, waitingAtMs));
+  applyRuntimePetState(
+    stateMachine.advance(runtimeStateTiming.watchingToWaitingMs, waitingAtMs),
+    createRendererPresentationEvent("quiet_tick", "runtime", "smoke"),
+    waitingAtMs
+  );
 }
 
 async function exerciseRuntimeMotionTuningForSmoke(): Promise<void> {
@@ -1327,32 +1368,76 @@ function updateRuntimeTuningPanelValues(): void {
 }
 
 function markRuntimePoked(): void {
-  applyRuntimePetState(stateMachine.tap(performance.now()));
+  const nowMs = performance.now();
+  petPresentationMemory = recordRuntimePokeEmotion(petPresentationMemory, nowMs);
+  applyRuntimePetState(stateMachine.tap(nowMs), createRendererPresentationEvent("poke", "visible_alpha"), nowMs);
 }
 
-function markRuntimeWorking(): void {
-  applyRuntimePetState(stateMachine.working(performance.now()));
+function markRuntimeWorking(eventType: Extract<PetPresentationEventType, "drag_started" | "scale_changed" | "scale_started" | "work_started"> = "work_started"): void {
+  const target = eventType === "drag_started" || eventType === "scale_started" || eventType === "scale_changed"
+    ? "interaction_frame"
+    : "runtime";
+  const nowMs = performance.now();
+  applyRuntimePetState(stateMachine.working(nowMs), createRendererPresentationEvent(eventType, target), nowMs);
 }
 
-function applyRuntimePetState(state: RuntimePetState): void {
+function applyRuntimePetState(
+  state: RuntimePetState,
+  event: PetInteractionEvent = createRendererPresentationEvent("quiet_tick"),
+  nowMs = performance.now()
+): void {
   const previousState = visualState;
   visualState = state;
   petFrame.dataset.runtimeState = state;
-  recordDefaultDoudouEmotionState(state, previousState);
+  recordPetPresentationState(state, previousState, event, nowMs);
   for (const candidate of RUNTIME_PET_STATES) {
     petFrame.classList.toggle(runtimePetStateClass(candidate), candidate === state);
   }
   applyRuntimeVisualPose();
 }
 
-function recordDefaultDoudouEmotionState(state: RuntimePetState, previousState: RuntimePetState): void {
-  const scenario = doudouEmotionScenarioForRuntimeState(state, previousState);
-  const scenarioEmotion = doudouEmotionForRuntimeScenario(scenario);
-  petFrame.dataset.doudouEmotion = scenarioEmotion.id;
+function recordPetPresentationState(
+  state: RuntimePetState,
+  previousState: RuntimePetState,
+  event: PetInteractionEvent,
+  nowMs: number
+): void {
+  petPresentationMemory = decayRuntimeEmotionMemory(petPresentationMemory, nowMs);
+  const motionPhase = classifyRuntimeEmotionMotionPhase(petPresentationMemory, nowMs);
+  const presentation = createPetPresentationEnvelope({
+    event,
+    memory: petPresentationMemory,
+    motionPhase,
+    nowMs,
+    pose: stateMachine.pose(),
+    previousState,
+    state,
+    timing: runtimeStateTiming
+  });
+  const scenarioEmotion = doudouEmotionForRuntimeScenario(presentation.scenario);
+  petFrame.dataset.doudouEmotion = presentation.emotionId;
   petFrame.dataset.doudouEmotionLabel = scenarioEmotion.labelZh;
-  defaultDoudouEmotionIdsObserved.add(scenarioEmotion.id);
-  defaultDoudouEmotionScenariosObserved.add(scenario);
-  switchLive2DRendererSpikeExpression(scenarioEmotion.id);
+  petFrame.dataset.petPresentationReactionAct = presentation.reactionAct;
+  petFrame.dataset.petPresentationSchemaVersion = presentation.schemaVersion;
+  petFrame.dataset.petPresentationStableState = presentation.affect.stableState;
+  defaultDoudouEmotionIdsObserved.add(presentation.emotionId);
+  defaultDoudouEmotionScenariosObserved.add(presentation.scenario);
+  petPresentationEnvelopeSchemaVersionsObserved.add(presentation.schemaVersion);
+  petPresentationReactionActsObserved.add(presentation.reactionAct);
+  petPresentationStableStatesObserved.add(presentation.affect.stableState);
+  switchLive2DRendererSpikeExpression(presentation.emotionId);
+}
+
+function createRendererPresentationEvent(
+  type: PetPresentationEventType,
+  target: PetInteractionTarget = "runtime",
+  source: PetInteractionEvent["source"] = "renderer"
+): PetInteractionEvent {
+  return {
+    source,
+    target,
+    type
+  };
 }
 
 function isRuntimeVisualStateApplied(): boolean {

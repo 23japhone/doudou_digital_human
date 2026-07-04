@@ -6,6 +6,14 @@ import {
 } from "./default-doudou-emotions.js";
 import type { RuntimeMotionDirection } from "./motion.js";
 import {
+  createPetPresentationEnvelope,
+  type PetEmbodimentPolicy,
+  type PetInteractionTarget,
+  type PetPresentationEnvelope,
+  type PetPresentationEventType,
+  type PetReactionAct
+} from "./presentation.js";
+import {
   classifyRuntimeEmotionMotionPhase,
   createRuntimeEmotionMemory,
   decayRuntimeEmotionMemory,
@@ -23,6 +31,8 @@ import {
 
 export const PET_INTERACTION_REPLAY_SCHEMA_VERSION = "doudou.interaction-replay.v0.1" as const;
 
+export type { PetReactionAct } from "./presentation.js";
+
 export const RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS = [
   "single-poke",
   "repeat-poke-retreat-watch",
@@ -35,36 +45,11 @@ export const RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS = [
 
 export type PetInteractionReplayFixtureId = typeof RUNTIME_INTERACTION_REPLAY_FIXTURE_IDS[number];
 
-export type PetInteractionEventType =
-  | "runtime_started"
-  | "cursor_alpha_entered"
-  | "cursor_alpha_left"
-  | "poke"
-  | "drag_started"
-  | "drag_ended"
-  | "scale_started"
-  | "scale_changed"
-  | "scale_ended"
-  | "quiet_tick"
-  | "work_started"
-  | "work_ended";
-
 export type PetInteractionReplaySyntheticEventType = "advance_time" | "assert_trace" | "motion_cue";
 
-export type PetInteractionReplayEventType = PetInteractionEventType | PetInteractionReplaySyntheticEventType;
+export type PetInteractionReplayEventType = PetPresentationEventType;
 
-export type PetInteractionReplayTarget = "interaction_frame" | "runtime" | "unknown" | "visible_alpha";
-
-export type PetReactionAct =
-  | "none"
-  | "look_toward_cursor"
-  | "cursor_dodge"
-  | "poke_pop"
-  | "repeat_poke_retreat"
-  | "repeat_poke_watch"
-  | "quiet_recovery"
-  | "work_hold"
-  | "motion_stop_rebound";
+export type PetInteractionReplayTarget = PetInteractionTarget;
 
 export type PetInteractionReplayFailureCode =
   | "missing_state"
@@ -129,18 +114,13 @@ export interface PetInteractionReplayFixture {
   titleZh: string;
 }
 
-export interface PetEmbodimentPolicyTrace {
-  canMoveWindow: boolean;
-  motionBudget: "none" | "low" | "medium";
-  recoverySpeed: "normal" | "slow";
-}
-
 export interface PetInteractionTraceEntry {
   atMs: number;
   emotionId: DefaultDoudouEmotionId;
   eventType: PetInteractionReplayEventType;
   motionPhase: RuntimeEmotionMotionPhase;
-  policy: PetEmbodimentPolicyTrace;
+  policy: PetEmbodimentPolicy;
+  presentation: PetPresentationEnvelope;
   reactionAct: PetReactionAct;
   scenario: DefaultDoudouEmotionScenario;
   state: RuntimePetState;
@@ -248,24 +228,36 @@ export function runPetInteractionReplay(fixture: PetInteractionReplayFixture): P
     motionPhase: RuntimeEmotionMotionPhase
   ): void {
     const state = machine.current();
-    const scenario = scenarioForTrace(state, lastRecordedState, reactionAct);
-    const emotionId = doudouEmotionForRuntimeScenario(scenario).id;
+    const presentation = createPetPresentationEnvelope({
+      event: {
+        source: "replay",
+        target: event.target,
+        type: event.type
+      },
+      memory,
+      motionPhase,
+      nowMs: event.atMs,
+      pose: machine.pose(),
+      previousState: lastRecordedState,
+      state
+    });
     const entry: PetInteractionTraceEntry = {
       atMs: event.atMs,
-      emotionId,
+      emotionId: presentation.emotionId,
       eventType: event.type,
       motionPhase,
-      policy: policyForTrace(event, reactionAct),
-      reactionAct,
-      scenario,
+      policy: presentation.policy,
+      presentation,
+      reactionAct: presentation.reactionAct,
+      scenario: presentation.scenario,
       state,
       wariness: clamp01(memory.wariness)
     };
     trace.push(entry);
     pushUnique(observedStates, state);
-    pushUnique(observedScenarios, scenario);
-    pushUnique(observedEmotionIds, emotionId);
-    pushUnique(observedReactionActs, reactionAct);
+    pushUnique(observedScenarios, presentation.scenario);
+    pushUnique(observedEmotionIds, presentation.emotionId);
+    pushUnique(observedReactionActs, presentation.reactionAct);
     pushUnique(observedMotionPhases, motionPhase);
     maxWariness = Math.max(maxWariness, entry.wariness);
     tapReactFrameObserved ||= machine.pose().clickExpression === "tap_react" || reactionAct === "poke_pop";
@@ -533,17 +525,6 @@ function evaluateExpectations(
   return failures;
 }
 
-function scenarioForTrace(
-  state: RuntimePetState,
-  previousState: RuntimePetState,
-  reactionAct: PetReactionAct
-): DefaultDoudouEmotionScenario {
-  if (reactionAct === "quiet_recovery") {
-    return "quiet_recovery";
-  }
-  return doudouEmotionScenarioForRuntimeState(state, previousState === state ? undefined : previousState);
-}
-
 function reactionActForMotionPhase(
   motionPhase: RuntimeEmotionMotionPhase,
   state: RuntimePetState
@@ -583,18 +564,6 @@ function reactionActForState(state: RuntimePetState): PetReactionAct {
     return "work_hold";
   }
   return "none";
-}
-
-function policyForTrace(
-  event: Pick<PetInteractionReplayEvent, "target" | "type">,
-  reactionAct: PetReactionAct
-): PetEmbodimentPolicyTrace {
-  const work = reactionAct === "work_hold";
-  return {
-    canMoveWindow: event.type === "drag_started" || event.type === "drag_ended",
-    motionBudget: work ? "low" : reactionAct === "none" ? "none" : "medium",
-    recoverySpeed: reactionAct === "quiet_recovery" ? "slow" : "normal"
-  };
 }
 
 function motionCueFromEvent(event: PetInteractionReplayEvent): RuntimePetMotionCue | null {

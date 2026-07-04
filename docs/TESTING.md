@@ -38,7 +38,7 @@
 
 `smoke:runtime -- --synthetic-replay` keeps the default Electron smoke coverage, then injects a sanitized synthetic replay plan derived from the same seven fixtures into the renderer. The renderer reports `syntheticReplay` evidence with fixture ids, applied event types including `work_started` / `work_ended`, DOM event count, IPC bridge count, completion, and privacy status. This mode is also available with `DOUDOU_RUNTIME_SMOKE_SYNTHETIC_REPLAY=1`.
 
-`smoke:runtime` also requires tray-menu 兜兜回应 evidence: the formal menu item must exist without enabling the legacy flag-gated panel, and default smoke must not dispatch a consented provider call. User-facing status text must not include provider/model/command/apply fields.
+`smoke:runtime` also requires pet presentation envelope evidence from the renderer: schema version `doudou.pet-presentation-envelope.v0.1`, reaction acts for idle, poke, repeat-poke retreat/watch, quiet recovery, and working, plus `calm` / `curious` / `focused` / `wary` stable states. It also requires tray-menu 兜兜回应 evidence: the formal menu item must exist without enabling the legacy flag-gated panel, and default smoke must not dispatch a consented provider call. User-facing status text must not include provider/model/command/apply fields.
 
 Set `DOUDOU_EMOTION_TRAY_SMOKE_CONSENT=1` together with the local emotion-model env vars to run the tray-menu path with consent enabled against the real provider; this live acceptance path validates provider-called and command-applied evidence for the fixture bundle only, to avoid repeated live calls, while the visible status remains limited to 兜兜 expression feedback. `DOUDOU_EMOTION_PANEL_SMOKE_CONSENT=1` remains a legacy alias for the same live smoke path.
 

@@ -19,6 +19,10 @@ import type {
   PetInteractionReplayFixtureId,
   PetInteractionReplayEventType
 } from "./interaction-replay.js";
+import type {
+  PetAffectStableState,
+  PetReactionAct
+} from "./presentation.js";
 
 export interface RuntimeAtlas {
   id: string;
@@ -163,6 +167,9 @@ export interface RuntimeSmokeResult {
   defaultDoudouEmotionIdsObserved: DefaultDoudouEmotionId[];
   defaultDoudouEmotionScenariosObserved: DefaultDoudouEmotionScenario[];
   emotionMotionPhasesObserved: string[];
+  petPresentationEnvelopeSchemaVersionsObserved: string[];
+  petPresentationReactionActsObserved: PetReactionAct[];
+  petPresentationStableStatesObserved: PetAffectStableState[];
   motionTuningApplied: boolean;
   motionTuningPanelVisible: boolean;
   motionTuningPresetButtonVisible: boolean;

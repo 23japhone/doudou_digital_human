@@ -27,6 +27,11 @@ describe("runtime interaction replay", () => {
       expect(result.observed.passiveCursorMovedWindow, fixture.id).toBe(false);
       expect(result.observed.maxWariness, fixture.id).toBeGreaterThanOrEqual(0);
       expect(result.observed.maxWariness, fixture.id).toBeLessThanOrEqual(1);
+      expect(result.trace.length, fixture.id).toBeGreaterThan(0);
+      expect(result.trace.every((entry) => entry.presentation.schemaVersion === "doudou.pet-presentation-envelope.v0.1")).toBe(true);
+      expect(result.trace.map((entry) => entry.presentation.reactionAct)).toEqual(result.trace.map((entry) => entry.reactionAct));
+      expect(result.trace.map((entry) => entry.presentation.scenario)).toEqual(result.trace.map((entry) => entry.scenario));
+      expect(result.trace.map((entry) => entry.presentation.emotionId)).toEqual(result.trace.map((entry) => entry.emotionId));
     }
   });
 
