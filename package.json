@@ -2,6 +2,7 @@
   "name": "doudou-digital-human",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "Static pet bundle to desktop runtime vertical slice for a digital desktop companion.",
   "type": "module",
   "main": "dist/src/runtime/main.js",
