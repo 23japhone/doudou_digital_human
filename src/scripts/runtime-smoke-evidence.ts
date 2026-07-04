@@ -36,6 +36,8 @@ export interface RuntimePetPerformanceSmokeEvidence {
   petPerformanceExpressionPrioritiesObserved?: string[];
   petPerformanceGovernorSchemaVersionsObserved?: string[];
   petPerformanceMotionBudgetsObserved?: string[];
+  petPerformanceReadabilityCatalogVersionsObserved?: string[];
+  petPerformanceReadabilityEmotionIdsObserved?: string[];
   petPerformanceTransitionTonesObserved?: string[];
 }
 
@@ -53,7 +55,18 @@ export function hasRuntimePetPerformanceSmokeEvidence(
 ): boolean {
   return Boolean(
     result.petPerformanceGovernorSchemaVersionsObserved?.includes("doudou.pet-performance-governor.v0.1") &&
+    result.petPerformanceReadabilityCatalogVersionsObserved?.includes(
+      "doudou.pet-performance-readability-catalog.v0.1"
+    ) &&
     hasEvery(result.petPerformanceMotionBudgetsObserved, ["none", "low", "medium"]) &&
+    hasEvery(result.petPerformanceReadabilityEmotionIdsObserved, [
+      "calm_idle",
+      "surprised",
+      "annoyed_pout",
+      "teary",
+      "comfort_soft",
+      "focused_working"
+    ]) &&
     hasEvery(result.petPerformanceExpressionPrioritiesObserved, ["normal", "force"]) &&
     hasEvery(result.petPerformanceTransitionTonesObserved, ["idle", "reaction", "soft_recovery", "focused"])
   );

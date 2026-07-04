@@ -33,8 +33,8 @@ Owning domain: `src/runtime/presentation.ts`, `src/runtime/interaction-replay.ts
 - `src/runtime/reaction.ts` 定义短期 `wariness`、alpha hit reaction、`retreating` / `watching` / `recovering` motion phase。
 - `src/runtime/default-doudou-emotions.ts` 把 runtime scenario 映射到默认兜兜 emotion id。
 - `src/runtime/presentation.ts` 已落地 `PetAffectCore`、`PetReactionAct`、`PetEmbodimentPolicy` 和 `PetPresentationEnvelope`，schema version 为 `doudou.pet-presentation-envelope.v0.1`。
-- `src/runtime/performance-governor.ts` 已落地轻量 `PetPerformancePlan`，schema version 为 `doudou.pet-performance-governor.v0.1`，把 `motionBudget` 转成 renderer adapter 可消费的动作幅度、节奏和表情限制。
-- `src/runtime/interaction-replay.ts` 的每条 `PetInteractionTraceEntry` 都携带同一份 `presentation` envelope 和 `performancePlan`；renderer smoke 也上报 envelope schema、reaction acts、stable states 和 governor plan evidence。
+- `src/runtime/performance-governor.ts` 已落地轻量 `PetPerformancePlan`，schema version 为 `doudou.pet-performance-governor.v0.1`，并维护 `doudou.pet-performance-readability-catalog.v0.1`，把 12 个默认兜兜 emotion id 的动作走廊和表情切换间隔变成可评审、可调参目录。
+- `src/runtime/interaction-replay.ts` 的每条 `PetInteractionTraceEntry` 都携带同一份 `presentation` envelope 和 `performancePlan`；renderer smoke 也上报 envelope schema、reaction acts、stable states、governor plan evidence 和 readability catalog evidence。
 - `tests/runtime/state.test.ts`、`tests/runtime/reaction.test.ts`、`tests/runtime/default-doudou-emotions.test.ts` 已覆盖状态机、wariness 和默认兜兜场景映射。
 - `tests/runtime/presentation.test.ts` 覆盖表现层合同；`tests/runtime/interaction-replay.test.ts` 校验 replay trace 与 presentation envelope 一致。
 - `npm run smoke:runtime` 要求观察到 `idle`、`tap`、`repeat_poke_retreat`、`repeat_poke_watch`、`quiet_recovery`、`working` 场景，以及全部 runtime states。
@@ -210,11 +210,15 @@ export interface PetPresentationEnvelope {
 
 ### PetPerformancePlan
 
-`PetPerformancePlan` 是 envelope 后面的轻量 performance governor 输出。它不重新判断情绪，只把 `PetEmbodimentPolicy.motionBudget`、`reactionAct` 和 policy flags 转成 renderer adapter 可以直接使用的幅度、节奏和表情限制。
+`PetPerformancePlan` 是 envelope 后面的轻量 performance governor 输出。它不重新判断情绪，只把 `PetPresentationEnvelope.emotionId` 对应到 `DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG`，再将 `PetEmbodimentPolicy.motionBudget`、`reactionAct` 和 policy flags 转成 renderer adapter 可以直接使用的幅度、节奏和表情限制。
+
+readability catalog 的 schema version 是 `doudou.pet-performance-readability-catalog.v0.1`。当前 catalog 覆盖全部 12 个默认兜兜 emotion id，每条记录包含 `motion` 走廊、`expression.minSwitchIntervalMs`、`expression.transitionTone`、`motionBudget` 和可评审的 `readabilityCue`。调参时应优先改 catalog 条目，再由 replay / smoke 证明实际 renderer 路径走到了对应 emotion id。
 
 ```ts
 export interface PetPerformancePlan {
   schemaVersion: "doudou.pet-performance-governor.v0.1";
+  readabilityCatalogVersion: "doudou.pet-performance-readability-catalog.v0.1";
+  readabilityEmotionId: DefaultDoudouEmotionId;
   reactionAct: PetReactionAct;
   motionBudget: "none" | "low" | "medium";
   motion: {
@@ -396,7 +400,7 @@ Trace 推荐保留：
 - Smoke:
   - `npm run smoke:runtime` 继续观察全部 runtime states、核心 scenarios 和 emotion ids。
   - `npm run smoke:runtime` 继续观察 `doudou.pet-presentation-envelope.v0.1`、`none` / `poke_pop` / `repeat_poke_retreat` / `repeat_poke_watch` / `quiet_recovery` / `work_hold` reaction acts，以及 `calm` / `curious` / `focused` / `wary` stable states。
-  - `npm run smoke:runtime` 继续观察 `doudou.pet-performance-governor.v0.1`、`none` / `low` / `medium` motion budgets、`normal` / `force` expression priorities，以及 `idle` / `reaction` / `soft_recovery` / `focused` transition tones。
+  - `npm run smoke:runtime` 继续观察 `doudou.pet-performance-governor.v0.1`、`doudou.pet-performance-readability-catalog.v0.1`、`none` / `low` / `medium` motion budgets、核心 readability emotion ids、`normal` / `force` expression priorities，以及 `idle` / `reaction` / `soft_recovery` / `focused` transition tones。
   - passive cursor contact 不移动窗口。
   - repeated poke 观察到最大 `wariness` 超过阈值。
 - Future replay:
@@ -428,6 +432,5 @@ Trace 推荐保留：
 
 ## 推荐下一步
 
-1. 为 `PetPerformancePlan` 增加 readability catalog，把不同默认兜兜 emotion id 的位移上限、停留时长和表情切换间隔从固定映射升级为可评审目录。
-2. 将未来模型驱动的 allowlisted runtime intent 先映射为 `PetInteractionEvent` 或 `PetReactionAct`，再经过 envelope 和 governor，不要让模型直接写 renderer 参数。
-3. 需要更接近桌面窗口的回归时，优先运行 `npm run smoke:runtime -- --synthetic-replay`，让 replay fixture 经 DOM/IPC adapter 再验证 envelope 和 governor evidence。
+1. 将未来模型驱动的 allowlisted runtime intent 先映射为 `PetInteractionEvent` 或 `PetReactionAct`，再经过 envelope、readability catalog 和 governor，不要让模型直接写 renderer 参数。
+2. 需要更接近桌面窗口的回归时，优先运行 `npm run smoke:runtime -- --synthetic-replay`，让 replay fixture 经 DOM/IPC adapter 再验证 envelope、catalog 和 governor evidence。

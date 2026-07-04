@@ -194,6 +194,8 @@ const defaultDoudouEmotionScenariosObserved = new Set<DefaultDoudouEmotionScenar
 const petPerformanceExpressionPrioritiesObserved = new Set<PetPerformancePlan["expression"]["priority"]>();
 const petPerformanceGovernorSchemaVersionsObserved = new Set<string>();
 const petPerformanceMotionBudgetsObserved = new Set<PetPerformancePlan["motionBudget"]>();
+const petPerformanceReadabilityCatalogVersionsObserved = new Set<PetPerformancePlan["readabilityCatalogVersion"]>();
+const petPerformanceReadabilityEmotionIdsObserved = new Set<PetPerformancePlan["readabilityEmotionId"]>();
 const petPerformanceTransitionTonesObserved = new Set<PetPerformanceTransitionTone>();
 const petPresentationEnvelopeSchemaVersionsObserved = new Set<string>();
 const petPresentationReactionActsObserved = new Set<PetReactionAct>();
@@ -678,6 +680,8 @@ function createSmokeResult(renderLoopAdvanced: boolean): RuntimeSmokeResult {
     petPerformanceExpressionPrioritiesObserved: [...petPerformanceExpressionPrioritiesObserved],
     petPerformanceGovernorSchemaVersionsObserved: [...petPerformanceGovernorSchemaVersionsObserved],
     petPerformanceMotionBudgetsObserved: [...petPerformanceMotionBudgetsObserved],
+    petPerformanceReadabilityCatalogVersionsObserved: [...petPerformanceReadabilityCatalogVersionsObserved],
+    petPerformanceReadabilityEmotionIdsObserved: [...petPerformanceReadabilityEmotionIdsObserved],
     petPerformanceTransitionTonesObserved: [...petPerformanceTransitionTonesObserved],
     petPresentationEnvelopeSchemaVersionsObserved: [...petPresentationEnvelopeSchemaVersionsObserved],
     petPresentationReactionActsObserved: [...petPresentationReactionActsObserved],
@@ -1435,6 +1439,8 @@ function recordPetPresentationState(
   petFrame.dataset.doudouEmotionLabel = scenarioEmotion.labelZh;
   petFrame.dataset.petPerformanceGovernorSchemaVersion = performancePlan.schemaVersion;
   petFrame.dataset.petPerformanceMotionBudget = performancePlan.motionBudget;
+  petFrame.dataset.petPerformanceReadabilityCatalogVersion = performancePlan.readabilityCatalogVersion;
+  petFrame.dataset.petPerformanceReadabilityEmotionId = performancePlan.readabilityEmotionId;
   petFrame.dataset.petPerformanceTransitionTone = performancePlan.expression.transitionTone;
   petFrame.dataset.petPresentationReactionAct = presentation.reactionAct;
   petFrame.dataset.petPresentationSchemaVersion = presentation.schemaVersion;
@@ -1444,6 +1450,8 @@ function recordPetPresentationState(
   petPerformanceExpressionPrioritiesObserved.add(performancePlan.expression.priority);
   petPerformanceGovernorSchemaVersionsObserved.add(performancePlan.schemaVersion);
   petPerformanceMotionBudgetsObserved.add(performancePlan.motionBudget);
+  petPerformanceReadabilityCatalogVersionsObserved.add(performancePlan.readabilityCatalogVersion);
+  petPerformanceReadabilityEmotionIdsObserved.add(performancePlan.readabilityEmotionId);
   petPerformanceTransitionTonesObserved.add(performancePlan.expression.transitionTone);
   petPresentationEnvelopeSchemaVersionsObserved.add(presentation.schemaVersion);
   petPresentationReactionActsObserved.add(presentation.reactionAct);

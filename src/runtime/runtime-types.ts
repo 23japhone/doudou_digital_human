@@ -175,6 +175,8 @@ export interface RuntimeSmokeResult {
   petPerformanceExpressionPrioritiesObserved: DoudouCubismMotionPriority[];
   petPerformanceGovernorSchemaVersionsObserved: string[];
   petPerformanceMotionBudgetsObserved: PetPerformancePlan["motionBudget"][];
+  petPerformanceReadabilityCatalogVersionsObserved: PetPerformancePlan["readabilityCatalogVersion"][];
+  petPerformanceReadabilityEmotionIdsObserved: DefaultDoudouEmotionId[];
   petPerformanceTransitionTonesObserved: PetPerformanceTransitionTone[];
   petPresentationEnvelopeSchemaVersionsObserved: string[];
   petPresentationReactionActsObserved: PetReactionAct[];

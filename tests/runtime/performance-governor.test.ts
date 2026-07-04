@@ -1,13 +1,49 @@
 import { describe, expect, test } from "vitest";
+import { DEFAULT_DOUDOU_EMOTION_IDS } from "../../src/runtime/default-doudou-emotions.js";
 import {
+  DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG,
+  PET_PERFORMANCE_READABILITY_CATALOG_SCHEMA_VERSION,
   createPetPerformancePlan,
-  shouldSwitchExpressionForPerformancePlan
+  shouldSwitchExpressionForPerformancePlan,
+  validatePetPerformanceReadabilityCatalog
 } from "../../src/runtime/performance-governor.js";
 import { createPetPresentationEnvelope, type PetInteractionEvent } from "../../src/runtime/presentation.js";
 import { createRuntimeEmotionMemory } from "../../src/runtime/reaction.js";
 import type { RuntimePetState, RuntimePetVisualPose } from "../../src/runtime/state.js";
 
 describe("pet performance governor", () => {
+  test("keeps a reviewable readability catalog for every default doudou emotion", () => {
+    expect(Object.keys(DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG).sort()).toEqual(
+      [...DEFAULT_DOUDOU_EMOTION_IDS].sort()
+    );
+    expect(validatePetPerformanceReadabilityCatalog(DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG)).toEqual({
+      extraEmotionIds: [],
+      invalidEmotionIds: [],
+      missingEmotionIds: [],
+      ok: true
+    });
+
+    for (const emotionId of DEFAULT_DOUDOU_EMOTION_IDS) {
+      const entry = DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG[emotionId];
+      expect(entry.emotionId).toBe(emotionId);
+      expect(entry.schemaVersion).toBe(PET_PERFORMANCE_READABILITY_CATALOG_SCHEMA_VERSION);
+      expect(entry.motion.amplitudeScale).toBeGreaterThanOrEqual(0);
+      expect(entry.motion.amplitudeScale).toBeLessThanOrEqual(1);
+      expect(entry.motion.cadenceMs).toBeGreaterThanOrEqual(320);
+      expect(entry.motion.maxTranslateXPx).toBeLessThanOrEqual(32);
+      expect(entry.motion.maxTranslateYPx).toBeLessThanOrEqual(11);
+      expect(entry.motion.maxRotateDeg).toBeLessThanOrEqual(14);
+      expect(entry.expression.minSwitchIntervalMs).toBeGreaterThanOrEqual(120);
+    }
+
+    expect(DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG.calm_idle.motion.cadenceMs).toBeGreaterThan(
+      DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG.surprised.motion.cadenceMs
+    );
+    expect(DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG.comfort_soft.motion).not.toEqual(
+      DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG.focused_working.motion
+    );
+  });
+
   test("turns no-motion presentation into a still renderer adapter plan", () => {
     const plan = createPetPerformancePlan(envelopeFor({
       event: { source: "renderer", target: "runtime", type: "runtime_started" },
@@ -15,6 +51,8 @@ describe("pet performance governor", () => {
     }));
 
     expect(plan).toMatchObject({
+      readabilityCatalogVersion: "doudou.pet-performance-readability-catalog.v0.1",
+      readabilityEmotionId: "calm_idle",
       schemaVersion: "doudou.pet-performance-governor.v0.1",
       motionBudget: "none",
       reactionAct: "none",
@@ -59,6 +97,38 @@ describe("pet performance governor", () => {
       transitionTone: "reaction"
     });
     expect(plan.interaction.interruptibleByPassiveCursor).toBe(true);
+  });
+
+  test("uses injected catalog values as tunable readability corridors", () => {
+    const tunedCatalog = {
+      ...DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG,
+      comfort_soft: {
+        ...DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG.comfort_soft,
+        expression: {
+          ...DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG.comfort_soft.expression,
+          minSwitchIntervalMs: 520
+        },
+        motion: {
+          ...DEFAULT_DOUDOU_PERFORMANCE_READABILITY_CATALOG.comfort_soft.motion,
+          cadenceMs: 1500,
+          maxTranslateXPx: 7
+        }
+      }
+    };
+    const plan = createPetPerformancePlan(envelopeFor({
+      event: { source: "renderer", target: "runtime", type: "quiet_tick" },
+      motionPhase: "recovering",
+      previousState: "watching",
+      state: "waiting"
+    }), { readabilityCatalog: tunedCatalog });
+
+    expect(plan.readabilityEmotionId).toBe("comfort_soft");
+    expect(plan.readabilityCatalogVersion).toBe(PET_PERFORMANCE_READABILITY_CATALOG_SCHEMA_VERSION);
+    expect(plan.motion).toMatchObject({
+      cadenceMs: 1500,
+      maxTranslateXPx: 7
+    });
+    expect(plan.expression.minSwitchIntervalMs).toBe(520);
   });
 
   test("allows force-priority expression replay even when the target emotion is already active", () => {

@@ -491,6 +491,8 @@ function parseSmokeResult(output: string) {
     petPerformanceExpressionPrioritiesObserved?: string[];
     petPerformanceGovernorSchemaVersionsObserved?: string[];
     petPerformanceMotionBudgetsObserved?: string[];
+    petPerformanceReadabilityCatalogVersionsObserved?: string[];
+    petPerformanceReadabilityEmotionIdsObserved?: string[];
     petPerformanceTransitionTonesObserved?: string[];
     petPresentationEnvelopeSchemaVersionsObserved?: string[];
     petPresentationReactionActsObserved?: string[];
